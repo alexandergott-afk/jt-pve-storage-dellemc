@@ -7,6 +7,69 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.4~beta1] - 2026-07-27
+
+Continues the cross-check against the related projects' incident records, and
+against Dell's own PowerStore and PowerVault manuals.
+
+### Fixed
+- **The storage API version is negotiated, not hardcoded.** PVE rejects a
+  plugin claiming a version newer than its own — and every storage of that
+  type then disappears from the node — while claiming an older one makes PVE
+  print `implementing an older storage API` on every load of `PVE::Storage`,
+  which is once per `pvesm` call and per daemon start. PVE 9 raised `APIVER`
+  twice within the 9.1 point releases, so no fixed number is right everywhere.
+  The plugin now claims what the running PVE asks for, capped at the newest
+  version whose changes are actually implemented here.
+- **`volume_resize` handles the `$snapname` parameter** added in storage API
+  14. It was being ignored, so a request to resize a snapshot would have
+  resized the volume it was taken from. It is refused with an explanation.
+- **Deleting a snapshot now releases the clone that was reading it.** This is
+  the `vzdump` snapshot-mode path: PVE takes a snapshot, reads it through
+  `path()` — which needs a clone of the snapshot on the array — and deletes
+  the snapshot as soon as the backup finishes. An array will not delete a
+  snapshot something was cloned from, so every such backup would have failed
+  at cleanup, leaving the clone on the array and its device on this node.
+  Dell's PowerVault guide states the rule plainly: a volume or snapshot with
+  child snapshots cannot be deleted until the children are.
+- **The orphan reaper leaves alone any device that still has a working path.**
+  A disk hot-added to a running VM is briefly missing from the array's
+  listing while the guest already has it open, and a guest's open file
+  descriptor is neither a holder nor a mount, so the in-use check cannot see
+  it. Removing the map under a running guest shows up as I/O errors on a
+  brand-new disk.
+- **Outages are measured in time, not polls.** Once PVE marks a storage
+  inactive it stops asking for a while, so a real outage may produce one or
+  two calls into the plugin — a counter waiting for three consecutive
+  failures would stay silent through exactly the outages worth reporting.
+  `activate_storage` also records the failure it dies on: PVE calls it before
+  `status()` and never reaches `status()` if it dies, which is what an
+  unreachable array does.
+- **`volume_snapshot_info` and `rename_snapshot` are implemented.** The base
+  class versions read a qcow2 file through `filesystem_path`, which this
+  plugin cannot provide, so they failed with a message about a method the
+  caller never asked for.
+- **PowerVault answers the confirmation prompt on rollback.** The CLI
+  Reference documents `rollback volume [prompt yes|no] snapshot <snap> <vol>`;
+  without it the array waits for an answer a script will never give.
+- **PowerFlex reports real snapshot timestamps** instead of showing every
+  snapshot as 1970.
+- **`pve-dell-config-get` bounds its `mount` and `umount`.** It runs during an
+  outage against storage that may be half dead, where an unbounded mount
+  never returns.
+
+### Changed
+- **Rolling back to anything but the most recent snapshot is refused.** Dell's
+  manuals describe what restoring a volume from a snapshot does to the volume
+  and say nothing about the snapshots taken after the restore point. On an
+  array that discards them, PVE would carry on listing restore points that no
+  longer exist. PVE is told which snapshots are in the way, as the built-in
+  plugins with destructive rollbacks do.
+
+### Added
+- `dell-rollback-any-snapshot` (boolean, default off): lifts the restriction
+  above for an operator who has verified the behaviour on their own array.
+
 ## [0.7.3~beta1] - 2026-07-27
 
 Cross-checked against the production incident records of the two related

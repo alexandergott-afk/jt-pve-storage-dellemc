@@ -586,11 +586,19 @@ sub snapshot_delete {
 }
 
 # Replace a volume's contents with one of its snapshots.
+#
+# The CLI Reference gives the syntax as
+#     rollback volume [prompt yes|no] snapshot <snapshot> <volume>
+# and the command "will prompt you to unmount the volume and the snapshot from
+# all initiators before starting the rollback operation". This client is a
+# script, not a person at a terminal: without 'prompt yes' the array is left
+# waiting for an answer that never comes. PVE has already established that the
+# guest is stopped by the time it asks for a rollback.
 sub snapshot_rollback {
     my ($self, $volume, $snapshot, %opts) = @_;
 
-    # NOT VERIFIED: `rollback volume <volume> snapshot <snapshot>`.
-    $self->_cmd(['rollback', 'volume', $volume, 'snapshot', $snapshot], %opts);
+    $self->_cmd(['rollback', 'volume', 'prompt', 'yes',
+                 'snapshot', $snapshot, $volume], %opts);
 
     return 1;
 }

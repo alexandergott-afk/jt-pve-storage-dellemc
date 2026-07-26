@@ -467,9 +467,13 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
         qr{/api/create/snapshots/volumes/pve-me5-100-d0/pve-me5-100-d0-s-x$},
         'create snapshots takes the source and the new name, as documented');
 
+    # 'rollback volume [prompt yes|no] snapshot <snapshot> <volume>', per the
+    # CLI Reference. Without 'prompt yes' the array waits for a confirmation
+    # that a script is never going to give it.
     $api->snapshot_rollback('pve-me5-100-d0', 'pve-me5-100-d0-s-x');
-    like($ua->last_request->uri->path, qr{/api/rollback/volume/pve-me5-100-d0/snapshot/},
-        'rollback names the volume and the snapshot');
+    like($ua->last_request->uri->path,
+        qr{/api/rollback/volume/prompt/yes/snapshot/pve-me5-100-d0-s-x/pve-me5-100-d0$},
+        'rollback answers the confirmation prompt and names snapshot then volume');
 }
 
 # ---------------------------------------------------------------------------

@@ -54,6 +54,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     get_device_usage_details
     list_vendor_multipath_devices
     describe_wwid_state
+    multipath_path_health
 );
 
 # Everything a Dell EMC block family plugin does that is not specific to one
@@ -64,8 +65,39 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # "Abstract interface" below; each dies with the name of the class that failed
 # to implement it.
 
-use constant APIVERSION     => 13;
-use constant MIN_APIVERSION => 9;
+# The storage API version this plugin claims.
+#
+# It has to be negotiated rather than hardcoded, because PVE treats the two
+# directions very differently:
+#
+#   api() > PVE::Storage::APIVER          the plugin is REJECTED and every
+#                                         storage of this type disappears from
+#                                         the node
+#   api() < APIVER - APIAGE               rejected as too old
+#   api() != APIVER (but in range)        loads, and PVE warns "implementing an
+#                                         older storage API" on every single
+#                                         load of PVE::Storage — that is once
+#                                         per pvesm call and per daemon start
+#
+# Proxmox VE 9 raised APIVER twice within the 9.1 point releases (13 -> 14 ->
+# 15), so no single number is right everywhere. Claiming what the running PVE
+# asks for, capped at the highest version whose changes are actually
+# implemented here, is both quiet and safe: api() is only a load-time gate,
+# and PVE calls plugin methods with its own current signatures regardless.
+#
+# Raise APIVERSION_MAX only after implementing that version's delta:
+#   14  volume_resize gained a $snapname parameter (rejected here — this
+#       plugin does not do snapshot-as-volume-chain)
+#   15  get_identity()
+use constant APIVERSION_MAX => 15;
+use constant APIVERSION_MIN => 9;
+
+# What to claim when PVE::Storage is not loaded at all, i.e. perl -c and the
+# unit tests. Any value in range does; this is the version the plugin was
+# first written against.
+use constant APIVERSION_FALLBACK => 13;
+
+use constant MIN_APIVERSION => APIVERSION_MIN;
 
 use constant MULTIPATH_CONF_DIR    => '/etc/multipath/conf.d';
 use constant MULTIPATH_CONF_MARKER => 'dellemc-multipath-config-version: ';
@@ -78,7 +110,18 @@ my $HEALTH     = 'PVE::Storage::Custom::DellEMC::Common::Health';
 # Registration
 # ---------------------------------------------------------------------------
 
-sub api { return APIVERSION }
+sub api {
+    my $pve = eval {
+        PVE::Storage->can('APIVER') ? PVE::Storage::APIVER() : undef;
+    };
+
+    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+$/;
+
+    my $claim = $pve < APIVERSION_MAX ? $pve : APIVERSION_MAX;
+    $claim = APIVERSION_MIN if $claim < APIVERSION_MIN;
+
+    return $claim;
+}
 
 # The shared dell-* options live in Common::Schema, which also owns the rule
 # that exactly one registered class may declare them: PVE dies with
@@ -520,8 +563,14 @@ sub activate_storage {
     # This runs on the pvestatd health path: single attempt, short timeout.
     eval { $class->_array_ping($scfg, status => 1, storeid => $storeid) };
     if ($@) {
+        my $err = $@;
+        # PVE calls activate_storage before status() and never reaches
+        # status() if this dies — which is precisely what an unreachable array
+        # does. Recording only in status() would mean recording nothing at all
+        # for the outages that matter most.
+        eval { $HEALTH->record_status_failure($storeid, $err) };
         die "Cannot reach the array at " . ($scfg->{'dell-portal'} // '?')
-          . " for storage '$storeid': $@";
+          . " for storage '$storeid': $err";
     }
 
     $class->_ensure_multipath_config();
@@ -892,6 +941,24 @@ sub _cleanup_orphaned_devices {
                 next;
             }
 
+            # A device with a working path is not an orphan, whatever the
+            # array's listing said. The listing can lag a create — a disk
+            # hot-added to a running VM is exactly the case — and a guest
+            # holding the device open is not visible as a holder or a mount.
+            # Getting this wrong means dmsetup pulling the map out from under
+            # a running guest, which it sees as I/O errors on a brand-new
+            # disk. Anything other than "every path has failed" is left alone.
+            my $health = eval { multipath_path_health($wwid) };
+            $health = -1 unless defined $health;
+            if ($health != 0) {
+                $class->_warn_once($storeid, "live-$wwid",
+                    "orphan cleanup: $mpath (WWID $wwid) is not on the array"
+                  . " but still has " . ($health > 0 ? "a working path"
+                    : "an unreadable path state") . ", so it is left alone."
+                  . " A device with a live path is in use by something.");
+                next;
+            }
+
             warn "orphan cleanup: removing stale device $mpath (WWID $wwid);"
                . " the array has not reported this volume for $entry->{miss}"
                . " consecutive passes\n";
@@ -1123,6 +1190,12 @@ sub _purge_own_snapshots {
 
         next if $opts{keep_base} && $decoded->{is_base};
         next if $opts{base_only} && !$decoded->{is_base};
+
+        # A snapshot that something was cloned from cannot be deleted, and
+        # Dell's own guidance for PowerVault is explicit: a volume with child
+        # snapshots, or a snapshot with child snapshots, needs the children
+        # removed first.
+        $class->_release_snapshot_clones($scfg, $storeid, $name);
 
         eval { $class->_array_snapshot_delete($scfg, $storeid, $name) };
         if ($@) {
@@ -1438,7 +1511,15 @@ sub volume_size_info {
 }
 
 sub volume_resize {
-    my ($class, $scfg, $storeid, $volname, $size, $running) = @_;
+    my ($class, $scfg, $storeid, $volname, $size, $running, $snapname) = @_;
+
+    # Storage API 14 added $snapname, for storages that keep snapshots as a
+    # chain of volumes. Here a snapshot is an object on the array and has no
+    # size of its own to change, so this has to be refused rather than
+    # silently resizing the volume the snapshot was taken from.
+    die "Resizing a snapshot is not supported by " . $class->type() . ": a"
+      . " snapshot on this array is a point-in-time copy, not a writable"
+      . " layer. Resize the volume '$volname' instead.\n" if $snapname;
 
     my $array_name = $class->_array_volname($storeid, $volname);
 
@@ -1725,7 +1806,10 @@ sub _prepare_snapshot_access {
     # between the create and the record would otherwise leave an object with
     # nothing pointing at it. A record for a clone that was never created is
     # harmless — the reaper finds no such object and drops the entry.
-    eval { $WWID_STATE->track_temp_clone($storeid, $temp) };
+    eval {
+        $WWID_STATE->track_temp_clone($storeid, $temp,
+            { volume => $array_name, snapshot => $snap_name });
+    };
 
     eval { $class->_array_clone($scfg, $storeid, $snap_name, $temp) };
     if ($@) {
@@ -1755,12 +1839,90 @@ sub _cleanup_snapshot_access {
     my $key = "$storeid:$volname:$snapname";
     my $temp = delete $SNAPSHOT_ACCESS{$key} or return;
 
-    my $wwid = eval { $class->_array_get_wwid($scfg, $temp) };
-    eval { cleanup_lun_devices($wwid) } if $wwid;
-    eval { $class->_release_volume($scfg, $storeid, $temp) };
-    eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
+    $class->_remove_temp_clone($scfg, $storeid, $temp);
 
     return;
+}
+
+# Remove one temporary clone, host side first, in the same order free_image
+# uses.
+#
+# Removing it only on the array leaves this node with a multipath map and its
+# sd* paths pointing at a volume that no longer answers, which multipathd then
+# reports as failed paths every couple of seconds forever. The slave list has
+# to be captured before the unmap, because after it the map can lose sight of
+# the paths that made it up.
+sub _remove_temp_clone {
+    my ($class, $scfg, $storeid, $name) = @_;
+
+    return 0 unless defined $name && length $name;
+
+    # Drop any in-process reference first, so nothing hands out a path to a
+    # clone that is being torn down.
+    for my $key (keys %SNAPSHOT_ACCESS) {
+        delete $SNAPSHOT_ACCESS{$key}
+            if ($SNAPSHOT_ACCESS{$key} // '') eq $name;
+    }
+
+    my $wwid = eval { $class->_array_get_wwid($scfg, $name) };
+
+    my @slaves;
+    if ($wwid) {
+        my $mpath = eval { get_multipath_device($wwid) };
+        if ($mpath) {
+            my $list = eval { get_multipath_slaves($mpath) } // [];
+            @slaves = @$list;
+        }
+    }
+
+    my $released = eval { $class->_release_volume($scfg, $storeid, $name); 1 };
+    my $error = $@;
+
+    if ($wwid) {
+        eval { cleanup_lun_devices($wwid) };
+        warn "Device cleanup for the temporary clone '$name' failed: $@" if $@;
+
+        for my $slave (@slaves) {
+            eval { remove_scsi_device($slave) } if -b $slave;
+        }
+    }
+
+    unless ($released) {
+        warn "Could not remove the temporary clone '$name': $error";
+        return 0;
+    }
+
+    eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
+
+    return 1;
+}
+
+# Remove every temporary clone taken from one snapshot.
+#
+# The array will not delete a snapshot that something was cloned from, and PVE
+# asks for exactly that: vzdump in snapshot mode takes a snapshot, reads it
+# through path(), and deletes it the moment the backup finishes. Without this
+# the delete fails every time and the clone is left behind on both sides.
+sub _release_snapshot_clones {
+    my ($class, $scfg, $storeid, $snap_name) = @_;
+
+    my $clones = eval { $WWID_STATE->temp_clones_of_snapshot($storeid, $snap_name) } // [];
+    return 0 unless @$clones;
+
+    my $removed = 0;
+    for my $name (@$clones) {
+        # Ownership gate, as everywhere else.
+        next unless index($name, $class->naming->volume_prefix($storeid)) == 0;
+
+        unless (eval { $class->_array_get_volume($scfg, $name) }) {
+            eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
+            next;
+        }
+
+        $removed += $class->_remove_temp_clone($scfg, $storeid, $name);
+    }
+
+    return $removed;
 }
 
 # Remove temporary snapshot-access clones whose creating process is gone.
@@ -1794,17 +1956,7 @@ sub _reap_temp_clones {
            . " created it is gone. It was used to read a snapshot and nothing"
            . " refers to it now.\n";
 
-        my $wwid = eval { $class->_array_get_wwid($scfg, $name) };
-        eval { cleanup_lun_devices($wwid) } if $wwid;
-
-        eval { $class->_release_volume($scfg, $storeid, $name) };
-        if ($@) {
-            warn "Could not remove the temporary clone '$name': $@";
-            next;
-        }
-
-        eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
-        $removed++;
+        $removed += $class->_remove_temp_clone($scfg, $storeid, $name);
     }
 
     return $removed;
@@ -1865,6 +2017,11 @@ sub volume_snapshot_delete {
         return 1;
     }
 
+    # A clone taken from this snapshot holds it on the array. PVE reads a
+    # snapshot through such a clone and then deletes the snapshot straight
+    # away, so this is the normal path, not an edge case.
+    $class->_release_snapshot_clones($scfg, $storeid, $snap_name);
+
     eval { $class->_array_snapshot_delete($scfg, $storeid, $snap_name) };
     if ($@) {
         my $err = $@;
@@ -1883,6 +2040,66 @@ sub volume_snapshot_delete {
         eval { $class->_delete_config_volume($scfg, $storeid, $vmid, $snap) };
         warn "Config volume cleanup failed (not fatal): $@" if $@;
     }
+
+    return 1;
+}
+
+# May PVE roll this volume back to this snapshot?
+#
+# PVE's own default is "always yes", which is right for a storage whose
+# rollback leaves other snapshots alone. Whether that holds on these arrays is
+# not documented: Dell's PowerStore and PowerVault manuals both describe what
+# a restore does to the volume and say nothing about the snapshots taken after
+# the one being restored. On an array that discards them, PVE would carry on
+# listing restore points that no longer exist — and nobody finds out until the
+# day they are needed.
+#
+# So the unknown is treated as dangerous, the way the built-in plugins whose
+# rollback IS destructive treat it: only the most recent snapshot may be
+# rolled back to, and everything newer is reported to PVE as a blocker so the
+# operator sees exactly what is in the way. An operator who has verified their
+# own array can lift this with 'dell-rollback-any-snapshot 1'.
+#
+# A snapshot whose creation time cannot be read counts as blocking. Being
+# wrong in that direction costs an inconvenience; being wrong in the other
+# direction destroys a restore point silently.
+sub volume_rollback_is_possible {
+    my ($class, $scfg, $storeid, $volname, $snap, $blockers) = @_;
+
+    $blockers //= [];   # not guaranteed to be set by the caller
+
+    my $snapshots = $class->volume_snapshot_list($scfg, $storeid, $volname);
+
+    my ($target) = grep { ($_->{name} // '') eq $snap } @$snapshots;
+    die "can't rollback, snapshot '$snap' does not exist on"
+      . " '$storeid:$volname'\n" unless $target;
+
+    return 1 if $class->_opt($scfg, 'rollback-any-snapshot', 0);
+
+    my $target_time = $target->{ctime} // 0;
+
+    for my $other (@$snapshots) {
+        my $name = $other->{name} // next;
+        next if $name eq $snap;
+
+        my $time = $other->{ctime} // 0;
+
+        # Newer, the same second, or unreadable on either side: cannot be
+        # shown to be older, so it counts against the rollback.
+        push @$blockers, $name
+            if !$time || !$target_time || $time >= $target_time;
+    }
+
+    die "Cannot roll back '$storeid:$volname' to '$snap': it is not the most"
+      . " recent snapshot, and these would be at risk: "
+      . join(', ', @$blockers) . ".\n"
+      . "  Dell does not document what a restore does to snapshots taken"
+      . " after the one being restored, so this plugin refuses rather than"
+      . " let PVE keep listing restore points the array may have discarded.\n"
+      . "  Roll back to the most recent snapshot, or delete the newer ones"
+      . " first. If you have verified the behaviour on your array, set"
+      . " 'dell-rollback-any-snapshot 1' on storage '$storeid'.\n"
+        if @$blockers;
 
     return 1;
 }
@@ -1930,6 +2147,40 @@ sub volume_snapshot_rollback {
     }
 
     return 1;
+}
+
+# PVE's base implementation reads the snapshot list out of a qcow2 file via
+# filesystem_path(), which this plugin cannot provide. Left alone it would
+# fail with a message about filesystem_path, which says nothing about what the
+# caller was trying to do. The array knows the answer, so give it.
+#
+# The shape is the one PVE expects from a storage that does not keep snapshots
+# as a chain of volumes: a hash keyed by snapshot name. 'current' is the live
+# volume and deliberately has no parent — there is no backing chain here.
+sub volume_snapshot_info {
+    my ($class, $scfg, $storeid, $volname) = @_;
+
+    my $info = { current => {} };
+
+    my $snaps = eval { $class->volume_snapshot_list($scfg, $storeid, $volname) } // [];
+    for my $snap (@$snaps) {
+        my $name = $snap->{name} // next;
+        $info->{$name} = { timestamp => $snap->{ctime} // 0 };
+    }
+
+    return $info;
+}
+
+# Also base-implemented through filesystem_path, and also unreachable here.
+# PVE only calls it for storages that keep snapshots as a chain of volumes.
+sub rename_snapshot {
+    my ($class, $scfg, $storeid, $volname, $source_snap, $target_snap) = @_;
+
+    die "Renaming a snapshot is not supported by " . $class->type() . ": the"
+      . " snapshot's name on the array is derived from the volume it belongs"
+      . " to, and PVE only renames snapshots for storages that keep them as a"
+      . " chain of volumes. Create a new snapshot and delete the old one"
+      . " instead.\n";
 }
 
 sub volume_snapshot_list {

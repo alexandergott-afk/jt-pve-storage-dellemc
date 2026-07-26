@@ -109,6 +109,18 @@ sub common_properties {
             maximum => 300,
             default => 30,
         },
+        'dell-rollback-any-snapshot' => {
+            description => "Allow rolling back to a snapshot that is not the"
+                . " most recent one. Off by default: Dell does not document"
+                . " what a restore does to the snapshots taken after the one"
+                . " being restored, and on an array that discards them PVE"
+                . " would go on listing restore points that no longer exist."
+                . " Turn this on only if you have verified the behaviour on"
+                . " your own array and model.",
+            type => 'boolean',
+            default => 0,
+            optional => 1,
+        },
         'dell-config-backup' => {
             description => "Write the VM configuration to a small volume"
                 . " beside each snapshot, so it can be recovered when"
@@ -163,6 +175,7 @@ sub common_options {
         'dell-portal-probe-timeout'  => { optional => 1 },
         'dell-status-timeout'        => { optional => 1 },
         'dell-activate-deadline'     => { optional => 1 },
+        'dell-rollback-any-snapshot' => { optional => 1 },
         'dell-config-backup'         => { optional => 1 },
         'dell-config-backup-timeout' => { optional => 1 },
         'dell-rescan-interval'       => { optional => 1 },

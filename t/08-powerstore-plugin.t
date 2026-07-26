@@ -233,4 +233,42 @@ ok($P->properties()->{'dell-config-backup'}, 'the option is declared');
         'a storage with no clones asks the array nothing');
 }
 
+# ---------------------------------------------------------------------------
+# Storage API version negotiation
+#
+# PVE rejects a plugin that claims a version higher than its own — and the
+# storage then disappears from the node, taking every guest on it with it.
+# Claiming lower than PVE's is accepted but makes PVE warn on every single
+# load of PVE::Storage, which is once per pvesm call. PVE 9 raised APIVER
+# twice inside the 9.1 point releases, so a hardcoded number is wrong
+# somewhere by construction.
+# ---------------------------------------------------------------------------
+
+SKIP: {
+    skip 'PVE::Storage is not available', 4
+        unless eval { require PVE::Storage; defined &PVE::Storage::APIVER };
+
+    my $apiver = PVE::Storage::APIVER();
+    my $apiage = PVE::Storage::APIAGE();
+    my $claim  = $P->api();
+
+    cmp_ok($claim, '<=', $apiver,
+        'never claims a version newer than this PVE (which would be rejected)');
+    cmp_ok($claim, '>=', $apiver - $apiage,
+        'and never one this PVE considers too old');
+
+    # Anything below PVE's own version means a warning on every load, so on a
+    # PVE we have implemented up to, the claim should match exactly.
+    my $max = PVE::Storage::Custom::DellEMC::Common::BlockBase::APIVERSION_MAX();
+    if ($apiver <= $max) {
+        is($claim, $apiver, 'claims exactly what this PVE asks for');
+    } else {
+        is($claim, $max, 'claims the newest version actually implemented');
+    }
+
+    is(PVE::Storage::Custom::DellPowerFlexPlugin->api(), $claim,
+        'every family negotiates the same way')
+        if eval { require PVE::Storage::Custom::DellPowerFlexPlugin; 1 };
+}
+
 done_testing();

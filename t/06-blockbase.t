@@ -936,4 +936,209 @@ SKIP: {
         'a record for an object the array does not have is dropped');
 }
 
+# ---------------------------------------------------------------------------
+# Deleting a snapshot releases the clone that was reading it
+#
+# This is the vzdump-in-snapshot-mode path, not an edge case: PVE takes a
+# snapshot, reads it through path($volname, $snap) — which needs a clone of
+# the snapshot on the array — and deletes the snapshot the moment the backup
+# finishes. An array will not delete a snapshot something was cloned from, so
+# without this every such backup fails at cleanup and leaves the clone behind
+# on the array and its device on the host.
+# ---------------------------------------------------------------------------
+
+{
+    my $state_dir = "$TMP/snapclones";
+    mkdir $state_dir;
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::state_dir = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::lock_dir  = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::cleanup_lun_devices = sub { 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_multipath_device = sub { undef };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_multipath_slaves = sub { [] };
+
+    my $W = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+
+    Test::Plugin->reset_state();
+
+    my $vol  = 'pve-t1-1699-disk0';
+    my $snap = "$vol.pve-snap-vzdump";
+
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+    $Test::Plugin::SNAPSHOTS{$snap} = { volume => $vol, ctime => 1 };
+
+    # path($volname, $snap) makes the clone.
+    my ($temp, $fresh) = Test::Plugin->_prepare_snapshot_access(
+        $scfg, 't1', 'vm-1699-disk-0', 'vzdump');
+
+    ok($fresh, 'reading a snapshot creates a clone of it');
+    ok($Test::Plugin::VOLUMES{$temp}, '... which exists on the array');
+    is_deeply($W->temp_clones_of_snapshot('t1', $snap), [$temp],
+        '... and is recorded against the snapshot it came from');
+
+    # vzdump now deletes the snapshot.
+    Test::Plugin->volume_snapshot_delete($scfg, 't1', 'vm-1699-disk-0', 'vzdump');
+
+    ok(!$Test::Plugin::VOLUMES{$temp},
+        'deleting the snapshot removes the clone that was reading it');
+    ok(!$Test::Plugin::SNAPSHOTS{$snap}, '... and the snapshot itself is gone');
+    is_deeply($W->temp_clones_of_snapshot('t1', $snap), [],
+        '... leaving no record behind');
+
+    # The clone is unmapped before it is deleted, as everywhere else.
+    my $calls = join(' | ', @{ Test::Plugin->calls() });
+    my @order = @{ Test::Plugin->calls() };
+    my ($unmap_idx) = grep { $order[$_] =~ /^unmap \Q$temp\E/ } 0 .. $#order;
+    my ($del_idx)   = grep { $order[$_] eq "delete $temp" } 0 .. $#order;
+    ok(defined $unmap_idx && defined $del_idx && $unmap_idx < $del_idx,
+        'the clone is unmapped before it is deleted');
+
+    # A second delete of the same snapshot must stay quiet, not fail.
+    my $again = eval { Test::Plugin->volume_snapshot_delete(
+        $scfg, 't1', 'vm-1699-disk-0', 'vzdump'); 1 };
+    ok($again, 'deleting a snapshot that is already gone is not an error');
+}
+
+# ---------------------------------------------------------------------------
+# The reaper never touches a device that still has a working path
+#
+# A disk hot-added to a running VM is briefly absent from the array's bulk
+# listing while the guest already has it open. QEMU's open file descriptor is
+# not a holder and not a mount, so the in-use check does not see it. Pulling
+# the map out from under the guest gives it I/O errors on a brand-new disk.
+# ---------------------------------------------------------------------------
+
+{
+    my $state_dir = "$TMP/pathhealth";
+    mkdir $state_dir;
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::state_dir = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::lock_dir  = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::list_vendor_multipath_devices = sub { [] };
+    # A real block device node, because the reaper only reaches the health
+    # gate for a device that exists. Nothing here touches it: every call that
+    # would is replaced below.
+    my ($real_block) = grep { -b $_ }
+        map { "/dev/$_" }
+        do { opendir(my $dh, '/sys/block') or last; sort grep { !/^\./ } readdir($dh) };
+
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_multipath_device =
+        sub { $real_block };
+    # Not a holder, not a mount: exactly what a running guest looks like.
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_device_in_use = sub { 0 };
+
+    my $W = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $gone = '3600abc000000dead';
+
+    my @flushed;
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::cleanup_lun_devices =
+        sub { push @flushed, $_[0]; 1 };
+
+    # -b on a path that does not exist is false, so the health gate is only
+    # reached when the device looks real. Pretend it does.
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::multipath_path_health = sub { 1 };
+
+    Test::Plugin->reset_state();
+
+    SKIP: {
+        skip 'no block device available to stand in for a multipath map', 3
+            unless defined $real_block;
+
+    # Tracked, long past the grace period, and missing from the array.
+    $W->track_wwid('t1', $gone);
+    my $state = $W->read_state('t1');
+    $state->{$gone} = { first_seen => time() - 7200, miss => 5 };
+    $W->write_state('t1', $state);
+
+    Test::Plugin->_cleanup_orphaned_devices('t1', $scfg);
+
+    is_deeply(\@flushed, [],
+        'a device that still has a path is never flushed');
+    ok($W->is_tracked('t1', $gone),
+        'and it stays tracked so a later pass can reconsider it');
+
+    # An unreadable path state is treated the same way as a live one.
+    {
+        local *PVE::Storage::Custom::DellEMC::Common::BlockBase::multipath_path_health = sub { -1 };
+        Test::Plugin->_cleanup_orphaned_devices('t1', $scfg);
+        is_deeply(\@flushed, [],
+            'nor is one whose path state could not be read');
+    }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Rolling back to anything but the most recent snapshot
+#
+# Dell documents what a restore does to the volume and says nothing about the
+# snapshots taken after the one being restored. PVE's default is to allow any
+# rollback, so on an array that discards them PVE would go on listing restore
+# points that are gone. The unknown is treated as dangerous, and the operator
+# who has verified their own array can lift it.
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-old"} = { volume => $vol, ctime => 1000 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-mid"} = { volume => $vol, ctime => 2000 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-new"} = { volume => $vol, ctime => 3000 };
+
+    my $blockers = [];
+    my $ok = eval {
+        Test::Plugin->volume_rollback_is_possible($scfg, 't1', 'vm-100-disk-0',
+            'new', $blockers);
+    };
+    is($ok, 1, 'rolling back to the most recent snapshot is allowed');
+    is_deeply($blockers, [], 'with nothing in the way');
+
+    $blockers = [];
+    $ok = eval {
+        Test::Plugin->volume_rollback_is_possible($scfg, 't1', 'vm-100-disk-0',
+            'old', $blockers);
+    };
+    ok(!$ok, 'rolling back past newer snapshots is refused');
+    is_deeply([sort @$blockers], ['mid', 'new'],
+        'and PVE is told exactly which snapshots are in the way');
+    like($@, qr/dell-rollback-any-snapshot/,
+        'the message says how to lift it after verifying the array');
+
+    # The escape hatch.
+    $blockers = [];
+    $ok = eval {
+        Test::Plugin->volume_rollback_is_possible(
+            { %$scfg, 'dell-rollback-any-snapshot' => 1 },
+            't1', 'vm-100-disk-0', 'old', $blockers);
+    };
+    is($ok, 1, 'an operator who has verified their array can allow it');
+
+    # A snapshot the array does not have.
+    ok(!eval {
+        Test::Plugin->volume_rollback_is_possible($scfg, 't1', 'vm-100-disk-0',
+            'nosuch', []);
+    }, 'a snapshot that does not exist is refused');
+    like($@, qr/does not exist/, '... saying so');
+
+    # Unreadable timestamps must block, not be assumed to be old.
+    Test::Plugin->reset_state();
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-a"} = { volume => $vol, ctime => 0 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-b"} = { volume => $vol, ctime => 0 };
+
+    $blockers = [];
+    ok(!eval {
+        Test::Plugin->volume_rollback_is_possible($scfg, 't1', 'vm-100-disk-0',
+            'a', $blockers);
+    }, 'a snapshot whose age cannot be read counts against the rollback');
+    is_deeply($blockers, ['b'], 'and is reported as the blocker');
+}
+
 done_testing();

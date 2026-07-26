@@ -248,16 +248,48 @@ sub _write_temp_clones {
     return 1;
 }
 
+# $info records what the clone was made from, so a later caller can find the
+# clones that belong to one snapshot. The name cannot carry that: PowerVault
+# allows 32 bytes for a whole object name and PowerFlex 31.
 sub track_temp_clone {
-    my ($class, $storeid, $name) = @_;
+    my ($class, $storeid, $name, $info) = @_;
 
     return 0 unless defined $name && length $name;
+    $info = {} unless ref($info) eq 'HASH';
 
     return $class->with_lock($storeid, sub {
         my $state = $class->_read_temp_clones($storeid);
-        $state->{$name} = { pid => $$, created => time() };
+        $state->{$name} = {
+            pid      => $$,
+            created  => time(),
+            volume   => $info->{volume},
+            snapshot => $info->{snapshot},
+        };
         return $class->_write_temp_clones($storeid, $state);
     });
+}
+
+# Temporary clones taken from one snapshot, whichever process made them.
+#
+# A clone of a snapshot keeps the array from deleting that snapshot, so the
+# names have to be findable by snapshot rather than only by the process that
+# created them.
+sub temp_clones_of_snapshot {
+    my ($class, $storeid, $snapshot) = @_;
+
+    return [] unless defined $snapshot && length $snapshot;
+
+    my $state = $class->_read_temp_clones($storeid);
+
+    my @names;
+    for my $name (sort keys %$state) {
+        my $entry = $state->{$name};
+        next unless ref($entry) eq 'HASH';
+        next unless defined $entry->{snapshot};
+        push @names, $name if $entry->{snapshot} eq $snapshot;
+    }
+
+    return \@names;
 }
 
 sub untrack_temp_clone {

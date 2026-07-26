@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.3~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.4~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -861,7 +861,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
             <tbody>
                 <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
                 <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-                <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td>
+                    <td colspan="3"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
                 <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
                 <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
                 <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
@@ -980,6 +981,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.4~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The storage API version is negotiated rather than hardcoded, deleting a snapshot releases the clone that was reading it (the vzdump snapshot-mode path), the orphan reaper leaves alone any device that still has a working path, and rolling back past newer snapshots is refused.</span>
+            <span class="lang-zh">儲存 API 版本改為協商而非寫死；刪除快照時會先釋放正在讀取它的暫時複製（即 vzdump 快照模式的流程）；殘留裝置清理不再碰任何仍有可用路徑的裝置；並拒絕跨過較新快照的還原。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.3~beta1</div>

@@ -19,6 +19,7 @@ English: [CONFIGURATION.md](CONFIGURATION.md)
 | `dell-portal-probe-timeout` | 0–30 | 否 | `2` | 每個 iSCSI portal 的 TCP 預檢秒數，0 表示停用 |
 | `dell-status-timeout` | 2–60 | 否 | `5` | pvestatd 健康路徑的 REST 逾時 |
 | `dell-activate-deadline` | 0–300 | 否 | `30` | portal 登入迴圈的總時間預算，0 表示停用 |
+| `dell-rollback-any-snapshot` | 布林 | 否 | `0` | 允許還原到「不是最新」的快照。預設關閉：Dell 沒有說明還原之後，那些在目標快照之後才建立的快照會怎麼樣；若陣列會把它們清掉，PVE 仍會繼續列出已經不存在的還原點 |
 | `dell-config-backup` | 布林 | 否 | `1` | 每次快照時，把 VM 設定另外寫進一個 1 MB 的 volume。每次對 VM 做快照都會多用掉一個 volume，因此當陣列的 volume 數量是瓶頸時請關閉它。PowerVault ME 不提供此功能，設了也不會生效 |
 | `dell-config-backup-timeout` | 5–60 | 否 | `15` | 等待 config 備份卷裝置的秒數 |
 | `dell-rescan-interval` | 0–3600 | 否 | `300` | 週期性 SAN 重新掃描的最小間隔，0 表示每次都掃 |

@@ -31,9 +31,16 @@ use PVE::Storage::Custom::DellEMC::Common::WwidState;
 #   journalctl -t pvestatd | grep dellemc
 
 use constant {
-    # Consecutive failed polls before an outage is declared. At the ~10s poll
-    # interval this is roughly half a minute of being unreachable.
-    STATUS_FAIL_THRESHOLD => 3,
+    # How long the array has to have been failing before an outage is
+    # declared, in seconds.
+    #
+    # Deliberately a duration and not a count of consecutive failed polls.
+    # Once PVE has marked a storage inactive it stops asking for a while, so a
+    # real outage may produce only one or two calls into this plugin — a
+    # counter that needs three would never fire, and the quieter the outage
+    # the less likely it is to be reported. Wall-clock time is what the
+    # operator experiences and what this can actually observe.
+    STATUS_FAIL_SECONDS => 30,
 
     # While still down, repeat the outage line at most this often.
     OUTAGE_REEMIT_SECONDS => 30,
@@ -124,9 +131,15 @@ sub write_state {
     return 1;
 }
 
-# Count a failed status poll. Reports an outage once the array has missed
-# STATUS_FAIL_THRESHOLD polls in a row, then repeats at most every
-# OUTAGE_REEMIT_SECONDS while it stays down.
+# Record that the array could not be reached.
+#
+# Called from both the status path and activate_storage: PVE calls
+# activate_storage first and does not reach status() if it dies, which is
+# exactly what happens when the array is unreachable. Recording only in
+# status() means recording nothing at all during the outages that matter.
+#
+# An outage is declared once the failures have been going on for
+# STATUS_FAIL_SECONDS, then repeated at most every OUTAGE_REEMIT_SECONDS.
 #
 # Returns 1 if the storage is currently considered down.
 sub record_status_failure {
@@ -140,13 +153,21 @@ sub record_status_failure {
 
     $state->{fail_count} = ($state->{fail_count} // 0) + 1;
 
-    if ($state->{fail_count} >= STATUS_FAIL_THRESHOLD) {
+    # A clock that went backwards must not push the start of the outage into
+    # the future, where it would never be old enough to report.
+    my $first = $state->{first_failure};
+    $first = $now if !defined($first) || $first > $now;
+    $state->{first_failure} = $first;
+
+    my $duration = $now - $first;
+
+    if ($duration >= STATUS_FAIL_SECONDS) {
         if (!$state->{down}
             || $class->_due($state->{last_outage_emit}, $now, OUTAGE_REEMIT_SECONDS)) {
             $class->log_event(sprintf(
                 "dellemc: [ERROR] storage '%s' OUTAGE - the array API has been"
-              . " unreachable for %d consecutive status polls. Last error: %s",
-                $storeid, $state->{fail_count}, $reason));
+              . " unreachable for %ds (%d failed attempt(s)). Last error: %s",
+                $storeid, $duration, $state->{fail_count}, $reason));
             $state->{last_outage_emit} = $now;
         }
         $state->{down} = 1;
@@ -170,13 +191,16 @@ sub record_status_ok {
     my $state = $class->read_state($storeid);
 
     if ($state->{down}) {
+        my $outage = defined $state->{first_failure}
+            ? $now - $state->{first_failure} : 0;
         $class->log_event(sprintf(
             "dellemc: [INFO] storage '%s' RECOVERED - the array API is reachable"
-          . " again.", $storeid));
+          . " again after %ds.", $storeid, $outage > 0 ? $outage : 0));
     }
 
-    $state->{fail_count} = 0;
-    $state->{down}       = 0;
+    $state->{fail_count}    = 0;
+    $state->{down}          = 0;
+    delete $state->{first_failure};
 
     if ($total && $total > 0) {
         my $pct = ($used // 0) / $total * 100;

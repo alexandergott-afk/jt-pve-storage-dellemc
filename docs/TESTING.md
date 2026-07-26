@@ -23,6 +23,7 @@ version it was observed on.
 | LUN id assignment behaviour | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | Multipath device settings | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
 | Fibre Channel data path | everywhere | NOT VERIFIED ON HARDWARE |
+| What a restore does to snapshots taken after the restore point | `DellPowerStorePlugin.pm`, `DellPowerVaultPlugin.pm`, `DellPowerFlexPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | WWPN spelling in a host object (bare hex vs colon-separated) | `DellPowerStorePlugin.pm`, `DellPowerVaultPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | Thin-clone parent field used to report linked clones (`protection_data.source_id`, `ancestorVolumeId`) | `DellPowerStorePlugin.pm`, `DellPowerFlexPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | NVMe-TCP | — | out of scope for 1.0 |

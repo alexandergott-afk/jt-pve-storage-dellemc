@@ -32,7 +32,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.3~beta1';
+my $VERSION = '0.7.4~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -218,6 +218,44 @@ my $api = PVE::Storage::Custom::DellEMC::PowerStore::API->new(
     type       => 'dellpowerstore',
 );
 
+# Run a command with a bound on how long it may block, and return its exit
+# code (-1 if it never finished). This tool runs during an outage, against
+# storage that may be half dead: an unbounded mount of a device whose paths
+# have gone away never returns, and the operator is left with no output and no
+# way to tell what is happening.
+sub run_bounded {
+    my ($cmd, $timeout) = @_;
+
+    $timeout ||= 30;
+
+    my $pid = fork();
+    unless (defined $pid) {
+        print STDERR "Warning: cannot fork to run @$cmd: $!\n";
+        return -1;
+    }
+
+    if ($pid == 0) {
+        # Child: replace itself with the command.
+        exec(@$cmd) or POSIX::_exit(127);
+    }
+
+    my $deadline = time() + $timeout;
+    while (time() < $deadline) {
+        my $reaped = waitpid($pid, POSIX::WNOHANG());
+        return $? >> 8 if $reaped == $pid;
+        return -1 if $reaped < 0;
+        select(undef, undef, undef, 0.1);
+    }
+
+    print STDERR "Warning: '@$cmd' did not finish within ${timeout}s\n";
+    kill('TERM', $pid);
+    select(undef, undef, undef, 0.5);
+    kill('KILL', $pid);
+    waitpid($pid, POSIX::WNOHANG());
+
+    return -1;
+}
+
 sub nodename {
     # /etc/hostname rather than PVE::INotify: this must work without PVE.
     if (open(my $fh, '<', '/etc/hostname')) {
@@ -370,7 +408,8 @@ my $mounted;
 
 sub cleanup {
     if ($mounted) {
-        system('/bin/umount', $mounted) == 0
+        run_bounded(['/bin/umount', $mounted], 30) == 0
+            or run_bounded(['/bin/umount', '-l', $mounted], 15) == 0
             or print STDERR "Warning: could not unmount $mounted\n";
         rmdir($mounted);
         $mounted = undef;
@@ -408,9 +447,11 @@ my $ok = eval {
 
     # Read-only, and noload so a dirty journal does not stop the mount: the
     # volume was written once and never touched again.
-    system('/bin/mount', '-o', 'ro,noload', $device, $mounted) == 0
-        or system('/bin/mount', '-o', 'ro', $device, $mounted) == 0
-        or die "Could not mount $device: $!\n";
+    run_bounded(['/bin/mount', '-o', 'ro,noload', $device, $mounted], 60) == 0
+        or run_bounded(['/bin/mount', '-o', 'ro', $device, $mounted], 60) == 0
+        or die "Could not mount $device. The volume should hold a small ext4\n"
+             . "  filesystem written by the plugin; if it does not, the backup\n"
+             . "  never completed for this snapshot.\n";
 
     my $path = "$mounted/${vmid}.conf";
     open(my $fh, '<', $path) or die "The volume holds no ${vmid}.conf: $!\n";

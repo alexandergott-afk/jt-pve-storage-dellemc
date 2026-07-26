@@ -191,30 +191,62 @@ is($S->with_lock('ps1', sub { return 'value' }), 'value', 'with_lock returns the
 
 reset_events();
 
+# An outage is a duration, not a number of polls. Once PVE has marked a
+# storage inactive it stops asking for a while, so a real outage can produce
+# only one or two calls into the plugin — a counter that waits for three
+# consecutive failures would stay silent through exactly the outages that
+# matter, and the quieter the outage the less likely it is to be reported.
+
 is($H->record_status_failure('ps1', 'connection refused', now => 1000), 0,
-    'one failed poll is not an outage');
+    'the first failure is not yet an outage');
 is(scalar @{ events() }, 0, 'and says nothing');
 
-is($H->record_status_failure('ps1', 'connection refused', now => 1001), 0,
-    'two failed polls are still not an outage');
+is($H->record_status_failure('ps1', 'connection refused', now => 1010), 0,
+    'nor is one ten seconds in');
 is(scalar @{ events() }, 0, 'still silent');
 
-is($H->record_status_failure('ps1', 'connection refused', now => 1002), 1,
-    'the third consecutive failure is an outage');
+# PVE goes quiet here and comes back a minute later. Two calls in total, and
+# the outage must still be reported.
+is($H->record_status_failure('ps1', 'connection refused', now => 1070), 1,
+    'an outage is declared once it has lasted long enough, however few polls');
 is(scalar @{ events() }, 1, 'which is reported once');
 like(events()->[0], qr/\[ERROR\].*OUTAGE/, 'reported at ERROR severity');
 like(events()->[0], qr/connection refused/, 'including the underlying error');
 like(events()->[0], qr/'ps1'/, 'and naming the storage');
+like(events()->[0], qr/\b70s\b/, 'and how long it has been going on');
 is($H->is_down('ps1'), 1, 'storage is marked down');
 is($H->fail_count('ps1'), 3, 'failure count kept');
 
 # While still down, the message must not repeat on every poll.
 reset_events();
-$H->record_status_failure('ps1', 'connection refused', now => 1010);
+$H->record_status_failure('ps1', 'connection refused', now => 1080);
 is(scalar @{ events() }, 0, 'no repeat within the re-emit window');
 
-$H->record_status_failure('ps1', 'connection refused', now => 1040);
+$H->record_status_failure('ps1', 'connection refused', now => 1120);
 is(scalar @{ events() }, 1, 'repeated once the window has passed');
+
+# A single failure that is never followed up must not be reported: one dropped
+# packet is not an outage.
+{
+    $H->record_status_ok('quiet1', 1000, 100, now => 2000);
+    reset_events();
+    is($H->record_status_failure('quiet1', 'timeout', now => 2001), 0,
+        'a lone failure is not an outage');
+    is(scalar @{ events() }, 0, 'and is not reported');
+    $H->record_status_ok('quiet1', 1000, 100, now => 2005);
+    is(scalar @{ events() }, 0, 'recovering from it is not reported either');
+}
+
+# A clock correction that moves time backwards must not park the start of the
+# outage in the future, where it could never become old enough to report.
+{
+    reset_events();
+    $H->record_status_failure('skew1', 'timeout', now => 5000);
+    $H->record_status_failure('skew1', 'timeout', now => 4000);
+    is(scalar @{ events() }, 0, 'the backwards step itself reports nothing');
+    is($H->record_status_failure('skew1', 'timeout', now => 4100), 1,
+        'and the outage is still declared from the corrected clock');
+}
 
 # Recovery
 reset_events();

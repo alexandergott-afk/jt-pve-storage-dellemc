@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.3~beta1). It has never been run against a
+> **This is a beta release (0.7.4~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.3~beta1 — three storage types are code complete, and
+> **Version 0.7.4~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
@@ -289,6 +289,14 @@ First-time setup: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
   as `alloc_image` plus a block-by-block `qemu-img` copy and never calls the
   plugin's `clone_image`. This is a PVE architectural decision, not a plugin
   defect. Use Linked Clone to get the array's thin clone.
+- **Rollback is limited to the most recent snapshot.** Dell's manuals
+  describe what restoring a volume from a snapshot does to the volume and
+  say nothing about the snapshots taken after the one being restored. On an
+  array that discards them, PVE would carry on listing restore points that
+  no longer exist, and nobody would find out until the day one was needed.
+  So a rollback that is not to the newest snapshot is refused, and PVE is
+  told which snapshots are in the way. Delete them first, or — if you have
+  verified the behaviour on your own array — set `dell-rollback-any-snapshot 1`.
 - **Volumes cannot be shrunk.** Only growth is supported; a shrink request is
   rejected rather than silently truncating a guest filesystem.
 - **The VM config backup volume is not offered on PowerVault ME.** On

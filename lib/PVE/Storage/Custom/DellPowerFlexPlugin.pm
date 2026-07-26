@@ -32,7 +32,13 @@ use PVE::Storage::Custom::DellEMC::PowerFlex::Host qw(
 # What is shared: the storage.cfg schema (Common::Schema), the REST
 # transport, the naming rules and the health reporting.
 
-use constant APIVERSION => 13;
+# Negotiated, not hardcoded: PVE rejects a plugin claiming more than its own
+# APIVER (the storage then vanishes from the node) and warns on every load
+# when the claim is lower. PVE 9 raised APIVER twice inside the 9.1 point
+# releases. See the long note in Common::BlockBase.
+use constant APIVERSION_MAX      => 15;
+use constant APIVERSION_MIN      => 9;
+use constant APIVERSION_FALLBACK => 13;
 
 push @PVE::Storage::Plugin::SHARED_STORAGE, 'dellpowerflex';
 
@@ -41,7 +47,18 @@ my $HEALTH = 'PVE::Storage::Custom::DellEMC::Common::Health';
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerFlex::Naming';
 my $HOST   = 'PVE::Storage::Custom::DellEMC::PowerFlex::Host';
 
-sub api { return APIVERSION }
+sub api {
+    my $pve = eval {
+        PVE::Storage->can('APIVER') ? PVE::Storage::APIVER() : undef;
+    };
+
+    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+$/;
+
+    my $claim = $pve < APIVERSION_MAX ? $pve : APIVERSION_MAX;
+    $claim = APIVERSION_MIN if $claim < APIVERSION_MIN;
+
+    return $claim;
+}
 sub type { return 'dellpowerflex' }
 
 sub plugindata {
@@ -333,6 +350,9 @@ sub _list_own_volumes {
             name => $name,
             size => $class->_api($scfg, %opts)->volume_size($row),
             used => 0,
+            # Epoch seconds. PVE renders this as the snapshot's date, so a
+            # missing value shows every snapshot as 1970.
+            ctime => $row->{creationTime} // 0,
             # The volume a snapshot was taken from. For a PVE linked clone
             # that is the template marker snapshot.
             ancestor => $row->{ancestorVolumeId},
@@ -418,8 +438,14 @@ sub activate_storage {
     my $api = $class->_api($scfg, status => 1, storeid => $storeid);
 
     eval { $api->system_id(status => 1) };
-    die "Cannot reach the PowerFlex API at " . ($scfg->{'dell-portal'} // '?')
-      . " for storage '$storeid': $@" if $@;
+    if ($@) {
+        my $err = $@;
+        # PVE never reaches status() if this dies, so the outage has to be
+        # recorded here or it is not recorded at all.
+        eval { $HEALTH->record_status_failure($storeid, $err) };
+        die "Cannot reach the PowerFlex API at " . ($scfg->{'dell-portal'} // '?')
+          . " for storage '$storeid': $err";
+    }
 
     # Fail early if the configured pool is not there; every later operation
     # would fail with something less obvious.
@@ -749,7 +775,12 @@ sub volume_size_info {
 }
 
 sub volume_resize {
-    my ($class, $scfg, $storeid, $volname, $size, $running) = @_;
+    my ($class, $scfg, $storeid, $volname, $size, $running, $snapname) = @_;
+
+    # Storage API 14 added $snapname; a PowerFlex snapshot is a volume in its
+    # own right and resizing one is not what the caller means here.
+    die "Resizing a snapshot is not supported by dellpowerflex. Resize the"
+      . " volume '$volname' instead.\n" if $snapname;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -968,6 +999,49 @@ sub volume_snapshot_delete {
     return 1;
 }
 
+# See the long note on the same method in Common::BlockBase: what PowerFlex's
+# overwrite-volume-content does to snapshots taken after the source is not
+# documented, so the unknown is treated as dangerous and only the most recent
+# snapshot may be rolled back to.
+sub volume_rollback_is_possible {
+    my ($class, $scfg, $storeid, $volname, $snap, $blockers) = @_;
+
+    $blockers //= [];
+
+    my $snapshots = $class->volume_snapshot_list($scfg, $storeid, $volname);
+
+    my ($target) = grep { ($_->{name} // '') eq $snap } @$snapshots;
+    die "can't rollback, snapshot '$snap' does not exist on"
+      . " '$storeid:$volname'\n" unless $target;
+
+    return 1 if $scfg->{'dell-rollback-any-snapshot'};
+
+    my $target_time = $target->{ctime} // 0;
+
+    for my $other (@$snapshots) {
+        my $name = $other->{name} // next;
+        next if $name eq $snap;
+
+        my $time = $other->{ctime} // 0;
+        push @$blockers, $name
+            if !$time || !$target_time || $time >= $target_time;
+    }
+
+    die "Cannot roll back '$storeid:$volname' to '$snap': it is not the most"
+      . " recent snapshot, and these would be at risk: "
+      . join(', ', @$blockers) . ".\n"
+      . "  Dell does not document what overwriting a volume from a snapshot"
+      . " does to the snapshots taken after it, so this plugin refuses rather"
+      . " than let PVE keep listing restore points the array may have"
+      . " discarded.\n"
+      . "  Roll back to the most recent snapshot, or delete the newer ones"
+      . " first. If you have verified the behaviour on your array, set"
+      . " 'dell-rollback-any-snapshot 1' on storage '$storeid'.\n"
+        if @$blockers;
+
+    return 1;
+}
+
 sub volume_snapshot_rollback {
     my ($class, $scfg, $storeid, $volname, $snap) = @_;
 
@@ -998,10 +1072,38 @@ sub volume_snapshot_list {
         next if $decoded->{is_base};
         next unless $decoded->{volume} eq $array_name;
 
-        push @res, { name => $decoded->{snapname}, ctime => 0 };
+        push @res, {
+            name  => $decoded->{snapname},
+            ctime => $volume->{ctime} // 0,
+        };
     }
 
     return \@res;
+}
+
+# The base implementations of both of these read a qcow2 file through
+# filesystem_path(), which this plugin cannot provide. Answering from the
+# array beats failing with a message about a method the caller never asked
+# for.
+sub volume_snapshot_info {
+    my ($class, $scfg, $storeid, $volname) = @_;
+
+    my $info = { current => {} };
+
+    my $snaps = eval { $class->volume_snapshot_list($scfg, $storeid, $volname) } // [];
+    for my $snap (@$snaps) {
+        my $name = $snap->{name} // next;
+        $info->{$name} = { timestamp => $snap->{ctime} // 0 };
+    }
+
+    return $info;
+}
+
+sub rename_snapshot {
+    my ($class, $scfg, $storeid, $volname, $source_snap, $target_snap) = @_;
+
+    die "Renaming a snapshot is not supported by dellpowerflex. Create a new"
+      . " snapshot and delete the old one instead.\n";
 }
 
 sub create_base {

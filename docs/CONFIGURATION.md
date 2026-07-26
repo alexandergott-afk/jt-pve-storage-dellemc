@@ -22,6 +22,7 @@ plugins — that is why the prefixes exist.
 | `dell-portal-probe-timeout` | 0–30 | no | `2` | TCP pre-check per iSCSI portal; 0 disables it |
 | `dell-status-timeout` | 2–60 | no | `5` | REST timeout on the pvestatd health path |
 | `dell-activate-deadline` | 0–300 | no | `30` | Wall-clock budget for the portal login loop; 0 disables it |
+| `dell-rollback-any-snapshot` | boolean | no | `0` | Allow rolling back to a snapshot that is not the most recent one. Off because Dell does not document what a restore does to the snapshots taken after the one being restored; on an array that discards them PVE would keep listing restore points that no longer exist |
 | `dell-config-backup` | boolean | no | `1` | Write the VM config to a 1 MB volume beside each snapshot. Costs one extra volume per snapshot of a VM, so turn it off on an array whose volume count is the binding limit. Ignored on PowerVault ME, which does not offer the feature |
 | `dell-config-backup-timeout` | 5–60 | no | `15` | Device wait for the config backup volume |
 | `dell-rescan-interval` | 0–3600 | no | `300` | Minimum seconds between periodic SAN rescans; 0 rescans every time |

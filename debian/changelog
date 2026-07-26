@@ -1,3 +1,47 @@
+jt-pve-storage-dellemc (0.7.4~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The storage API version is negotiated instead of hardcoded. PVE 9 raised
+    APIVER twice inside the 9.1 point releases; claiming more than the running
+    PVE makes it reject the plugin and every storage of these types disappears
+    from the node, and claiming less makes PVE warn on every load of
+    PVE::Storage, which is once per pvesm call.
+  * volume_resize now knows about the $snapname parameter added in storage API
+    14 and refuses it, rather than silently resizing the volume the snapshot
+    was taken from.
+  * Deleting a snapshot now first removes the temporary clone that was reading
+    it. vzdump in snapshot mode takes a snapshot, reads it through path(), and
+    deletes it the moment the backup finishes; an array will not delete a
+    snapshot something was cloned from, so every such backup would have failed
+    at cleanup and left the clone behind on the array and its device on the
+    host.
+  * Rolling back to anything other than the most recent snapshot is refused.
+    Dell documents what a restore does to the volume and says nothing about
+    snapshots taken after the restore point; on an array that discards them
+    PVE would keep listing restore points that no longer exist. New option
+    dell-rollback-any-snapshot lifts it once the behaviour is verified.
+  * The orphan reaper leaves alone any device that still has a working
+    multipath path. A disk hot-added to a running VM is briefly absent from
+    the array's listing while the guest already has it open, and a guest's
+    open file descriptor is not a holder or a mount.
+  * An outage is now declared on elapsed time rather than on a count of
+    consecutive failed polls, and activate_storage records the failure it
+    dies on. PVE stops polling a storage it has marked inactive, so a counter
+    that waits for three failures would stay silent through exactly the
+    outages that matter, and activate_storage dying means status() is never
+    reached at all.
+  * volume_snapshot_info and rename_snapshot are implemented rather than
+    inherited: the base versions read a qcow2 file through filesystem_path,
+    which this plugin cannot provide.
+  * PowerVault answers the confirmation prompt on rollback, as the CLI
+    Reference requires of a script.
+  * PowerFlex reports real snapshot timestamps instead of 1970.
+  * pve-dell-config-get bounds its mount and umount. It runs during an outage,
+    against storage that may be half dead.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.3~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
