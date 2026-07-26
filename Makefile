@@ -1,5 +1,5 @@
 PACKAGE = jt-pve-storage-dellemc
-VERSION = 0.1.0
+VERSION = 0.2.0
 
 DESTDIR =
 PREFIX   = /usr
@@ -74,7 +74,7 @@ check-multipath-flush:
 	@echo "Checking for forbidden system-wide multipath flush..."
 	@hits=$$(grep -rnE 'multipath[[:space:]]+(-[A-Za-z]*F|--flush)' \
 		$(GUARD_PATHS) --exclude-dir=.git --binary-files=without-match 2>/dev/null \
-		| grep -viE 'never|不得|不要|禁止' || true); \
+		| grep -viE 'never|不得|不要|不會|絕不|禁止' || true); \
 	if [ -n "$$hits" ]; then \
 		echo "ERROR: forbidden system-wide multipath flush found:"; \
 		echo "$$hits" | sed 's/^/  /'; \

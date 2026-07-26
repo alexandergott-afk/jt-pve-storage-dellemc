@@ -14,15 +14,15 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.1.0 — project skeleton (Phase 0).**
-> This package currently registers **no** storage type. It contains the build
-> system, packaging and safety tooling only. Do not deploy it expecting a
-> working storage backend yet.
+> **Version 0.2.0 — shared Common layer (Phase 1).**
+> This package still registers **no** storage type. It contains the build
+> system, packaging, safety tooling and the modules the family plugins will
+> be built on. Do not deploy it expecting a working storage backend yet.
 
 | Phase | Content | State |
 |---|---|---|
 | 0 | Skeleton: Makefile, `debian/`, CI, README | **done** |
-| 1 | Common layer: Naming, REST, Multipath, ISCSI, FC, WwidState, Health | planned |
+| 1 | Common layer: Naming, REST, Multipath, ISCSI, FC, WwidState, Health | **done** |
 | 2 | `Common::BlockBase` abstract plugin base | planned |
 | 3 | PowerStore REST API client | planned |
 | 4 | `dellpowerstore` plugin, docs, on-hardware iSCSI test pass | planned |

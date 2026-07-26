@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.2.0-1) unstable; urgency=medium
+
+  * Phase 1: the shared Common layer. Still no PVE storage type — these are
+    the modules the plugins will be built on.
+  * Naming: object naming and the pve-<storeid>- ownership gate that guards
+    every destructive path.
+  * REST: HTTP transport with the retry policy the health path depends on —
+    a POST is never retried on 5xx, 401 re-authenticates once, 429/503 back
+    off with a capped Retry-After.
+  * Multipath: dm-multipath and SCSI device lifecycle, ported from the
+    NetApp and Pure plugins with the vendor gate parameterised. Every sysfs
+    access is timeout-bounded and the system-wide flush cannot be reached.
+  * ISCSI: initiator, portal probing and per-session rescan.
+  * FC: HBA WWPN discovery and WWN normalisation. Does not issue a LIP by
+    default.
+  * WwidState: per-node WWID tracking with the grace period and miss
+    threshold the orphan reaper needs before it may tear a device down.
+  * Health: outage detection and capacity alerting for status(), rate
+    limited so a ~10s poll cannot flood the journal.
+  * 342 unit tests across t/01-naming.t .. t/05-state.t.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sun, 26 Jul 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.1.0-1) unstable; urgency=medium
 
   * Phase 0: project skeleton.

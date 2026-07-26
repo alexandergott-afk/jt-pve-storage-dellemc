@@ -10,13 +10,13 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.1.0 — 專案骨架（Phase 0）。**
-> 本套件目前**尚未**註冊任何 storage type，只包含建置系統、打包與安全檢查工具。請勿當成可用的儲存後端部署。
+> **版本 0.2.0 — 共用 Common 層（Phase 1）。**
+> 本套件仍**尚未**註冊任何 storage type，目前包含建置系統、打包、安全檢查工具，以及各系列 plugin 之後要建立在其上的模組。請勿當成可用的儲存後端部署。
 
 | 階段 | 內容 | 狀態 |
 |---|---|---|
 | 0 | 骨架：Makefile、`debian/`、CI、README | **已完成** |
-| 1 | Common 層：Naming、REST、Multipath、ISCSI、FC、WwidState、Health | 規劃中 |
+| 1 | Common 層：Naming、REST、Multipath、ISCSI、FC、WwidState、Health | **已完成** |
 | 2 | `Common::BlockBase` 抽象 plugin 基底 | 規劃中 |
 | 3 | PowerStore REST API 客戶端 | 規劃中 |
 | 4 | `dellpowerstore` plugin、文件、iSCSI 實機測試 | 規劃中 |
