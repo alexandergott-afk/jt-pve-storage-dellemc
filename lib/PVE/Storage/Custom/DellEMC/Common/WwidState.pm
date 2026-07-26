@@ -46,6 +46,12 @@ use constant {
     # listing cannot trigger teardown.
     ORPHAN_MISS_THRESHOLD => 3,
 
+    # A temporary snapshot-access clone is short-lived, but the operation that
+    # created it can legitimately take a while. Waiting this long before
+    # considering an abandoned one for removal keeps a slow-but-live operation
+    # out of the reaper's way.
+    TEMP_CLONE_GRACE_SECONDS => 900,
+
     # Never block a storage daemon on a lock. See with_lock.
     LOCK_WAIT_SECONDS => 10,
 };
@@ -181,6 +187,121 @@ sub write_state {
     };
 
     return 1;
+}
+
+# ---------------------------------------------------------------------------
+# Temporary snapshot-access clones
+#
+# Reading a snapshot needs a short-lived clone of it on the array. The process
+# that creates one normally deletes it again, but a worker that is killed
+# between the two leaves an object nothing refers to: it is not a PVE volume
+# name, so it never appears in list_images, and the orphan reaper will not
+# touch an object the array still has. Without a record it is invisible and
+# occupies array space until an operator finds it by hand.
+#
+# The record is per node, and so is the clone: it is only ever mapped to this
+# node's host object, so another node must never reap it.
+# ---------------------------------------------------------------------------
+
+sub temp_clone_file {
+    my ($class, $storeid) = @_;
+    return $class->state_dir . '/' . $class->safe_storeid($storeid) . '-tmpclones.json';
+}
+
+sub _read_temp_clones {
+    my ($class, $storeid) = @_;
+
+    my $file = $class->temp_clone_file($storeid);
+    return {} unless -f $file;
+
+    open(my $fh, '<', $file) or return {};
+    local $/;
+    my $json = <$fh>;
+    close($fh);
+
+    my $data = eval { decode_json($json // '') } // {};
+
+    return ref($data) eq 'HASH' ? $data : {};
+}
+
+sub _write_temp_clones {
+    my ($class, $storeid, $state) = @_;
+
+    $class->ensure_dirs();
+    my $file = $class->temp_clone_file($storeid);
+    my $tmp  = "$file.tmp.$$";
+
+    open(my $fh, '>', $tmp) or do {
+        warn "Cannot open $tmp for writing: $!\n";
+        return 0;
+    };
+    print $fh encode_json($state // {});
+    close($fh);
+    chmod(0600, $tmp);
+
+    rename($tmp, $file) or do {
+        warn "Cannot rename $tmp to $file: $!\n";
+        unlink($tmp);
+        return 0;
+    };
+
+    return 1;
+}
+
+sub track_temp_clone {
+    my ($class, $storeid, $name) = @_;
+
+    return 0 unless defined $name && length $name;
+
+    return $class->with_lock($storeid, sub {
+        my $state = $class->_read_temp_clones($storeid);
+        $state->{$name} = { pid => $$, created => time() };
+        return $class->_write_temp_clones($storeid, $state);
+    });
+}
+
+sub untrack_temp_clone {
+    my ($class, $storeid, $name) = @_;
+
+    return 0 unless defined $name && length $name;
+
+    return $class->with_lock($storeid, sub {
+        my $state = $class->_read_temp_clones($storeid);
+        return 1 unless exists $state->{$name};
+        delete $state->{$name};
+        return $class->_write_temp_clones($storeid, $state);
+    });
+}
+
+# Temporary clones whose creating process is gone and that are old enough to
+# be certain they are not part of an operation still starting up.
+#
+# kill(0) answers for a process this user may signal, which covers every PVE
+# worker: they all run as root, as does this code. A pid that has been reused
+# by an unrelated process only delays the reap to the next pass.
+sub stale_temp_clones {
+    my ($class, $storeid, %opts) = @_;
+
+    my $grace = $opts{grace} // TEMP_CLONE_GRACE_SECONDS;
+    my $now   = $opts{now}   // time();
+
+    my $state = $class->_read_temp_clones($storeid);
+
+    my @stale;
+    for my $name (sort keys %$state) {
+        my $entry = $state->{$name};
+        $entry = {} unless ref($entry) eq 'HASH';
+
+        my $age = $now - ($entry->{created} // $now);
+        next if $age >= 0 && $age < $grace;
+
+        my $pid = $entry->{pid};
+        next if defined $pid && $pid > 0 && kill(0, $pid);
+
+        push @stale, $name;
+    }
+
+    return \@stale;
 }
 
 # Normalise one entry to { first_seen, miss }.

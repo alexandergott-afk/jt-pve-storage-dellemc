@@ -169,6 +169,9 @@ sub _is_sdc { my ($class, $scfg) = @_; return $class->_access_mode($scfg) eq 'sd
 my %API_CACHE;
 use constant API_CACHE_TTL => 300;
 
+# A successful create is not a promise that the next query can see the object.
+use constant AWAIT_OBJECT_TIMEOUT => 30;
+
 sub _api {
     my ($class, $scfg, %opts) = @_;
 
@@ -540,7 +543,8 @@ sub alloc_image {
     my $host_id = eval { $class->_host_id($scfg, $storeid) };
     if ($@) {
         my $err = $@;
-        eval { $api->volume_delete($id) };
+        eval { $api->volume_delete($id, storeid => $storeid) };
+        $class->_invalidate_list_cache($scfg, $storeid);
         die "Volume created but this node could not be identified to the"
           . " array, so it was removed again: $err";
     }
@@ -548,7 +552,13 @@ sub alloc_image {
     eval { $api->volume_map($id, $host_id, nvme => !$class->_is_sdc($scfg)) };
     if ($@) {
         my $err = $@;
-        eval { $api->volume_delete($id) };
+        # Unmap before deleting. The map may have partly taken effect even
+        # though the call reported failure, and PowerFlex refuses to remove a
+        # volume that is still mapped — which would leave an orphan volume
+        # plus a mapping no one owns.
+        eval { $api->volume_unmap($id, $host_id,
+            nvme => !$class->_is_sdc($scfg), storeid => $storeid) };
+        eval { $api->volume_delete($id, storeid => $storeid) };
         $class->_invalidate_list_cache($scfg, $storeid);
         die "Failed to map the new volume to this node; it was removed"
           . " again: $err";
@@ -589,12 +599,17 @@ sub free_image {
 
     eval { $api->volume_delete($id, storeid => $storeid) };
 
+    # Captured immediately: $@ is global and every eval below resets it, so
+    # reading it again later would report a refused delete as success.
+    my $delete_error = $@;
+
     if ($isBase || $volname =~ /^base-/) {
-        if (my $err = $@) {
-            if ($err !~ /descendant|snapshot|child|depend/i
+        if ($delete_error) {
+            if ($delete_error !~ /descendant|snapshot|child|depend/i
                 && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
                     base_only => 1)) {
                 eval { $api->volume_delete($id, storeid => $storeid) };
+                $delete_error = $@;
             }
         } else {
             eval { $class->_purge_own_snapshots($scfg, $storeid, $array_name,
@@ -602,8 +617,8 @@ sub free_image {
         }
     }
 
-    if ($@) {
-        my $err = $@;
+    if ($delete_error) {
+        my $err = $delete_error;
         die "Cannot delete volume '$volname': the array reports dependent"
           . " objects, which on PowerFlex means snapshots or clones made from"
           . " it. Delete those first.\n  Array error: $err"
@@ -781,6 +796,25 @@ sub rename_volume {
     $class->_invalidate_list_cache($scfg, $storeid);
 
     return "$storeid:$target_volname";
+}
+
+# Wait for a named volume to become resolvable to an id. Returns the id, or
+# dies naming the volume.
+sub _await_volume_id {
+    my ($class, $api, $storeid, $name) = @_;
+
+    my $deadline = time() + AWAIT_OBJECT_TIMEOUT;
+
+    while (1) {
+        my $id = eval { $api->volume_id_by_name($name, storeid => $storeid) };
+        return $id if $id;
+        last if time() >= $deadline;
+        sleep(1);
+    }
+
+    die "The array accepted the request but volume '$name' was still not"
+      . " resolvable after " . AWAIT_OBJECT_TIMEOUT . "s. Check in PowerFlex"
+      . " Manager whether it exists before retrying.\n";
 }
 
 # ---------------------------------------------------------------------------
@@ -1036,13 +1070,28 @@ sub clone_image {
     $api->snapshot_create($source_id, $target, storeid => $storeid);
     $class->_invalidate_list_cache($scfg, $storeid);
 
-    my $target_id = $api->volume_id_by_name($target, storeid => $storeid);
-    if ($target_id) {
-        my $host_id = eval { $class->_host_id($scfg, $storeid) };
+    my $target_id = $class->_await_volume_id($api, $storeid, $target);
+
+    my $host_id = eval { $class->_host_id($scfg, $storeid) };
+    my $host_error = $@;
+
+    unless ($host_error) {
         eval {
             $api->volume_map($target_id, $host_id,
                 nvme => !$class->_is_sdc($scfg), storeid => $storeid);
-        } if $host_id;
+        };
+        $host_error = $@;
+    }
+
+    # A clone this node cannot reach is worse than no clone: PVE would record
+    # a disk whose device never appears. Roll it back, unmapping first.
+    if ($host_error) {
+        eval { $api->volume_unmap($target_id, $host_id,
+            nvme => !$class->_is_sdc($scfg), storeid => $storeid) } if $host_id;
+        eval { $api->volume_delete($target_id, storeid => $storeid) };
+        $class->_invalidate_list_cache($scfg, $storeid);
+        die "The clone was created but could not be mapped to this node, so"
+          . " it was removed again: $host_error";
     }
 
     return $linked_to_base ? "$volname/$target_volname" : $target_volname;

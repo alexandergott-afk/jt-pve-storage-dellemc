@@ -823,12 +823,41 @@ sub _cleanup_orphaned_devices {
     }
     $volumes //= [];
 
+    # Built ONLY from what the list call already returned. This runs in the
+    # background of every status() poll on every node, so a per-volume query
+    # here would be (volumes x nodes) requests every ten seconds against the
+    # array's management interface — the shape that collapses a management
+    # gateway once an array is big enough or its firmware less forgiving.
     my %alive;
+    my $without_wwid = 0;
     for my $vol (@$volumes) {
         next unless $vol->{name};
-        my $wwid = $vol->{wwid} // eval { $class->_array_get_wwid($scfg, $vol->{name}) };
-        $alive{lc($wwid)} = 1 if $wwid;
+        if (my $wwid = $vol->{wwid}) {
+            $alive{lc($wwid)} = 1;
+        } else {
+            $without_wwid++;
+        }
     }
+
+    # An empty alive set with volumes present means the listing did not carry
+    # WWIDs, not that every volume vanished. Acting on it would count every
+    # tracked device as missing and eventually tear down devices a running VM
+    # is using, so the pass is abandoned instead.
+    if (@$volumes && !%alive) {
+        $class->_warn_once($storeid, 'no-wwids',
+            "orphan cleanup: the array listed " . scalar(@$volumes) . " volume(s)"
+          . " for storage '$storeid' but none carried a WWID, so stale devices"
+          . " cannot be identified. Skipping cleanup rather than guessing."
+          . " This means the volume listing is not returning the field the"
+          . " plugin reads the WWID from; see docs/TESTING.md.");
+        return;
+    }
+
+    $class->_warn_once($storeid, 'partial-wwids',
+        "orphan cleanup: $without_wwid of " . scalar(@$volumes) . " volume(s) on"
+      . " storage '$storeid' were listed without a WWID and are treated as"
+      . " absent. A device belonging to one of them could be removed once it"
+      . " has been missing long enough.") if $without_wwid;
 
     # Reconcile in one locked pass: reset the miss counter for what is still
     # there, register what is new, count a miss for what is gone.
@@ -886,7 +915,31 @@ sub _cleanup_orphaned_devices {
 
     $class->_report_untracked_devices($storeid, $scfg, \%alive, $tracked);
 
+    eval { $class->_reap_temp_clones($storeid, $scfg) };
+    warn "Temporary clone cleanup failed: $@" if $@;
+
     return;
+}
+
+# One warning per storage per topic per hour. status() runs every ten seconds,
+# so an unconditional warn on a persistent condition is journal noise that
+# hides everything else.
+sub _warn_once {
+    my ($class, $storeid, $topic, $message, %opts) = @_;
+
+    my $interval = $opts{interval} // 3600;
+    my $dir  = $WWID_STATE->lock_dir;
+    my $flag = "$dir/warned-" . $WWID_STATE->safe_storeid($storeid) . "-$topic";
+
+    if (-f $flag) {
+        my $age = time() - ((stat($flag))[9] // 0);
+        return 0 if $age >= 0 && $age < $interval;
+    }
+
+    warn "$message\n";
+    eval { open(my $fh, '>', $flag) or return; close($fh) };
+
+    return 1;
 }
 
 # Devices from our vendor that are neither on the array nor tracked. They are
@@ -1183,7 +1236,19 @@ sub free_image {
 
     # Unmap everywhere BEFORE local cleanup. The other order lets an in-flight
     # rescan on any node re-import the LUN and rebuild the device behind us.
-    my $hosts = eval { $class->_array_mapped_hosts($scfg, $array_name) } // [];
+    #
+    # A failed query is fatal here rather than best-effort: carrying on would
+    # delete a volume that is still mapped, and every node it is mapped to
+    # keeps a device that answers nothing. Anything touching one of those
+    # hangs in uninterruptible sleep, which is a node-wide storage freeze.
+    # Failing the delete is retryable; ghost LUNs are not.
+    my $hosts = eval { $class->_array_mapped_hosts($scfg, $array_name) };
+    die "Cannot delete volume '$volname': the array did not answer which"
+      . " hosts it is mapped to, and deleting a mapped volume would leave"
+      . " every one of them with a device that answers nothing. Retry once"
+      . " the array is reachable.\n  Array error: $@" if $@;
+    $hosts //= [];
+
     for my $host (@$hosts) {
         eval { $class->_array_unmap_from_host($scfg, $array_name, $host) };
         warn "Failed to unmap '$array_name' from host '$host': $@" if $@;
@@ -1208,6 +1273,13 @@ sub free_image {
 
     eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
 
+    # Captured immediately, and everything below works on the copy. $@ is
+    # global and every eval in between resets it, so reading it again after
+    # the marker handling would report a refused delete as success — and PVE
+    # would drop the disk from the VM configuration while the volume is still
+    # on the array.
+    my $delete_error = $@;
+
     # The template marker is handled last and separately. A template that
     # still has linked clones cannot be deleted whatever we do, and removing
     # its marker on the way to failing would leave a volume PVE no longer
@@ -1215,11 +1287,12 @@ sub free_image {
     # refusal was not about dependents, or when the delete already succeeded
     # and the marker would otherwise outlive the volume it marks.
     if ($isBase || $volname =~ /^base-/) {
-        if (my $err = $@) {
-            if ($err !~ /clone|dependent|child|in use/i
+        if ($delete_error) {
+            if ($delete_error !~ /clone|dependent|child|in use/i
                 && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
                     base_only => 1)) {
                 eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
+                $delete_error = $@;
             }
         } else {
             eval { $class->_purge_own_snapshots($scfg, $storeid, $array_name,
@@ -1227,8 +1300,8 @@ sub free_image {
         }
     }
 
-    if ($@) {
-        my $err = $@;
+    if ($delete_error) {
+        my $err = $delete_error;
         if ($err =~ /clone|dependent|child|in use/i) {
             die "Cannot delete volume '$volname': the array reports dependent"
               . " objects, which usually means thin clones were made from it."
@@ -1648,8 +1721,18 @@ sub _prepare_snapshot_access {
     my $temp = $class->naming->encode_temp_clone_name($array_name,
         _short_token($$, time()));
 
+    # Recorded before the clone exists rather than after: a worker killed
+    # between the create and the record would otherwise leave an object with
+    # nothing pointing at it. A record for a clone that was never created is
+    # harmless — the reaper finds no such object and drops the entry.
+    eval { $WWID_STATE->track_temp_clone($storeid, $temp) };
+
     eval { $class->_array_clone($scfg, $storeid, $snap_name, $temp) };
-    die "Failed to create a temporary clone for snapshot access: $@" if $@;
+    if ($@) {
+        my $err = $@;
+        eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
+        die "Failed to create a temporary clone for snapshot access: $err";
+    }
 
     my $host = $class->_host_name($scfg);
     eval { $class->_array_map_to_host($scfg, $temp, $host) };
@@ -1657,6 +1740,7 @@ sub _prepare_snapshot_access {
         my $err = $@;
         # The map may have taken effect even though the response failed.
         eval { $class->_release_volume($scfg, $storeid, $temp) };
+        eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
         die "Failed to map the temporary snapshot clone: $err";
     }
 
@@ -1674,8 +1758,56 @@ sub _cleanup_snapshot_access {
     my $wwid = eval { $class->_array_get_wwid($scfg, $temp) };
     eval { cleanup_lun_devices($wwid) } if $wwid;
     eval { $class->_release_volume($scfg, $storeid, $temp) };
+    eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
 
     return;
+}
+
+# Remove temporary snapshot-access clones whose creating process is gone.
+#
+# Runs in the background of status(), where the resilient client is fine. It
+# only ever touches objects this node recorded, so a clone another node is
+# using is not reachable from here.
+sub _reap_temp_clones {
+    my ($class, $storeid, $scfg) = @_;
+
+    my $stale = eval { $WWID_STATE->stale_temp_clones($storeid) } // [];
+    return 0 unless @$stale;
+
+    my $removed = 0;
+    for my $name (@$stale) {
+        # Ownership gate, as on every destructive path: only an object whose
+        # name this storage would have produced.
+        my $prefix = $class->naming->volume_prefix($storeid);
+        unless (index($name, $prefix) == 0) {
+            eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
+            next;
+        }
+
+        unless (eval { $class->_array_get_volume($scfg, $name) }) {
+            # Already gone, or never created.
+            eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
+            next;
+        }
+
+        warn "Removing the temporary snapshot clone '$name': the process that"
+           . " created it is gone. It was used to read a snapshot and nothing"
+           . " refers to it now.\n";
+
+        my $wwid = eval { $class->_array_get_wwid($scfg, $name) };
+        eval { cleanup_lun_devices($wwid) } if $wwid;
+
+        eval { $class->_release_volume($scfg, $storeid, $name) };
+        if ($@) {
+            warn "Could not remove the temporary clone '$name': $@";
+            next;
+        }
+
+        eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
+        $removed++;
+    }
+
+    return $removed;
 }
 
 # ---------------------------------------------------------------------------

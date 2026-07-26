@@ -7,6 +7,58 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.3~beta1] - 2026-07-27
+
+Cross-checked against the production incident records of the two related
+projects, [jt-pve-storage-netapp](https://github.com/jasoncheng7115/jt-pve-storage-netapp)
+and [jt-pve-storage-purestorage](https://github.com/jasoncheng7115/jt-pve-storage-purestorage).
+Every documented failure class was traced through this codebase; nine were
+present here.
+
+### Fixed
+- **A refused delete could be reported as success.** `free_image` read `$@`
+  after other `eval`s had run in between, and an `eval` resets it. An array
+  that refused the delete produced the same return as a successful one, so
+  PVE dropped the disk from the VM configuration while the volume was still
+  there. The error is now captured the moment the delete returns.
+- **A volume could be deleted while still mapped.** If the array failed to
+  answer which hosts a volume was mapped to, `free_image` carried on and
+  deleted it anyway. Every node it was mapped to would keep a device that
+  answers nothing, and anything touching one hangs in uninterruptible sleep.
+  That query failing is now fatal, which is retryable; ghost devices are not.
+- **The orphan reaper made one array call per volume** whenever a listing did
+  not carry WWIDs. That runs in the background of every `status()` poll on
+  every node, so it scales as volumes × nodes every ten seconds — the shape
+  that collapses an array's management gateway. It now uses only what the
+  listing returned, and a listing that carries no WWIDs at all abandons the
+  pass instead of concluding that every volume was deleted.
+- **Temporary snapshot-access clones could leak.** A worker killed between
+  creating one and deleting it left an object with no PVE volume name: it
+  appears in no listing and the reaper does not touch objects the array still
+  has. They are now recorded per node and removed once the creating process is
+  gone.
+- **PowerStore collection listings could truncate silently.** The pager
+  stopped on a page shorter than the one it asked for, but an array may cap a
+  page below the requested size. Volumes past the cut disappeared from the
+  disk list and the reaper treated them as deleted. It now follows the
+  `Content-Range` the array returns.
+- **PowerVault and PowerFlex now wait for an object to become visible after
+  creating it**, as PowerStore already did. A successful create is not a
+  promise that the next query can see it, and every caller maps or looks up
+  the object immediately afterwards.
+- **PowerFlex unmaps before deleting in every rollback path**, and a clone
+  this node cannot map is rolled back instead of left behind as a disk whose
+  device never appears.
+- **The block-device test that follows a device glob runs inside the same
+  timeout as the glob**, rather than after it.
+- `decode_json` was called in `PowerStore/API.pm` without importing `JSON`.
+
+### Added
+- `t/11-imports.t`: `perl -c` compiles a call to an undefined subroutine
+  without complaint, so a helper used without its `use` line fails only at
+  runtime — on the array-facing path, which cannot be exercised without
+  hardware. The missing `JSON` import above was found this way.
+
 ## [0.7.2~beta1] - 2026-07-26
 
 A review pass over every plugin entry point against the Proxmox VE 9.2.5

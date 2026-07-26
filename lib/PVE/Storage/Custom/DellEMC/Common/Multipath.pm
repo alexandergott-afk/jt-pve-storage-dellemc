@@ -610,18 +610,32 @@ sub get_device_by_wwid {
 
     # Fall back to udev's by-id links: the map may exist without multipathd
     # answering, or the LUN may have a single path.
+    #
+    # The -b test belongs INSIDE the alarm with the glob. It resolves the
+    # symlink to /dev/sd* or /dev/dm-*, and stat() on a multipath device whose
+    # paths are all down while queueing is still on hits the same block-layer
+    # wait that hangs vgs. A timeout around the glob alone leaves the stat
+    # unbounded, which is the half that actually blocks.
     (my $safe_wwid = $wwid) =~ s/([\[\]{}*?\\])/\\$1/g;
-    my @devices;
+    my $found;
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
-        alarm(5);
-        @devices = glob("/dev/disk/by-id/wwn-*$safe_wwid*");
+        alarm($opts{glob_timeout} // 5);
+
+        my @devices = glob("/dev/disk/by-id/wwn-*$safe_wwid*");
         push @devices, glob("/dev/disk/by-id/scsi-*$safe_wwid*");
+
+        for my $device (@devices) {
+            next unless -b $device;
+            $found = $device;
+            last;
+        }
+
         alarm(0);
     };
     alarm(0);
 
-    return _untaint_device_path($devices[0]) if @devices && -b $devices[0];
+    return _untaint_device_path($found) if defined $found;
 
     return undef;
 }

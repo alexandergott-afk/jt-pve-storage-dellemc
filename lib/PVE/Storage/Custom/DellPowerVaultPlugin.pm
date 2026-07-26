@@ -142,6 +142,12 @@ sub family_options {
 my %API_CACHE;
 use constant API_CACHE_TTL => 300;
 
+# How long to wait for an object the array has accepted but does not yet
+# report. A successful create is not a promise that the next query can see it:
+# an array's management database can lag its own write path, and every caller
+# here maps or looks up the object immediately afterwards.
+use constant AWAIT_OBJECT_TIMEOUT => 30;
+
 sub _api {
     my ($class, $scfg, %opts) = @_;
 
@@ -284,7 +290,31 @@ sub _array_create_volume {
         if defined $scfg->{'pvault-tier-affinity'}
         && $scfg->{'pvault-tier-affinity'} ne 'no-affinity';
 
-    return $api->volume_create($name, $size, %args, %opts);
+    $api->volume_create($name, $size, %args, %opts);
+
+    # Every caller maps or queries the volume straight after this returns.
+    $class->_await_volume($scfg, $name, %opts);
+
+    return $name;
+}
+
+# Wait for a named object to become visible. Returns 1 as soon as it is;
+# dies naming the object if it never appears.
+sub _await_volume {
+    my ($class, $scfg, $name, %opts) = @_;
+
+    my $api = $class->_api($scfg, %opts);
+    my $deadline = time() + AWAIT_OBJECT_TIMEOUT;
+
+    while (1) {
+        return 1 if eval { $api->volume_get_by_name($name, %opts) };
+        last if time() >= $deadline;
+        sleep(1);
+    }
+
+    die "The array accepted the request but '$name' was still not listed after "
+      . AWAIT_OBJECT_TIMEOUT . "s. Check in PowerVault Manager whether it"
+      . " exists before retrying.\n";
 }
 
 sub _array_delete_volume {
@@ -400,7 +430,13 @@ sub _array_clone {
     die "Clone source '$source' does not exist on the array\n"
         unless $api->volume_get_by_name($source, %opts);
 
-    return $api->snapshot_create($source, $target, %opts);
+    $api->snapshot_create($source, $target, %opts);
+
+    # The caller maps it immediately; a snapshot the array has not published
+    # yet would fail that map and take the clone down with it.
+    $class->_await_volume($scfg, $target, %opts);
+
+    return $target;
 }
 
 # ---------------------------------------------------------------------------

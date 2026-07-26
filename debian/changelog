@@ -1,3 +1,39 @@
+jt-pve-storage-dellemc (0.7.3~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Cross-checked against the production incident records of the two related
+    projects (jt-pve-storage-netapp, jt-pve-storage-purestorage). Nine issues
+    of the same classes were present here and are fixed.
+  * A delete the array refused could be reported to PVE as success, because
+    $@ was read after intervening evals had reset it. PVE would then drop the
+    disk from the VM configuration while the volume was still on the array.
+  * free_image no longer proceeds to delete when the array fails to say which
+    hosts a volume is mapped to. Deleting a mapped volume leaves every node it
+    is mapped to with a device that answers nothing.
+  * The orphan reaper no longer falls back to a per-volume array query when a
+    listing carries no WWID. That was one call per volume on every poll on
+    every node. A listing that returns no WWIDs at all now abandons the pass
+    rather than treating every volume as deleted.
+  * Temporary clones created to read a snapshot are recorded per node and
+    removed when the process that created them is gone. They have no PVE
+    volume name, so nothing else would ever find them.
+  * PowerStore collection paging follows the Content-Range the array returns
+    instead of assuming a short page means the end. A server-side page cap
+    would otherwise hide volumes and make the reaper treat live ones as
+    deleted.
+  * PowerVault and PowerFlex wait for an object to become visible after
+    creating it, as PowerStore already did.
+  * PowerFlex unmaps before deleting in every rollback path, and rolls back a
+    clone this node cannot map.
+  * The block-device test that follows a device glob now runs inside the same
+    timeout as the glob.
+  * New test t/11-imports.t: perl -c compiles a call to an undefined
+    subroutine without complaint, so a helper used without its use line only
+    fails at runtime. One such slip was found this way.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 01:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.2~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

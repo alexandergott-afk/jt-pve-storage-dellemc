@@ -203,22 +203,27 @@ sub sdc_device_for_volume {
 
     croak "volume_id is required" unless defined $volume_id && length $volume_id;
 
-    my @candidates;
+    # The -b test runs inside the alarm with the glob: it resolves the symlink
+    # and stats the device, and a stat on a block device whose backing paths
+    # are gone can block in the kernel just as the glob can.
+    my $found;
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         alarm(5);
-        @candidates = glob(SDC_DEV_GLOB);
+
+        for my $link (glob(SDC_DEV_GLOB)) {
+            next unless $link =~ /\Q$volume_id\E$/i;
+            my $device = _untaint_device($link) or next;
+            next unless -b $device;
+            $found = $device;
+            last;
+        }
+
         alarm(0);
     };
     alarm(0);
 
-    for my $link (@candidates) {
-        next unless $link =~ /\Q$volume_id\E$/i;
-        my $device = _untaint_device($link) or next;
-        return $device if -b $device;
-    }
-
-    return undef;
+    return $found;
 }
 
 # ---------------------------------------------------------------------------
@@ -457,24 +462,27 @@ sub nvme_device_for_volume {
     my $needle = lc($volume_id);
     $needle =~ s/^0x//;
 
-    my @candidates;
+    # glob and stat together under one alarm; see sdc_device_for_volume.
+    my $found;
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         alarm(5);
-        @candidates = glob('/dev/disk/by-id/nvme-*');
+
+        for my $link (glob('/dev/disk/by-id/nvme-*')) {
+            next unless lc($link) =~ /\Q$needle\E/;
+            # Skip partition links; PVE wants the whole namespace.
+            next if $link =~ /-part\d+$/;
+            my $device = _untaint_device($link) or next;
+            next unless -b $device;
+            $found = $device;
+            last;
+        }
+
         alarm(0);
     };
     alarm(0);
 
-    for my $link (@candidates) {
-        next unless lc($link) =~ /\Q$needle\E/;
-        # Skip partition links; PVE wants the whole namespace.
-        next if $link =~ /-part\d+$/;
-        my $device = _untaint_device($link) or next;
-        return $device if -b $device;
-    }
-
-    return undef;
+    return $found;
 }
 
 # ---------------------------------------------------------------------------

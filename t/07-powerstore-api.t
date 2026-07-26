@@ -230,6 +230,74 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 }
 
 {
+    # The array is free to answer with fewer rows than the page size asked
+    # for. Stopping on a short page then truncates the result silently: disks
+    # disappear from the list AND the orphan reaper stops seeing live volumes,
+    # which is how it starts treating them as deleted. The array reports the
+    # true total in Content-Range with its 206, and that is what must decide.
+    my @all = map { { id => "v$_", name => "pve-ps1-1$_-disk0" } } (1 .. 250);
+
+    my $total = scalar(@all);
+
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+
+        my %q = URI->new($req->uri)->query_form;
+        my $offset = $q{offset} // 0;
+
+        # A cap well below the requested limit of 200. The end index is
+        # clamped: a slice that runs past the end would be aliased by grep and
+        # grow the array, which would make this fake, not the client, decide
+        # how many rows exist.
+        my $end = $offset + 99;
+        $end = $total - 1 if $end > $total - 1;
+        my @slice = $offset <= $end ? @all[$offset .. $end] : ();
+        my $last  = $offset + scalar(@slice) - 1;
+
+        return json_response(206, \@slice,
+            'Content-Range' => "items $offset-$last/$total");
+    });
+
+    my $volumes = $api->volume_list('pve-ps1-');
+    is(scalar @$volumes, 250,
+        'a page shorter than requested does not end the walk');
+    is($ua->query_of(-1)->{offset}, 200,
+        'the offset advances by what actually arrived');
+}
+
+{
+    # No Content-Range at all: fall back to treating a short page as the end,
+    # which is the only thing left to go on.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+        return json_response(200, [ { id => 'v1', name => 'pve-ps1-100-disk0' } ]);
+    });
+
+    my $volumes = $api->volume_list('pve-ps1-');
+    is(scalar @$volumes, 1, 'a single short page without a header ends the walk');
+    is(scalar @{ $ua->requests }, 2, 'and costs one login plus one request');
+}
+
+{
+    # Content-Range that says '*' (the array will not count) must not stop the
+    # walk early or loop forever.
+    my $calls = 0;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+        $calls++;
+        my @rows = map { { id => "v$_", name => "pve-ps1-1$_-disk0" } } (1 .. 200);
+        return json_response(206, $calls > 1 ? [] : \@rows,
+            'Content-Range' => 'items 0-199/*');
+    });
+
+    my $volumes = $api->volume_list('pve-ps1-');
+    is(scalar @$volumes, 200, 'an uncounted range walks until a page is empty');
+}
+
+{
     # An exact-name lookup must use eq., not a prefix match: 'pve-ps1-10' is a
     # prefix of 'pve-ps1-100-disk0'.
     my ($api, $ua) = make_api(handler => sub {

@@ -670,6 +670,34 @@ SKIP: {
         'and the template keeps its marker snapshot');
 }
 
+# A failed delete must never be reported as success. Everything between the
+# delete and the check has to keep its hands off $@ — an eval anywhere in
+# between resets it, and free_image would return undef exactly as it does on
+# success. PVE would then drop the disk from the VM configuration while the
+# volume is still on the array.
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+
+    no warnings 'redefine';
+    local *Test::Plugin::_array_delete_volume = sub {
+        my ($class, $scfg, $storeid, $name) = @_;
+        $class->log_call('delete', $name);
+        die "the array is busy, try again later\n";
+    };
+
+    my $ok = eval { Test::Plugin->free_image('t1', $scfg, 'base-100-disk-0', 1, 'raw'); 1 };
+
+    ok(!$ok, 'a delete the array refused is reported as a failure');
+    like($@ // '', qr/busy|Failed to delete/,
+        '... with the array error in the message');
+    ok($Test::Plugin::VOLUMES{$vol}, 'and the volume is still on the array');
+}
+
 # ---------------------------------------------------------------------------
 # Temporary snapshot-access clone names
 # ---------------------------------------------------------------------------
@@ -765,6 +793,147 @@ SKIP: {
     my $one = Test::Plugin->list_images('t1', $scfg, undef, ['t1:vm-100-disk-1']);
     is(scalar(@$one), 1, 'a vollist filter matches exactly one volume');
     is($one->[0]{volid}, 't1:vm-100-disk-1', '... and it is the right one');
+}
+
+# ---------------------------------------------------------------------------
+# Orphan reaper: no per-volume array calls, and never act on a listing that
+# carries no WWIDs
+#
+# This runs in the background of every status() poll on every node. One array
+# call per volume here is (volumes x nodes) requests every ten seconds, which
+# is what takes an array's management interface down. And an alive set that
+# came back empty because the listing lacked WWIDs must never be read as
+# "every volume was deleted" — that would reap devices a running VM is using.
+# ---------------------------------------------------------------------------
+
+{
+    my $state_dir = "$TMP/reaper";
+    mkdir $state_dir;
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::state_dir = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::lock_dir  = sub { $state_dir };
+
+    # Nothing in this test may touch multipathd or a real device.
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_multipath_device = sub { undef };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_device_in_use = sub { 0 };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::cleanup_lun_devices = sub { 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::list_vendor_multipath_devices = sub { [] };
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $W = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+
+    # 1. A listing that carries WWIDs: they become the alive set, and no
+    #    per-volume lookup is made.
+    Test::Plugin->reset_state();
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk0'} =
+        { size => 1024, used => 0, wwid => '3600abc0000000001' };
+
+    my $per_volume_calls = 0;
+    {
+        no warnings 'redefine';
+        local *Test::Plugin::_array_get_wwid = sub { $per_volume_calls++; return undef };
+        Test::Plugin->_cleanup_orphaned_devices('t1', $scfg);
+    }
+
+    is($per_volume_calls, 0,
+        'the reaper makes no per-volume array call — it uses the listing');
+    ok($W->is_tracked('t1', '3600abc0000000001'),
+        'a WWID the array reported is imported into the tracking state');
+
+    # 2. A listing with volumes but no WWIDs: the pass must be abandoned, and
+    #    the WWID tracked from the earlier pass must survive it.
+    Test::Plugin->reset_state();
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk0'} = { size => 1024, used => 0 };
+
+    Test::Plugin->_cleanup_orphaned_devices('t1', $scfg);
+
+    ok($W->is_tracked('t1', '3600abc0000000001'),
+        'a listing without WWIDs does not count every device as missing');
+
+    # 3. A volume that really is gone accumulates misses rather than being
+    #    reaped on the first pass.
+    Test::Plugin->reset_state();
+    $Test::Plugin::VOLUMES{'pve-t1-101-disk0'} =
+        { size => 1024, used => 0, wwid => '3600abc0000000002' };
+
+    Test::Plugin->_cleanup_orphaned_devices('t1', $scfg);
+
+    my $state = $W->read_state('t1');
+    my $entry = $W->entry($state->{'3600abc0000000001'});
+    is($entry->{miss}, 1, 'a volume the array no longer reports counts one miss');
+    ok(!$W->is_reapable($entry), '... and is not reapable yet');
+    ok($W->is_reapable({ first_seen => time() - 7200, miss => 3 }),
+        'only after the grace period and the miss threshold both agree');
+}
+
+# ---------------------------------------------------------------------------
+# Temporary snapshot-access clones are recorded and reaped
+#
+# Reading a snapshot creates a clone on the array. A worker killed before it
+# can delete that clone leaves an object with no PVE volume name, so nothing
+# lists it and the orphan reaper will not touch an object the array still has.
+# ---------------------------------------------------------------------------
+
+{
+    my $state_dir = "$TMP/tmpclones";
+    mkdir $state_dir;
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::state_dir = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::WwidState::lock_dir  = sub { $state_dir };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::cleanup_lun_devices = sub { 1 };
+
+    my $W = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+
+    Test::Plugin->reset_state();
+
+    my $live      = 'pve-t1-100-disk0-tmpsnap-live';
+    my $abandoned = 'pve-t1-100-disk0-tmpsnap-dead';
+    my $foreign   = 'someone-elses-object';
+
+    $Test::Plugin::VOLUMES{$_} = { size => 1024, used => 0 }
+        for ($live, $abandoned, $foreign);
+
+    $W->track_temp_clone('t1', $live);
+    $W->track_temp_clone('t1', $abandoned);
+    $W->track_temp_clone('t1', $foreign);
+
+    # Age one of them past the grace period and point it at a pid that is gone.
+    # Pid 2 is kthreadd, which is alive, so it stands in for a live worker.
+    my $state = $W->_read_temp_clones('t1');
+    $state->{$abandoned} = { pid => 0x7FFFFFF, created => time() - 7200 };
+    $state->{$foreign}   = { pid => 0x7FFFFFF, created => time() - 7200 };
+    $W->_write_temp_clones('t1', $state);
+
+    my $stale = $W->stale_temp_clones('t1');
+    is_deeply([sort @$stale], [sort ($abandoned, $foreign)],
+        'only clones past the grace period whose process is gone are stale');
+    ok(!grep({ $_ eq $live } @$stale),
+        'a clone created by a live process is never stale');
+
+    Test::Plugin->_reap_temp_clones('t1', $scfg);
+
+    ok(!$Test::Plugin::VOLUMES{$abandoned}, 'the abandoned clone is removed');
+    ok($Test::Plugin::VOLUMES{$live}, 'the live one is left alone');
+    ok($Test::Plugin::VOLUMES{$foreign},
+        'an object outside this storage prefix is never touched');
+
+    ok(!exists $W->_read_temp_clones('t1')->{$abandoned},
+        'and its record is dropped');
+    ok(!exists $W->_read_temp_clones('t1')->{$foreign},
+        'as is the record of an object this storage does not own');
+
+    # An entry for a clone that was never created must not keep coming back.
+    $W->track_temp_clone('t1', 'pve-t1-100-disk0-tmpsnap-never');
+    my $s2 = $W->_read_temp_clones('t1');
+    $s2->{'pve-t1-100-disk0-tmpsnap-never'} = { pid => 0x7FFFFFF, created => time() - 7200 };
+    $W->_write_temp_clones('t1', $s2);
+
+    Test::Plugin->_reap_temp_clones('t1', $scfg);
+    ok(!exists $W->_read_temp_clones('t1')->{'pve-t1-100-disk0-tmpsnap-never'},
+        'a record for an object the array does not have is dropped');
 }
 
 done_testing();

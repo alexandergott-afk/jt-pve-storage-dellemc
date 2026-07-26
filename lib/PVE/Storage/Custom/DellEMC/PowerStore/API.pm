@@ -10,6 +10,7 @@ use warnings;
 use base qw(PVE::Storage::Custom::DellEMC::Common::REST);
 
 use HTTP::Cookies;
+use JSON qw(decode_json);
 use MIME::Base64 qw(encode_base64);
 
 # PowerStore Manager REST client.
@@ -146,27 +147,63 @@ sub error_hint {
 # ---------------------------------------------------------------------------
 
 # GET a collection, following pages. $params are filter/select parameters.
+#
+# The page size the array uses is NOT necessarily the one we asked for: a
+# server-side cap, or a large row, can make it answer with fewer. Stopping on
+# a short page would then silently truncate the result — which does not fail
+# anywhere visible, it just hides volumes from the disk list AND leaves the
+# orphan reaper with an incomplete alive set, so live volumes past the cut are
+# treated as deleted. The array says what it did in the Content-Range header
+# that comes with 206 Partial Content ('items 0-99/1234'), so the total is
+# what decides, and the short-page heuristic is only the fallback for a
+# response that carries no such header.
 sub _collection {
     my ($self, $endpoint, $params, %opts) = @_;
 
     my @rows;
     my $offset = 0;
+    my $total;
 
     for my $page (1 .. MAX_PAGES) {
         my %query = (%{ $params // {} }, limit => PAGE_SIZE, offset => $offset);
 
-        my $batch = $self->get($endpoint, \%query, %opts);
+        my $resp = $self->get($endpoint, \%query, %opts, raw => 1);
+
+        my $body  = $resp->decoded_content // '';
+        my $batch = length($body) ? eval { decode_json($body) } : [];
+        if ($@) {
+            die $self->_msg("GET $endpoint returned a body that is not JSON:"
+                . " $@") . "\n";
+        }
         $batch = [] unless ref($batch) eq 'ARRAY';
 
         push @rows, @$batch;
-        last if scalar(@$batch) < PAGE_SIZE;
 
-        $offset += PAGE_SIZE;
+        # An empty page always ends it, whatever the headers say.
+        last unless @$batch;
+
+        # 'Content-Range: items 0-99/1234' — the figure after the slash is how
+        # many rows match in total. '*' means the array will not say.
+        if (my $range = $resp->header('Content-Range')) {
+            my ($reported) = $range =~ m{/\s*(\d+)\s*$};
+            $total = $reported if defined $reported;
+        }
+
+        # Advance by what actually arrived, not by what was requested.
+        $offset += scalar(@$batch);
+
+        if (defined $total) {
+            last if $offset >= $total;
+        } else {
+            last if scalar(@$batch) < PAGE_SIZE;
+        }
 
         if ($page == MAX_PAGES) {
             $self->log_warn("stopped paging $endpoint after " . MAX_PAGES
-                . " pages (" . scalar(@rows) . " rows); the result may be"
-                . " incomplete");
+                . " pages (" . scalar(@rows) . " rows"
+                . (defined $total ? " of $total" : '') . "); the result is"
+                . " incomplete and volumes past this point are not visible to"
+                . " this plugin");
         }
     }
 
