@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.13~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * New test t/19-powervault-lifecycle.t completes the set: each of the three
+    families now has a whole VM's life tested against a fake array that
+    enforces that family's own rules. PowerVault's are the strangest — a
+    snapshot is a first-class volume in the same namespace, so a linked clone
+    is a snapshot wearing a volume name, and everything has to fit in 32 bytes
+    without a dot.
+  * The lifecycle tests also assert the order of the four values status()
+    returns. PVE wants total, available, used, active, while the arrays report
+    total, used, available; getting that wrong shows up only as wrong numbers
+    in the GUI.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 13:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.12~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

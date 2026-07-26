@@ -179,6 +179,21 @@ my $store = 'pf1';
 
 reset_array();
 
+# 0. PVE wants (total, available, used, active) and the array reports
+#    (total, used, available). Getting the order wrong is invisible except as
+#    wrong numbers in the GUI.
+{
+    no warnings 'redefine';
+    local *Test::PflexApi::get_managed_capacity = sub { return (1000, 400, 600) };
+
+    my ($total, $avail, $used, $active) = $P->status($store, $scfg);
+
+    is($total,  1000, 'status reports the total first');
+    is($avail,   600, '... then what is available');
+    is($used,    400, '... then what is used');
+    is($active,    1, '... then whether the storage is usable');
+}
+
 # 1. A disk, mapped to this node.
 my $disk = $P->alloc_image($store, $scfg, 100, 'raw', undef, 8 * 1024 * 1024);
 is($disk, 'vm-100-disk-0', 'the first disk is disk-0');

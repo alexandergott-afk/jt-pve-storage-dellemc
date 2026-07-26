@@ -7,6 +7,21 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.13~beta1] - 2026-07-27
+
+### Added
+- `t/19-powervault-lifecycle.t` completes the set: each of the three families
+  now has a whole VM's life tested against a fake array that enforces that
+  family's own rules. PowerVault's model is the strangest of the three — a
+  snapshot is a first-class volume in the same namespace, so a linked clone is
+  a snapshot wearing a volume name — and the fake enforces what Dell's
+  Administrator's Guide states: a volume or snapshot with child snapshots
+  cannot be deleted until the children are.
+- The lifecycle tests assert the order of the four values `status()` returns.
+  PVE wants total, available, used, active; the arrays report total, used,
+  available. Swapping two of them is invisible except as wrong numbers in the
+  GUI.
+
 ## [0.7.12~beta1] - 2026-07-27
 
 ### Fixed

@@ -230,6 +230,19 @@ sub snapshots_of {
 
 $A->reset_array();
 
+# 0. What PVE asks for first. The order of these four is easy to get wrong and
+#    the mistake is invisible: the GUI simply shows the wrong numbers.
+#    PVE wants (total, available, used, active); the array reports
+#    (total, used, available).
+{
+    my ($total, $avail, $used, $active) = $A->status($store, $scfg);
+
+    is($total,  1000, 'status reports the total first');
+    is($avail,   600, '... then what is available');
+    is($used,    400, '... then what is used');
+    is($active,    1, '... then whether the storage is usable');
+}
+
 # 1. Create a disk for VM 100.
 #
 # PVE passes alloc_image a size in KiB and volume_resize a size in BYTES.
