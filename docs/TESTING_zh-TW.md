@@ -75,6 +75,10 @@ ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放�
 | `map volume [access rw] initiator <hosts> [lun <n>] <volumes>`；指定 initiator 時必須給 LUN | map volume |
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`；快照名稱上限 32 bytes 且全系統唯一 | create snapshots |
+| `pattern` 接受 shell 風格的萬用字元 —— `*`、`?`、`[]` —— 比對的是名稱中**是否含有**該字串 | show volumes |
+| `show volumes` 的輸出欄位：Name、Total Size、Alloc Size、Serial Number、WWN、Pool、Class、Type、Role、Health | show volumes |
+| `show maps` 的每一列帶有 `nickname`（host 或 host group 名稱，未設定時為空白）、`identifier`（initiator 的 WWPN 或 IQN）、`lun`、`access`、`ports`、`parent-id` | volume-view-mappings basetype |
+| initiator 的資料列帶有 `id`（WWPN 或 IQN）與 `hba-nickname` | initiator-view basetype |
 
 ### 之後已對照 Dell CLI Reference 查證
 
@@ -140,12 +144,14 @@ help create host
 |---|---|---|
 | `total-size-numeric` | 儲存池容量，單位為 512 位元組區塊 | 文件記載為 **Total Size** |
 | `avail-numeric` | 儲存池可用空間 | 文件記載為 **Avail** |
-| `size-numeric` | volume 大小 | 文件記載為 **Size** |
-| `allocated-size-numeric` | volume 已使用空間 | 文件記載為 **Allocated Size** |
-| `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | **未驗證** —— 這是第一個該確認的 |
-| `volume-name`、`name` | 物件名稱 | 已記載 |
-| `identifier`、`nickname` | 一列對應屬於誰 | 文件記載為 **Identifier** 與 **Nickname** |
-| `lun` | 對應的 LUN | 已記載 |
+| `total-size-numeric`（volume） | volume 大小 | `show volumes` 記載的欄位是 **Total Size**，不是 Size |
+| `alloc-size-numeric` | volume 已使用空間 | `show volumes` 記載的欄位是 **Alloc Size**，不是 Allocated Size |
+| `size-numeric`、`allocated-size-numeric` | 較舊的拼法，排在已記載的名稱之後 | — |
+| `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | `show volumes` 記載了 **WWN** 與 **Serial Number** 兩個欄位；主機的 WWID 究竟由哪一個推導出來，仍**未驗證** |
+| `volume-name`、`name` | 物件名稱 | 文件記載為 **Name** |
+| `nickname` | 一列對應屬於哪個 host 或 host group | `volume-view-mappings` 記載為 host 或 host group 名稱，**未設定時為空白** |
+| `identifier` | 一列對應屬於哪個 initiator（WWPN 或 IQN） | `volume-view-mappings`，已記載 |
+| `lun`、`access`、`ports` | 對應的 LUN、存取模式與連接埠 | `volume-view-mappings`，已記載 |
 | `media` | `iSCSI`、`FC(P)`、`FC(L)`、`SAS` | 文件記載為 **Media** |
 | `target-id` | iSCSI 連接埠的 IQN | 文件記載為 **Target ID** |
 | `ip-address` | iSCSI portal 位址 | 已記載 |

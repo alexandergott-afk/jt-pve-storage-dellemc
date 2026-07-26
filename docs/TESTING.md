@@ -91,6 +91,10 @@ during development. Still unverified against hardware, but not guesswork:
 | `map volume [access rw] initiator <hosts> [lun <n>] <volumes>`; a LUN is required when an initiator is named | map volume |
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`; snapshot names max 32 bytes, unique system-wide | create snapshots |
+| `pattern` takes shell-style wildcards — `*`, `?`, `[]` — and matches names *containing* the string | show volumes |
+| `show volumes` output columns: Name, Total Size, Alloc Size, Serial Number, WWN, Pool, Class, Type, Role, Health | show volumes |
+| A `show maps` row carries `nickname` (host or host group name, blank if unset), `identifier` (initiator WWPN or IQN), `lun`, `access`, `ports`, `parent-id` | volume-view-mappings basetype |
+| An initiator row carries `id` (WWPN or IQN) and `hba-nickname` | initiator-view basetype |
 
 ### Verified against Dell's CLI Reference since
 
@@ -168,12 +172,14 @@ SSH, for PowerFlex through the API directly.
 |---|---|---|
 | `total-size-numeric` | pool capacity, in 512-byte blocks | documented as **Total Size** |
 | `avail-numeric` | pool free space | documented as **Avail** |
-| `size-numeric` | volume size | documented as **Size** |
-| `allocated-size-numeric` | volume space in use | documented as **Allocated Size** |
-| `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | **not verified** — the first thing to check |
-| `volume-name`, `name` | object name | documented |
-| `identifier`, `nickname` | who a mapping row belongs to | documented as **Identifier** and **Nickname** |
-| `lun` | LUN of a mapping | documented |
+| `total-size-numeric` (volume) | volume size | `show volumes` documents the column as **Total Size**, not Size |
+| `alloc-size-numeric` | volume space in use | `show volumes` documents the column as **Alloc Size**, not Allocated Size |
+| `size-numeric`, `allocated-size-numeric` | the older spellings, tried after the documented ones | — |
+| `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | `show volumes` documents **WWN** and **Serial Number** as columns; which one the host's WWID derives from is still **not verified** |
+| `volume-name`, `name` | object name | documented as **Name** |
+| `nickname` | the host or host group a mapping belongs to | `volume-view-mappings` documents it as the host or host group name, **blank if unset** |
+| `identifier` | the initiator a mapping belongs to (WWPN or IQN) | `volume-view-mappings`, documented |
+| `lun`, `access`, `ports` | LUN, access mode and ports of a mapping | `volume-view-mappings`, documented |
 | `media` | `iSCSI`, `FC(P)`, `FC(L)`, `SAS` | documented as **Media** |
 | `target-id` | the IQN of an iSCSI port | documented as **Target ID** |
 | `ip-address` | iSCSI portal address | documented |

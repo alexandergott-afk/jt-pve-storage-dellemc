@@ -1,3 +1,28 @@
+jt-pve-storage-dellemc (0.7.26~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault: the second volume mapped to a host would have collided with
+    the first. next_free_lun compared the host against whichever identity
+    field a mapping row defined first, and a real row defines both - so the
+    initiator IQN was compared against a host name, no row ever matched, and
+    every LUN looked free. It now matches any of the identities a row
+    carries, and does so without regard to case.
+  * PowerVault: volume size and used space read the field names the CLI
+    Reference documents. 'show volumes' names its columns Total Size and
+    Alloc Size; the code looked for Size and Allocated Size first, so used
+    space read as zero on an array that spells it as documented. The older
+    spellings are still accepted behind the documented ones.
+  * The comment claiming 'show maps' has no host-name column was wrong: the
+    volume-view-mappings basetype documents nickname as the host or host
+    group name. It is blank when unset, which is why the initiator id is
+    still matched too.
+  * docs/TESTING.md records the show volumes output columns, the
+    volume-view-mappings and initiator-view properties, and that the pattern
+    parameter takes shell wildcards and matches names containing the string.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:07:27 +0800
+
 jt-pve-storage-dellemc (0.7.25~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

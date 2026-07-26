@@ -5,6 +5,16 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.26~beta1] - 2026-07-27
+
+### 修正
+- **對映到同一台 PowerVault host 的第二個 volume 會與第一個相撞。** `next_free_lun` 取的是對應資料列中「第一個有值」的身分欄位，再拿它跟 host 比對 —— 而真實的資料列 `identifier`（initiator 的 IQN 或 WWPN）與 `nickname`（host 名稱）兩者都有值。IQN 永遠不會等於 host 名稱，於是沒有任何一列比對得上、每個 LUN 看起來都是空的，下一次對映就會拿到一個已經在用的 LUN。現在會比對該列帶有的任何一種身分，且不分大小寫。
+- **PowerVault 的已用空間會讀成 0。** `show volumes` 文件記載的欄位是 **Total Size** 與 **Alloc Size**，而程式先找的是 `size` 與 `allocated-size`。較舊的拼法仍然接受，只是排在已記載的名稱之後。
+
+### 變更
+- 原本註解寫著「`show maps` 沒有 host 名稱欄位」是錯的。`volume-view-mappings` basetype 記載 `nickname` 就是 host 或 host group 名稱 —— 未設定時為空白，這也正是仍然要一併比對 initiator id 的原因。
+- `docs/TESTING.md` 記下了 `show volumes` 的輸出欄位、`volume-view-mappings` 與 `initiator-view` 的屬性，以及 `pattern` 接受 shell 風格萬用字元、比對的是名稱中**是否含有**該字串。
+
 ## [0.7.25~beta1] - 2026-07-27
 
 ### 修正

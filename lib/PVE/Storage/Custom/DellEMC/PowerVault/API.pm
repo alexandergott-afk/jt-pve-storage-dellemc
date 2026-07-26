@@ -525,15 +525,22 @@ sub volume_rename {
     return 1;
 }
 
-# Bytes, from the numeric field. 'size' alone is a formatted string.
+# Bytes, from the numeric field. The bare field is a formatted string.
+#
+# 'show volumes' documents its output columns as Total Size and Alloc Size —
+# not Size and Allocated Size, which is what these used to look for first.
+# The documented spelling leads; the others stay behind it because a wrong
+# guess here is silent. A volume whose size reads as zero makes every resize
+# request look like growth and shows the disk as empty in PVE.
 sub volume_size {
     my ($self, $row) = @_;
-    return $self->_blocks_to_bytes($row, 'size', 'total-size');
+    return $self->_blocks_to_bytes($row, 'total-size', 'size');
 }
 
 sub volume_used {
     my ($self, $row) = @_;
-    return $self->_blocks_to_bytes($row, 'allocated-size', 'storage-size');
+    return $self->_blocks_to_bytes($row, 'alloc-size', 'allocated-size',
+        'storage-size');
 }
 
 # The multipath WWID is '3' + the volume's WWN.
@@ -762,16 +769,18 @@ sub mapping_list {
 
 # Mappings of one volume.
 #
-# 'show maps' without the initiator parameter reports one row per INITIATOR,
-# with the columns Serial Number, Name, Ports, LUN, Access, Identifier,
-# Nickname and Profile — there is no host-name column. So a row identifies
-# who it is mapped to by initiator id (Identifier) or by nickname, and asking
-# "is this volume mapped to host X" cannot be answered by comparing against a
-# host name alone.
+# 'show maps' reports one row per INITIATOR. The volume-view-mappings basetype
+# gives each row a 'nickname', documented as the host or host group name and
+# "blank if unset", and an 'identifier', the initiator's WWPN or IQN. So the
+# host name is there — but only when the initiator has been given one, which
+# a manually registered initiator on someone else's array may not have been.
 #
-# Every candidate is therefore returned, and the caller decides: a host name,
-# an initiator nickname and an initiator id are all things 'unmap volume
-# initiator ...' accepts, which is what these are used for.
+# Asking "is this volume mapped to host X" therefore cannot rest on either
+# field alone. Every candidate is returned and the caller decides: a host
+# name, a host group name and an initiator id are all things
+# 'unmap volume initiator ...' accepts, which is what these are used for.
+# 'host-id' and 'host' are not in the documented basetype; they are kept for
+# a firmware that spells it differently, and cost nothing when absent.
 sub volume_mappings {
     my ($self, $volume, %opts) = @_;
 
@@ -781,7 +790,7 @@ sub volume_mappings {
     for my $row (@$rows) {
         my @names = grep { defined && length }
             $row->{'nickname'}, $row->{'identifier'},
-            $row->{'host-id'},  $row->{'host'}, $row->{'name'};
+            $row->{'host-id'},  $row->{'host'};
 
         next unless @names;
 
@@ -828,17 +837,28 @@ sub is_mapped {
 # The CLI requires a LUN whenever an initiator is named, and increments from
 # it when several volumes are mapped at once. Choosing it here keeps the
 # numbering dense and predictable rather than letting it drift upward.
+#
+# $host may be a host name, a host-group name or an initiator id, and a
+# mapping row carries the first two in 'nickname' and the last in
+# 'identifier'. Comparing against whichever field happens to be defined first
+# would answer 'no' for every row on a system where both are — the LUNs
+# already in use would look free, and the second volume mapped to a host
+# would collide with the first.
 sub next_free_lun {
     my ($self, $host, %opts) = @_;
 
     my $base = $opts{base} // MIN_LUN_ID;
     $base = MIN_LUN_ID if $base < MIN_LUN_ID;
 
+    my $want = lc($host // '');
+
     my %used;
     for my $row (@{ $self->mapping_list(%opts) }) {
-        my $mapped_host = $row->{'identifier'} // $row->{'host-id'}
-                       // $row->{'nickname'} // $row->{'host'} // '';
-        next unless $mapped_host eq $host;
+        my @names = grep { defined && length }
+            $row->{'nickname'},  $row->{'identifier'},
+            $row->{'host-id'},   $row->{'host'};
+        next unless grep { lc($_) eq $want } @names;
+
         my $lun = $row->{lun};
         $used{$lun} = 1 if defined $lun && $lun =~ /^\d+$/;
     }

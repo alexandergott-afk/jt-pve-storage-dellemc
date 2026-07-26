@@ -368,9 +368,13 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
 {
     my ($api, $ua) = make_api(handler => sub {
         my ($req, $path) = @_;
+        # The columns 'show volumes' documents are Total Size and Alloc
+        # Size, so those are the field names a real array answers with.
         return reply({ %{ ok_status() }, volumes => [
-            { 'volume-name' => 'pve-me5-100-d0', 'size-numeric' => 67108864,
-              'allocated-size-numeric' => 2048, wwn => '600c0ff0001234560000000000000001' },
+            { 'volume-name' => 'pve-me5-100-d0',
+              'total-size-numeric' => 67108864,
+              'alloc-size-numeric' => 2048,
+              wwn => '600c0ff0001234560000000000000001' },
         ]}) if $path =~ m{/show/volumes};
         return reply(ok_status());
     });
@@ -388,8 +392,22 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
     like($path, qr{/type/all$}, 'and every type, so snapshots are visible too');
 
     my $row = $volumes->[0];
-    is($api->volume_size($row), 67108864 * 512, 'size comes from the numeric field, in blocks');
-    is($api->volume_used($row), 2048 * 512, 'and so does the allocated size');
+    is($api->volume_size($row), 67108864 * 512,
+        'the size comes from the documented Total Size field, in 512-byte blocks');
+    is($api->volume_used($row), 2048 * 512,
+        'and the used space from Alloc Size');
+
+    # A zero here is the damaging answer, not an error: volume_resize compares
+    # against the current size, so every request would look like growth, and
+    # PVE would show the disk as empty.
+    cmp_ok($api->volume_size($row), '>', 0, 'a size never silently reads as zero');
+
+    # Older spellings stay behind the documented ones rather than being
+    # dropped: a firmware that answers with them still works.
+    is($api->volume_size({ 'size-numeric' => 100 }), 100 * 512,
+        'the older Size spelling is still understood');
+    is($api->volume_used({ 'allocated-size-numeric' => 8 }), 8 * 512,
+        'and the older Allocated Size spelling');
     is($api->volume_wwid($row), '3600c0ff0001234560000000000000001',
         'the WWID is the WWN with the NAA prefix');
 }
@@ -450,6 +468,42 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 
     is($api->is_mapped('pve-me5-100-d0', 'pve-c1-node1'), 1, 'existing mapping found');
     is($api->is_mapped('pve-me5-100-d0', 'pve-c1-node9'), 0, 'another host is not');
+}
+
+{
+    # A realistic row. The volume-view-mappings basetype gives 'nickname' as
+    # the host or host group name and 'identifier' as the initiator's IQN or
+    # WWPN, and a real array fills in both. Picking whichever field is defined
+    # first then answers with the IQN for every row, so no LUN ever looks
+    # used and the second volume mapped to a host collides with the first.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() }, 'volume-view-mappings' => [
+            { nickname => 'pve-c1-node1', lun => 1,
+              identifier => 'iqn.1993-08.org.debian:01:node1' },
+            { nickname => 'pve-c1-node1', lun => 3,
+              identifier => 'iqn.1993-08.org.debian:01:node1' },
+            { nickname => 'pve-c1-node2', lun => 2,
+              identifier => 'iqn.1993-08.org.debian:01:node2' },
+        ]}) if $path =~ m{/show/maps};
+        return reply(ok_status());
+    });
+
+    is($api->next_free_lun('pve-c1-node1'), 2,
+        'a LUN in use by this host is not handed out again');
+    is($api->next_free_lun('PVE-C1-NODE1'), 2,
+        'and the name is matched without regard to case');
+    is($api->next_free_lun('iqn.1993-08.org.debian:01:node1'), 2,
+        'the initiator id identifies the same host');
+    is($api->next_free_lun('pve-c1-node2'), 1,
+        "another host's LUNs are its own");
+
+    is($api->is_mapped('pve-me5-100-d0', 'pve-c1-node1'), 1,
+        'the host name in nickname is a mapping');
+    is($api->is_mapped('pve-me5-100-d0', 'iqn.1993-08.org.debian:01:node2'), 1,
+        'and so is an initiator id in identifier');
+    is($api->is_mapped('pve-me5-100-d0', 'pve-c1-node9'), 0,
+        'a host that is not there is not');
 }
 
 {

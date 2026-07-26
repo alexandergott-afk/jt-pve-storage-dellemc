@@ -7,6 +7,30 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.26~beta1] - 2026-07-27
+
+### Fixed
+- **The second volume mapped to a PowerVault host would have collided with the
+  first.** `next_free_lun` took whichever identity field a mapping row defined
+  first and compared it against the host — and a real row defines both
+  `identifier` (the initiator's IQN or WWPN) and `nickname` (the host name).
+  An IQN never equals a host name, so no row ever matched, every LUN looked
+  free, and the next mapping was handed a LUN already in use. It now matches
+  any identity the row carries, without regard to case.
+- **PowerVault used space read as zero.** `show volumes` documents its columns
+  as **Total Size** and **Alloc Size**; the code looked for `size` and
+  `allocated-size` first. The older spellings are still accepted, behind the
+  documented ones.
+
+### Changed
+- The comment saying `show maps` has no host-name column was wrong. The
+  `volume-view-mappings` basetype documents `nickname` as the host or host
+  group name — blank when unset, which is why the initiator id is still
+  matched alongside it.
+- `docs/TESTING.md` records the `show volumes` output columns, the
+  `volume-view-mappings` and `initiator-view` properties, and that `pattern`
+  takes shell-style wildcards and matches names *containing* the string.
+
 ## [0.7.25~beta1] - 2026-07-27
 
 ### Fixed

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.25~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.26~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.26~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The second volume mapped to a PowerVault host would have been handed a LUN the first one already used, because the LUN search compared an initiator IQN against a host name. PowerVault size and used space now read the field names the CLI Reference documents.</span>
+            <span class="lang-zh">對映到同一台 PowerVault host 的第二個 volume，會拿到第一個已經在用的 LUN —— 因為搜尋可用 LUN 時，拿 initiator 的 IQN 去比對 host 名稱。PowerVault 的大小與已用空間現在改讀 CLI Reference 記載的欄位名稱。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.25~beta1</div>
