@@ -374,8 +374,13 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
     is(scalar @$volumes, 1, 'volumes returned');
 
     my $path = $ua->last_request->uri->path;
-    like($path, qr{/show/volumes/pattern/pve-me5-}, 'filtered on the array by pattern');
-    like($path, qr{/details$}, 'details requested, which is where the WWN lives');
+    # 'show volumes [details] [pattern <string>] [pool <pool>] [type ...]',
+    # in the order the CLI Reference gives them.
+    like($path, qr{/show/volumes/details/pattern/pve-me5-},
+        'filtered on the array by pattern, in the documented argument order');
+    like($path, qr{/show/volumes/details/},
+        'details requested, which is where the WWN lives');
+    like($path, qr{/type/all$}, 'and every type, so snapshots are visible too');
 
     my $row = $volumes->[0];
     is($api->volume_size($row), 67108864 * 512, 'size comes from the numeric field, in blocks');
@@ -610,6 +615,76 @@ SKIP: {
     $api->host_add_initiators('pve-pve-node1', []);
     is(scalar @{ $ua->requests }, $before,
         'an empty initiator list sends nothing at all');
+}
+
+# ---------------------------------------------------------------------------
+# map volume: the one command whose argument order differs between ME4 and ME5
+#
+# Both orders come from Dell's own CLI Reference. This plugin targets both
+# families, so it sends the ME5 form and falls back to the ME4 one — mapping
+# is the operation no volume can be used without.
+# ---------------------------------------------------------------------------
+
+{
+    my @paths;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        push @paths, $path;
+        return reply({ status => [{ 'response-type' => 'Success',
+                                    'return-code' => 0 }],
+                       'volume-view-mappings' => [] })
+            if $path =~ m{/show/maps};
+        return reply(ok_status());
+    });
+
+    my $lun = $api->volume_map('pve-me5-100-d0', 'pve-pve-node1', lun => 7);
+    is($lun, 7, 'the LUN chosen is the one reported back');
+
+    my ($map_path) = grep { m{/map/volume/} } @paths;
+    like($map_path, qr{/map/volume/access/rw/initiator/pve-pve-node1/lun/7/pve-me5-100-d0$},
+        'the ME5 order is sent first: the volume comes last');
+
+    is(scalar(grep { m{/map/volume/} } @paths), 1,
+        'and one command is enough when the array accepts it');
+}
+
+{
+    # An array that refuses the ME5 order must still get its volume mapped.
+    my @map_paths;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+
+        if ($path =~ m{/map/volume/}) {
+            push @map_paths, $path;
+            # Refuse the ME5 form, accept the ME4 one.
+            return reply(err_status('Invalid parameter', -10001))
+                if $path =~ m{/lun/\d+/pve-me5-100-d0$};
+            return reply(ok_status());
+        }
+
+        return reply(ok_status());
+    });
+
+    my $lun = eval { $api->volume_map('pve-me5-100-d0', 'pve-pve-node1', lun => 3) };
+
+    is($lun, 3, 'the volume is mapped even so');
+    is(scalar(@map_paths), 2, 'by trying the other documented order');
+    like($map_paths[1], qr{/map/volume/pve-me5-100-d0/access/rw/},
+        '... which puts the volume first, as the ME4 guide has it');
+}
+
+{
+    # Both refused: one message, carrying both refusals.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(err_status('Invalid parameter', -10001))
+            if $path =~ m{/map/volume/};
+        return reply(ok_status());
+    });
+
+    ok(!eval { $api->volume_map('pve-me5-100-d0', 'pve-pve-node1', lun => 1); 1 },
+        'an array that refuses both orders is a failure');
+    like($@, qr/ME5 form.*ME4 form/s, '... reported with both refusals');
 }
 
 done_testing();

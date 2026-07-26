@@ -7,6 +7,26 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.15~beta1] - 2026-07-27
+
+### Fixed
+- **`map volume` differs between ME4 and ME5**, and both orders are from
+  Dell's own CLI Reference: ME5 documents the volume last, ME4 documents it
+  first. This plugin targets both families, so it sends the ME5 form and falls
+  back to the ME4 one if the array refuses it — mapping is the operation no
+  volume can be used without. An array that wants the other order says so in
+  the journal once.
+- `show volumes` sends its parameters in the order the guide gives them.
+- `docs/ARCHITECTURE.md` named the wrong tests for the abstract interface and
+  the property-declaration rule, and was missing the overrides added since it
+  was written.
+
+### Changed
+- The host commands corrected in 0.7.14 were re-checked against the ME5 guide
+  as well as the ME4 one. Both families document them identically, so that
+  fix is right for both — worth confirming, since `map volume` proves the two
+  guides do not always agree.
+
 ## [0.7.14~beta1] - 2026-07-27
 
 ### Fixed

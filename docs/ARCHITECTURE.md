@@ -58,6 +58,7 @@ DellEMC::Common::BlockBase       everything array-independent:
         +-- Common::FC           HBA discovery, WWN normalisation
         +-- Common::Multipath    SCSI device lifecycle, dm-multipath maps
         +-- Common::Naming       PVE names <-> array object names
+        +-- Common::Schema       the shared dell-* options, declared once
         +-- Common::WwidState    WWID tracking, orphan grace periods
         +-- Common::Health       status failure counters, capacity alerts
 ```
@@ -69,8 +70,10 @@ name limits.
 ## The BlockBase contract
 
 A block family implements these and inherits everything else. Each one dies
-with the name of the class that failed to implement it, and `t/08` asserts
-that none is left inherited.
+with the name of the class that failed to implement it — which happens the
+first time that operation is tried, so for several of them that is the first
+delete or the first snapshot read. `t/15` asserts that no family has left one
+inherited.
 
 ```
 type                    the PVE storage type string
@@ -97,8 +100,11 @@ _array_get_portals      iSCSI portals, [{ portal, iqn }]
 ```
 
 Optional overrides: `naming`, `family_properties`, `family_options`,
-`identity_suffix`, `capacity_scope`, `multipath_config_version`,
-`_array_list_base_snapshots`.
+`identity_suffix`, `capacity_scope`, `multipath_config_version`, `_vendor_re`,
+`_array_list_base_snapshots`, `_array_clone_parents` (how a linked clone's
+base is identified from the array's own metadata), and
+`supports_config_backup` (a family whose volume ceiling is too low to spend
+one volume per snapshot returns 0 and the feature is never offered).
 
 ## Property declaration
 
@@ -109,8 +115,10 @@ plugin; it happens while PVE builds the storage schema, so every storage on
 the node stops working.
 
 The shared `dell-*` options are therefore declared by whichever family class
-PVE asks first, and the others declare only their own. Adding a family
-requires no change to this mechanism, and `t/06` covers it.
+PVE asks first, and the others declare only their own. `Common::Schema` owns
+that rule, so adding a family requires no change to the mechanism. `t/09`
+covers the rule itself and `t/15` asserts it across all three plugins at
+once, against the PVE installed on the machine.
 
 ### A note on PowerMax, before it is built
 

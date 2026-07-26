@@ -105,6 +105,21 @@ guesses were wrong, and both sit on the first activation of the storage:
 | rename a volume | `set volume name <new> <volume>` | unchanged |
 | unmap | `unmap volume initiator <hosts> <volumes>` | unchanged; omitting the initiator would delete the DEFAULT mapping instead |
 | roll back | `rollback volume [prompt yes\|no] snapshot <snap> <volume>` | now answers the prompt |
+| list volumes | `show volumes [details] [pattern <s>] [pool <p>] [type ...]` | argument order now matches the guide |
+| map | see below — ME4 and ME5 document **different** orders | ME5 form, with a fallback |
+
+`map volume` is the one command whose documented argument order differs
+between the two families:
+
+```
+ME5:  map volume [access ...] initiator <initiators> [lun <LUN>] <volumes>
+ME4:  map volume <volumes> [access ...] initiator <initiators> [lun <LUN>]
+```
+
+The plugin sends the ME5 form and falls back to the ME4 one if the array
+refuses it, so both work; on an ME4 the journal says which order it settled
+on. **On the first hardware run, check that line** — it is the cheapest
+confirmation that the mapping path is behaving as documented.
 
 ### NOT VERIFIED — check these first
 

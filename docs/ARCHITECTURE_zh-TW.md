@@ -40,6 +40,7 @@ DellEMC::Common::BlockBase       所有與陣列無關的邏輯：
         +-- Common::FC           HBA 探索、WWN 正規化
         +-- Common::Multipath    SCSI 裝置生命週期、dm-multipath map
         +-- Common::Naming       PVE 名稱與陣列物件名稱的對應
+        +-- Common::Schema       共用的 dell-* 選項，只宣告一次
         +-- Common::WwidState    WWID 追蹤、orphan 寬限期
         +-- Common::Health       status 失敗計數、容量告警
 ```
@@ -48,7 +49,7 @@ DellEMC::Common::BlockBase       所有與陣列無關的邏輯：
 
 ## BlockBase 要求實作的方法
 
-block 系列只需要實作以下方法，其餘全部繼承。每個未實作的方法都會以「哪個類別沒有實作它」的訊息中止，`t/08` 也會檢查沒有任何一個仍停留在抽象狀態。
+block 系列只需要實作以下方法，其餘全部繼承。每個未實作的方法都會以「哪個類別沒有實作它」的訊息中止 —— 而且是在該操作第一次被執行時才發生，對其中幾個方法來說，那就是第一次刪除或第一次讀取快照的時候。`t/15` 會檢查沒有任何系列漏掉其中任何一個。
 
 ```
 type                    PVE storage type 字串
@@ -74,13 +75,13 @@ _array_is_mapped        _array_mapped_hosts
 _array_get_portals      iSCSI portal，格式為 [{ portal, iqn }]
 ```
 
-可選擇覆寫：`naming`、`family_properties`、`family_options`、`identity_suffix`、`capacity_scope`、`multipath_config_version`、`_array_list_base_snapshots`。
+可選擇覆寫：`naming`、`family_properties`、`family_options`、`identity_suffix`、`capacity_scope`、`multipath_config_version`、`_vendor_re`、`_array_list_base_snapshots`、`_array_clone_parents`（如何從陣列自身的中繼資料判斷連結複製的母體），以及 `supports_config_backup`（volume 上限太少、無法為每個快照再多花一個 volume 的系列回傳 0，該功能就完全不提供）。
 
 ## Property 宣告
 
 PVE 會把所有已註冊外掛的 `properties()` 合併成同一份 schema，若兩個外掛宣告了相同名稱就會以 `duplicate property` **中止** —— 見 `PVE::SectionConfig::init`。這個失敗的影響範圍不限於出問題的外掛：它發生在 PVE 建立 storage schema 的過程中，因此該節點上的每一個儲存都會停止運作。
 
-因此共用的 `dell-*` 選項由「PVE 最先詢問到的那個系列類別」宣告，其他系列只宣告自己的。新增系列不需要更動這個機制，`t/06` 也涵蓋了它。
+因此共用的 `dell-*` 選項由「PVE 最先詢問到的那個系列類別」宣告，其他系列只宣告自己的。這個規則由 `Common::Schema` 負責，因此新增系列不需要更動這個機制。`t/09` 涵蓋規則本身，`t/15` 則會針對本機安裝的 PVE，一次檢查三個外掛之間有沒有重複。
 
 ### 關於 PowerMax，在動工之前先記下
 

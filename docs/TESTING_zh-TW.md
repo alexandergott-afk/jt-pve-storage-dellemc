@@ -88,6 +88,19 @@ ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放�
 | 重新命名 volume | `set volume name <新名稱> <volume>` | 不變 |
 | 解除對應 | `unmap volume initiator <hosts> <volumes>` | 不變；若省略 initiator，刪掉的會是**預設對應** |
 | 還原 | `rollback volume [prompt yes\|no] snapshot <快照> <volume>` | 現在會回答那個確認提示 |
+| 列出 volume | `show volumes [details] [pattern <s>] [pool <p>] [type ...]` | 參數順序已與指南一致 |
+| 對應 | 見下方 —— ME4 與 ME5 記載的順序**不同** | 先送 ME5 形式，並保留退回機制 |
+
+`map volume` 是唯一一個「兩個系列記載的參數順序不同」的指令：
+
+```
+ME5：map volume [access ...] initiator <initiators> [lun <LUN>] <volumes>
+ME4：map volume <volumes> [access ...] initiator <initiators> [lun <LUN>]
+```
+
+外掛會先送 ME5 的形式，若陣列拒絕就退回 ME4 的形式，因此兩者都能運作；在
+ME4 上，journal 會記錄它最後採用了哪一種順序。**第一次上實機時請檢查那一
+行** —— 那是確認對應路徑行為符合文件最省力的方式。
 
 ### 尚未查證 —— 請優先確認這些
 

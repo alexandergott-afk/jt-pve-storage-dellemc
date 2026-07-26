@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.15~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * 'map volume' is the one PowerVault command whose documented argument order
+    differs between ME4 and ME5, and both orders come from Dell's own CLI
+    Reference: ME5 puts the volume last, ME4 puts it first. The plugin sends
+    the ME5 form and falls back to the ME4 one if the array refuses it, so
+    both families work; the journal records which order an array wanted.
+  * 'show volumes' now sends its parameters in the documented order.
+  * The host commands corrected in 0.7.14 were re-checked against the ME5
+    guide as well as the ME4 one: both families document them identically, so
+    that fix is right for both.
+  * docs/ARCHITECTURE.md was out of date about which tests cover the abstract
+    interface and the property-declaration rule, and did not mention the
+    overrides added since it was written.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 15:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.14~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

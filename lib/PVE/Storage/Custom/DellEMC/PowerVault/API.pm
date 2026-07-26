@@ -406,18 +406,26 @@ sub _parse_size_string {
 # Volumes
 # ---------------------------------------------------------------------------
 
+# From the CLI Reference:
+#     show volumes [details] [pattern <string>] [pool <pool>]
+#                  [type all|base|standard|snapshot|primary-volume|secondary-volume]
+#                  [vdisk <vdisks>] [volumes]
+#
+# The parameters are given in the documented order. `pattern` filters on the
+# array — listing the whole inventory and filtering here would put it on the
+# wire on every poll.
 sub volume_list {
     my ($self, $pattern, %opts) = @_;
 
-    my @tokens = ('show', 'volumes');
+    my @tokens = ('show', 'volumes', 'details');
 
-    # `pattern` filters on the array. Listing everything and filtering here
-    # would put the whole inventory on the wire on every poll.
-    if (defined $pattern && length $pattern) {
-        push @tokens, 'pattern', $pattern;
-    }
+    push @tokens, 'pattern', $pattern
+        if defined $pattern && length $pattern;
+
+    push @tokens, 'pool', $opts{pool}
+        if defined $opts{pool} && length $opts{pool};
+
     push @tokens, 'type', ($opts{type} // 'all');
-    push @tokens, 'details';
 
     my $data = $self->_cmd(\@tokens, %opts);
 
@@ -428,7 +436,8 @@ sub volume_get_by_name {
     my ($self, $name, %opts) = @_;
 
     # An exact name, not a pattern: 'pve-ps1-100-d1' must not match
-    # 'pve-ps1-100-d10'.
+    # 'pve-ps1-100-d10'. The trailing positional argument is the documented
+    # place for a comma-separated list of volume names.
     my $data = eval { $self->_cmd(['show', 'volumes', 'details', $name], %opts) };
     if ($@) {
         # A missing volume is an error to the CLI, not an empty list.
@@ -752,15 +761,47 @@ sub next_free_lun {
         . " pvault-lun-id-base.") . "\n";
 }
 
+# ME4 and ME5 document DIFFERENT argument orders for this one command, and
+# both were read from Dell's own CLI Reference:
+#
+#   ME5:  map volume [access ...] initiator <initiators> [lun <LUN>]
+#                    [ports <ports>] <volumes>          <- volume LAST
+#   ME4:  map volume <volumes> [access ...] [host <hosts>] initiator
+#                    <initiators> [lun <LUN>] [ports <ports>]
+#                                                        <- volume FIRST
+#
+# This plugin targets both, so it sends the ME5 form and falls back to the
+# ME4 one if the array rejects it. The fallback costs a round trip only on a
+# system that wants the other order, and mapping is the one operation no
+# volume can be used without.
 sub volume_map {
     my ($self, $volume, $host, %opts) = @_;
 
     my $lun = $opts{lun} // $self->next_free_lun($host, base => $opts{lun_base}, %opts);
 
-    $self->_cmd(['map', 'volume', 'access', 'rw', 'initiator', $host,
-                 'lun', $lun, $volume], %opts);
+    my @me5 = ('map', 'volume', 'access', 'rw', 'initiator', $host,
+               'lun', $lun, $volume);
+    my @me4 = ('map', 'volume', $volume, 'access', 'rw', 'initiator', $host,
+               'lun', $lun);
 
-    return $lun;
+    my $ok = eval { $self->_cmd(\@me5, %opts); 1 };
+    return $lun if $ok;
+
+    my $me5_error = $@;
+
+    $ok = eval { $self->_cmd(\@me4, %opts); 1 };
+    if ($ok) {
+        $self->log_warn("this array wants the ME4 argument order for"
+            . " 'map volume'; using it from here on");
+        return $lun;
+    }
+
+    chomp(my $me4_error = $@);
+    chomp($me5_error);
+
+    die $self->_msg("could not map volume '$volume' to '$host'. Both"
+        . " documented argument orders were refused.\n  ME5 form: $me5_error"
+        . "\n  ME4 form: $me4_error") . "\n";
 }
 
 sub volume_unmap {
