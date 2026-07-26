@@ -33,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.34~beta1';
+my $VERSION = '0.7.35~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -250,7 +250,11 @@ sub run_bounded {
     }
 
     if ($pid == 0) {
-        # Child: replace itself with the command.
+        # Child: replace itself with the command. C locale, so that a mount
+        # failure reads the same on every node — recovery is not the moment
+        # to be handed a message nobody here can paste into a search.
+        $ENV{LC_ALL} = 'C';
+        $ENV{LANG}   = 'C';
         exec(@$cmd) or POSIX::_exit(127);
     }
 

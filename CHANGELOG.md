@@ -7,6 +7,23 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.35~beta1] - 2026-07-27
+
+### Fixed
+- **Every command this plugin runs now runs in the C locale.** util-linux
+  ships translations, so on a node running `zh_TW` — exactly the kind of node
+  this plugin is written for — `fuser -v` answers in Chinese and every parser
+  written against its English output silently matches nothing. Nothing fails
+  and nothing is logged; the information simply stops arriving, which is how
+  the "which process holds this device" line was blank for a different reason
+  two releases ago.
+- `pve-dell-config-get` pins it too, so a mount failure during recovery reads
+  the same on every node.
+
+### Added
+- A test asserts the locale is pinned in each of the three modules that run
+  commands.
+
 ## [0.7.34~beta1] - 2026-07-27
 
 ### Fixed

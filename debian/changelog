@@ -1,3 +1,17 @@
+jt-pve-storage-dellemc (0.7.35~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Every command this plugin runs now runs in the C locale. util-linux
+    ships translations, so on a node running zh_TW - which is exactly the
+    kind of node this plugin is written for - 'fuser -v' answers in Chinese
+    and every parser written against its English output silently matches
+    nothing. Nothing fails; the information just stops arriving.
+  * A test asserts the locale is pinned in each of the three modules that
+    run commands.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:58:16 +0800
+
 jt-pve-storage-dellemc (0.7.34~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

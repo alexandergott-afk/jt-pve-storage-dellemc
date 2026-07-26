@@ -516,4 +516,31 @@ my $TMP = tempdir(CLEANUP => 1);
         'nothing decides anything by matching strerror text');
 }
 
+# Every command whose output this plugin parses must run in the C locale.
+# util-linux ships translations, so 'fuser -v' on a zh_TW node answers in
+# Chinese — and the nodes this plugin is written for are as likely to run
+# zh_TW as en_US. A parser that silently matches nothing is the failure.
+for my $file (qw(
+    lib/PVE/Storage/Custom/DellEMC/Common/Multipath.pm
+    lib/PVE/Storage/Custom/DellEMC/Common/ISCSI.pm
+    lib/PVE/Storage/Custom/DellEMC/PowerFlex/Host.pm
+)) {
+    my $source = '';
+    for my $path ($file, "../$file") {
+        next unless open(my $fh, '<', $path);
+        local $/;
+        $source = <$fh>;
+        close($fh);
+        last;
+    }
+
+  SKIP: {
+        skip "$file is not readable from here", 1 unless length $source;
+        like($source, qr/local\s+\$ENV\{LC_ALL\}\s*=\s*'C'/,
+            "$file pins the C locale before running a command")
+            or diag('a translated tool answers in the node\'s language and'
+                  . ' every parser here silently matches nothing');
+    }
+}
+
 done_testing();

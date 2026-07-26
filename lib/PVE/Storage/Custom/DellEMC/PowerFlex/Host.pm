@@ -107,6 +107,14 @@ sub _run {
         local $SIG{ALRM} = sub { die "timeout\n" };
         alarm($timeout);
 
+        # The output of some of these is parsed, and util-linux tools ship
+        # translations: a node running in another language answers with
+        # another language. Pin the child to C so what comes back is what the
+        # parsers were written against. This is not hypothetical here — the
+        # nodes this plugin is written for are as likely to run zh_TW as en_US.
+        local $ENV{LC_ALL} = 'C';
+        local $ENV{LANG}   = 'C';
+
         $pid = open3(my $in, my $out, $err, @$cmd);
         close($in);
 
