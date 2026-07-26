@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.16~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.17~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -981,6 +981,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.17~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerVault would have re-added an initiator on every host check, and the array's refusal fails activate_storage — so a working storage would have gone inactive. Ports the array calls unusable are no longer offered to the login loop.</span>
+            <span class="lang-zh">PowerVault 每次檢查 host 都會重新加入 initiator，而陣列的拒絕會讓 activate_storage 失敗 —— 原本正常的儲存因此會變成 inactive。陣列自己說不可用的連接埠，也不再送進登入迴圈。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.16~beta1</div>

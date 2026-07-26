@@ -223,6 +223,13 @@ sub _cmd {
 
         my $command = join(' ', @$tokens);
         my $message = $status->{response} // 'the array reported a failure';
+
+        # A refusal the caller expects and can live with. Matched against the
+        # array's own words ONLY: the rendered message also carries the
+        # command, and a command named 'add host-members' would match a
+        # pattern looking for the word 'member'.
+        return undef
+            if $opts{tolerate} && $message =~ $opts{tolerate};
         my $code    = $status->{'return-code'};
         $message .= " (return code $code)" if defined $code;
 
@@ -624,6 +631,12 @@ sub initiator_list {
     return $self->_objects($data, 'initiator');
 }
 
+# From the CLI Reference:
+#     show host-groups [hosts <hosts>] [groups <host-groups>]
+#
+# The output nests: host groups contain hosts, and each host contains its
+# initiators, reported with Nickname, Discovered, Mapped, Profile, Host Type
+# and ID (a WWPN for FC and SAS, an IQN for iSCSI).
 sub host_list {
     my ($self, %opts) = @_;
 
@@ -646,6 +659,42 @@ sub host_get_by_name {
     }
 
     return undef;
+}
+
+# Does this host already contain this initiator?
+#
+# The initiators are nested inside the host object and the exact JSON shape is
+# firmware-dependent, so rather than guessing at field names this walks the
+# structure and looks for the id itself. An initiator id — an IQN or a WWPN —
+# is distinctive enough that finding it anywhere under the host means the host
+# has it. Answering "no" when the answer is yes would mean re-adding a member
+# on every host check, and a refusal there fails activate_storage.
+sub host_has_initiator {
+    my ($self, $host, $initiator) = @_;
+
+    return 0 unless defined $initiator && length $initiator;
+
+    my $want  = lc($initiator);
+    my @queue = ($host);
+    my $seen  = 0;
+
+    while (@queue) {
+        my $node = shift @queue;
+        next unless defined $node;
+
+        # A structure deep or circular enough to spin here is not a host.
+        last if ++$seen > 10_000;
+
+        if (ref($node) eq 'HASH') {
+            push @queue, values %$node;
+        } elsif (ref($node) eq 'ARRAY') {
+            push @queue, @$node;
+        } elsif (!ref($node)) {
+            return 1 if lc($node) eq $want;
+        }
+    }
+
+    return 0;
 }
 
 # From the CLI Reference:
@@ -680,8 +729,12 @@ sub host_add_initiators {
 
     return 1 unless ref($initiators) eq 'ARRAY' && @$initiators;
 
+    # An initiator that is already a member is the state we wanted. This path
+    # runs on activation, so a refusal that means "it is already how you want
+    # it" must not turn a healthy storage into a failing one.
     $self->_cmd(['add', 'host-members', 'initiators',
-                 join(',', @$initiators), $name], %opts);
+                 join(',', @$initiators), $name],
+        %opts, tolerate => qr/already|is a member|duplicate/i);
 
     return 1;
 }
@@ -852,25 +905,62 @@ sub volume_unmap {
 
 # [ { portal => 'ip:3260', iqn => '...' }, ... ]
 #
-# NOT VERIFIED: the field names of `show ports`.
+# From the CLI Reference, `show ports` reports per port: Ports, Media (FC(P),
+# FC(L), SAS or iSCSI), Target ID (a WWPN for FC and SAS, the node name — the
+# IQN — for iSCSI), Status (Up, Warning, Error, Not Present, Disconnected),
+# IP Address and IP Version for iSCSI, MAC, and Health.
+#
+# A port the array itself calls Not Present or Disconnected is not worth
+# offering to the login loop: this node would pay a TCP probe for it, and
+# without the probe a discovery and a login timeout. When the field is absent
+# the port is kept — an unfamiliar firmware should not make the storage
+# unusable.
+sub _port_is_usable {
+    my ($self, $port) = @_;
+
+    my $status = $port->{status} // $port->{'status-numeric'};
+    return 1 unless defined $status && length $status;
+
+    return 0 if lc($status) =~ /not\s*present|disconnected|error/;
+
+    my $health = $port->{health};
+    return 0 if defined $health && lc($health) eq 'fault';
+
+    return 1;
+}
+
+sub _port_media {
+    my ($self, $port) = @_;
+    return lc($port->{media} // $port->{'port-type'} // '');
+}
+
 sub iscsi_portals {
     my ($self, %opts) = @_;
 
     my $data = $self->_cmd(['show', 'ports'], %opts);
     my $ports = $self->_objects($data, 'port');
 
-    my @portals;
+    my (@portals, @skipped);
     for my $port (@$ports) {
-        my $type = lc($port->{'port-type'} // $port->{media} // '');
-        next unless $type =~ /iscsi/;
+        next unless $self->_port_media($port) =~ /iscsi/;
 
-        my $ip = $port->{'ip-address'} // $port->{'primary-ip-address'} // next;
-        next if $ip =~ /^0\.0\.0\.0$/ || !length $ip;
+        my $ip = $port->{'ip-address'} // $port->{'primary-ip-address'};
+        next unless defined $ip && length $ip;
+        next if $ip =~ /^0\.0\.0\.0$/;
 
+        # 'Target ID' is the node name for an iSCSI port.
         my $target = $port->{'target-id'} // $port->{'iqn'} // next;
+
+        unless ($self->_port_is_usable($port)) {
+            push @skipped, $ip;
+            next;
+        }
 
         push @portals, { portal => "$ip:3260", iqn => $target };
     }
+
+    $self->log_warn("skipping " . scalar(@skipped) . " iSCSI port(s) the array"
+        . " reports as not usable: " . join(', ', @skipped)) if @skipped;
 
     return \@portals;
 }
@@ -880,7 +970,8 @@ sub fc_ports {
 
     my $data = $self->_cmd(['show', 'ports'], %opts);
 
-    return [ grep { lc($_->{'port-type'} // '') =~ /fc/ }
+    # Media is 'FC(P)' or 'FC(L)' on this family.
+    return [ grep { $self->_port_media($_) =~ /fc/ }
              @{ $self->_objects($data, 'port') } ];
 }
 

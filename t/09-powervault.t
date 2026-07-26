@@ -739,4 +739,121 @@ SKIP: {
     is($mappings->[0]{lun}, '3', 'and the LUN comes with it');
 }
 
+# ---------------------------------------------------------------------------
+# show ports: the array says which ports are usable
+#
+# The documented fields are Media (FC(P), FC(L), SAS, iSCSI), Target ID — the
+# node name for an iSCSI port — Status (Up, Warning, Error, Not Present,
+# Disconnected), IP Address and Health. Offering a port the array calls Not
+# Present to the login loop costs this node a probe at best, and a discovery
+# plus a login timeout at worst.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({
+            status => [{ 'response-type' => 'Success', 'return-code' => 0 }],
+            port => [
+                { media => 'iSCSI', 'target-id' => 'iqn.1988-11.com.dell:01.me5',
+                  'ip-address' => '10.0.0.11', status => 'Up', health => 'OK' },
+                { media => 'iSCSI', 'target-id' => 'iqn.1988-11.com.dell:01.me5',
+                  'ip-address' => '10.0.0.12', status => 'Disconnected' },
+                { media => 'iSCSI', 'target-id' => 'iqn.1988-11.com.dell:01.me5',
+                  'ip-address' => '10.0.0.13', status => 'Not Present' },
+                { media => 'iSCSI', 'target-id' => 'iqn.1988-11.com.dell:01.me5',
+                  'ip-address' => '0.0.0.0', status => 'Up' },
+                { media => 'FC(P)', 'target-id' => '207000c0ff1a2b3c',
+                  status => 'Up' },
+                { media => 'SAS', 'target-id' => '500c0ff1a2b3c000', status => 'Up' },
+                # An unfamiliar firmware that reports no status at all must
+                # not make the storage unusable.
+                { media => 'iSCSI', 'target-id' => 'iqn.1988-11.com.dell:01.me5',
+                  'ip-address' => '10.0.0.14' },
+            ],
+        }) if $path =~ m{/show/ports};
+        return reply(ok_status());
+    });
+
+    my $portals = $api->iscsi_portals();
+
+    is_deeply([map { $_->{portal} } @$portals],
+        ['10.0.0.11:3260', '10.0.0.14:3260'],
+        'only usable iSCSI ports with a real address are offered');
+
+    is($portals->[0]{iqn}, 'iqn.1988-11.com.dell:01.me5',
+        "the target IQN comes from 'Target ID', as documented");
+
+    my $fc = $api->fc_ports();
+    is(scalar(@$fc), 1, 'FC ports are picked out by media, which reads FC(P)');
+    isnt($fc->[0]{media}, 'SAS', 'and SAS is not mistaken for one');
+}
+
+# ---------------------------------------------------------------------------
+# Is this initiator already on this host?
+#
+# 'show host-groups' nests initiators inside hosts, and the JSON shape varies
+# by firmware. Answering "no" when the answer is yes means re-adding a member
+# on every host check, which the array refuses — and a refusal there fails
+# activate_storage, so a working storage would go inactive.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api();
+
+    my $iqn = 'iqn.1993-08.org.debian:01:node1';
+
+    # Whatever the firmware nests it in, the id is findable.
+    my @shapes = (
+        { name => 'h1', initiator => [{ id => $iqn, nickname => 'node1' }] },
+        { name => 'h1', initiators => { initiator => [{ 'initiator-id' => $iqn }] } },
+        { name => 'h1', 'host-members' => [{ id => uc($iqn) }] },
+        { name => 'h1', id => $iqn },
+    );
+
+    for my $i (0 .. $#shapes) {
+        ok($api->host_has_initiator($shapes[$i], $iqn),
+            "the initiator is found however the firmware nests it (shape $i)");
+    }
+
+    ok(!$api->host_has_initiator({ name => 'h1', initiator => [{ id => 'iqn.other' }] },
+            $iqn),
+        'and a host without it says so');
+
+    ok(!$api->host_has_initiator({ name => 'h1' }, $iqn),
+        'as does a host with no initiators at all');
+
+    ok(!$api->host_has_initiator({ name => 'h1', id => $iqn }, ''),
+        'an empty initiator id matches nothing');
+
+    # A structure that refers to itself must not spin.
+    my $loop = { name => 'h1' };
+    $loop->{self} = $loop;
+    my $done = eval { $api->host_has_initiator($loop, $iqn); 1 };
+    ok($done, 'a self-referential structure terminates');
+}
+
+{
+    # Adding an initiator that is already a member is the state we wanted.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(err_status('The initiator is already a member of the host', -1))
+            if $path =~ m{/add/host-members};
+        return reply(ok_status());
+    });
+
+    ok(eval { $api->host_add_initiators('pve-pve-node1', ['iqn.test']); 1 },
+        'an initiator that is already a member is not an error');
+
+    my ($api2, $ua2) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(err_status('No such host', -10058))
+            if $path =~ m{/add/host-members};
+        return reply(ok_status());
+    });
+
+    ok(!eval { $api2->host_add_initiators('pve-pve-node1', ['iqn.test']); 1 },
+        'but a real failure still is one');
+}
+
 done_testing();

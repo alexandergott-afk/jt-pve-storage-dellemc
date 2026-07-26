@@ -5,6 +5,13 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.17~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 每次檢查 host 時都會重新加入 initiator。** 「這個 host 是否已經有本節點的 initiator」原本是靠讀取 host 物件上的扁平欄位來判斷，但 `show host-groups` 是把 initiator **巢狀**放在 host 底下的 —— 每個 initiator 有 Nickname、Discovered、Mapped、Profile、Host Type 與 ID。因此這個檢查永遠回答「沒有」，而陣列會拒絕加入一個它已經有的成員；這個拒絕會讓 `activate_storage` 失敗，於是一個原本正常的儲存會變成 inactive。現在會在 host 結構中的任何位置尋找該 id，不論韌體用的是哪種格式；而「它已經是你想要的狀態了」這類拒絕也會被接受，而不再視為致命錯誤。
+- **陣列自己說不可用的 iSCSI 連接埠，不再送進登入迴圈。** `show ports` 會回報 Media、Target ID（iSCSI 埠是節點名稱）、Status（Up、Warning、Error、Not Present、Disconnected）、IP Address 與 Health。原本只讀了 Media 與位址，因此一個已斷線的連接埠，輕則讓本節點多做一次探測，重則付出一次 discovery 加一次 login 的逾時。
+- **「可容忍的拒絕」只比對陣列自己的用字。** 完整的錯誤訊息裡還帶著失敗的指令，而一個叫做 `add host-members` 的指令會命中任何在找「member」這個字的樣式 —— 這正是在 0.7.12 之前讓範本永遠刪不掉的同一個陷阱。
+
 ## [0.7.16~beta1] - 2026-07-27
 
 ### 修正

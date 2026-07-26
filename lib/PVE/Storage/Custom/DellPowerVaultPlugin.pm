@@ -479,16 +479,15 @@ sub _array_ensure_host {
         return $name;
     }
 
-    # The host exists. A reinstalled node, or one that gained an HBA port,
-    # has initiators the host object does not know about yet and would
-    # otherwise see nothing at all.
-    my $known = lc(join(',',
-        $host->{'initiator-id'} // '',
-        $host->{'member-id'}    // '',
-        $host->{id}             // '',
-    ));
-
-    my @missing = grep { index($known, lc($_)) < 0 } @$want;
+    # The host exists. A reinstalled node, or one that gained an HBA port, has
+    # initiators the host object does not know about yet and would otherwise
+    # see nothing at all.
+    #
+    # 'show host-groups' nests the initiators inside the host, and the exact
+    # shape is firmware-dependent, so the id is looked for anywhere within the
+    # host object rather than in fields this plugin has guessed at. Getting
+    # this wrong the other way would mean re-adding a member on every check.
+    my @missing = grep { !$api->host_has_initiator($host, $_) } @$want;
     return $name unless @missing;
 
     eval { $api->host_add_initiators($name, \@missing, %opts) };

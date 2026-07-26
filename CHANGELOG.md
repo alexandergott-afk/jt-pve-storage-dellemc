@@ -7,6 +7,29 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.17~beta1] - 2026-07-27
+
+### Fixed
+- **PowerVault would have re-added an initiator on every host check.** Whether
+  a host already had this node's initiator was decided by reading flat fields
+  on the host object, but `show host-groups` nests initiators inside hosts —
+  each with Nickname, Discovered, Mapped, Profile, Host Type and ID. The check
+  therefore always said no, and the array refuses to add a member it already
+  has; that refusal fails `activate_storage`, so a working storage would have
+  gone inactive. The id is now looked for anywhere within the host structure,
+  whatever shape the firmware uses, and a refusal meaning "it is already how
+  you want it" is accepted rather than fatal.
+- **iSCSI ports the array calls unusable are no longer offered to the login
+  loop.** `show ports` reports Media, Target ID — the node name for an iSCSI
+  port — Status (Up, Warning, Error, Not Present, Disconnected), IP Address
+  and Health. Only Media and the address were being read, so a disconnected
+  port cost this node a probe at best and a discovery plus login timeout at
+  worst.
+- **A tolerated refusal is matched against the array's own words only.** The
+  rendered error also carries the command that failed, and a command named
+  `add host-members` matches any pattern looking for the word "member" — the
+  same trap that made template deletion impossible until 0.7.12.
+
 ## [0.7.16~beta1] - 2026-07-27
 
 ### Fixed

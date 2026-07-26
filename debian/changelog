@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.17~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault checked whether a host already had this node's initiator by
+    reading flat fields on the host object. 'show host-groups' nests the
+    initiators inside the host, so the check always said no, and every host
+    check would have re-added a member the array already had — a refusal
+    there fails activate_storage, so a working storage would have gone
+    inactive. The id is now looked for anywhere within the host structure,
+    whatever the firmware nests it in, and a refusal that means "it is
+    already how you want it" is accepted.
+  * iSCSI ports the array reports as Not Present, Disconnected or in Error
+    are no longer offered to the login loop. 'show ports' documents Media,
+    Target ID — the node name for an iSCSI port — Status, IP Address and
+    Health; only Media and the address were being read.
+  * The tolerated-refusal check matches the array's own words only. The
+    rendered error also carries the command, and a command named
+    'add host-members' matches any pattern looking for the word 'member' —
+    the same trap that made template deletion impossible in 0.7.12.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 17:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.16~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
