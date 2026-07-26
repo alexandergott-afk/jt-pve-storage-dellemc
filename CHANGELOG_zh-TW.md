@@ -3,6 +3,8 @@
 本專案所有值得記錄的變更都寫在這裡。
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
+
 ## [0.7.0~beta1] - 2026-07-26
 
 新增 PowerFlex 3.x 與 4.x 的 `dellpowerflex` storage type。

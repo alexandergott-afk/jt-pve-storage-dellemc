@@ -307,6 +307,8 @@ First-time setup: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 | [`docs/NAMING_CONVENTIONS.md`](docs/NAMING_CONVENTIONS.md) | PVE object to array object naming |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Symptoms, causes, recovery |
 | [`docs/TESTING.md`](docs/TESTING.md) | Test matrix and hardware verification status |
+| [`docs/RELEASE_TESTING.md`](docs/RELEASE_TESTING.md) | What is tested before every release |
+| [`docs/POWERFLEX_SDC.md`](docs/POWERFLEX_SDC.md) | PowerFlex host access: SDC vs NVMe/TCP, and Dell's support matrix |
 
 ---
 

@@ -1,4 +1,9 @@
 PACKAGE = jt-pve-storage-dellemc
+
+# Versioning: the patch number increments per release and runs to .99 before
+# the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
+# step with debian/changelog; the release workflow refuses to publish when
+# the git tag and debian/changelog disagree.
 VERSION = 0.7.0~beta1
 
 DESTDIR =
@@ -16,7 +21,8 @@ UNIT_TESTS   = $(wildcard t/*.t)
 GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
-.PHONY: all install uninstall test syntax unit check-multipath-flush deb deb-clean clean
+.PHONY: all install uninstall test syntax unit check-multipath-flush \
+        release-check deb deb-clean clean
 
 all:
 	@echo "Nothing to build. Run 'make install', 'make test' or 'make deb'."
@@ -98,6 +104,40 @@ check-multipath-flush:
 		exit 1; \
 	fi; \
 	echo "  OK: no system-wide multipath flush found."
+
+# Everything that must pass before a release, including the checks that catch
+# a half-finished version bump. See docs/RELEASE_TESTING.md; this target is
+# stage 1 of that plan.
+release-check: check-multipath-flush syntax unit
+	@echo "Checking version consistency..."
+	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
+		| sed 's/-[0-9]*$$//'); \
+	tool_version=$$(sed -n "s/^my \$$VERSION = '\(.*\)';/\1/p" \
+		bin/pve-dell-config-get); \
+	fail=0; \
+	echo "  Makefile:        $(VERSION)"; \
+	echo "  debian/changelog: $$deb_version"; \
+	echo "  config tool:      $$tool_version"; \
+	if [ "$(VERSION)" != "$$deb_version" ]; then \
+		echo "  ERROR: Makefile and debian/changelog disagree"; fail=1; \
+	fi; \
+	if [ "$(VERSION)" != "$$tool_version" ]; then \
+		echo "  ERROR: Makefile and bin/pve-dell-config-get disagree"; fail=1; \
+	fi; \
+	for f in CHANGELOG.md CHANGELOG_zh-TW.md; do \
+		if ! grep -q "\[$(VERSION)\]" $$f; then \
+			echo "  ERROR: $$f has no entry for $(VERSION)"; fail=1; \
+		fi; \
+	done; \
+	if [ "$$fail" = "1" ]; then \
+		echo ""; \
+		echo "A release whose files disagree about its own version is worse"; \
+		echo "than no release. Fix the above, then run this again."; \
+		exit 1; \
+	fi; \
+	echo "  OK: every file agrees on $(VERSION)"
+	@echo ""
+	@echo "Stage 1 passed. Stages 2 to 5 are in docs/RELEASE_TESTING.md."
 
 deb:
 	dpkg-buildpackage -us -uc -b

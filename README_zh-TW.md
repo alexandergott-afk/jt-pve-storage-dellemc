@@ -215,6 +215,8 @@ pvesm add dellpowerflex pflex1 \
 | [`docs/NAMING_CONVENTIONS_zh-TW.md`](docs/NAMING_CONVENTIONS_zh-TW.md) | PVE 物件與陣列物件的命名對照 |
 | [`docs/TROUBLESHOOTING_zh-TW.md`](docs/TROUBLESHOOTING_zh-TW.md) | 症狀、成因與復原方式 |
 | [`docs/TESTING_zh-TW.md`](docs/TESTING_zh-TW.md) | 測試矩陣與實機驗證狀態 |
+| [`docs/RELEASE_TESTING_zh-TW.md`](docs/RELEASE_TESTING_zh-TW.md) | 每次發布前要做完的測試 |
+| [`docs/POWERFLEX_SDC_zh-TW.md`](docs/POWERFLEX_SDC_zh-TW.md) | PowerFlex 主機端存取：SDC 與 NVMe/TCP，以及 Dell 支援矩陣 |
 
 ---
 

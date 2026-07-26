@@ -3,8 +3,11 @@ name: Release
 # Publishes a downloadable .deb whenever a version tag is pushed, so an
 # operator does not have to clone the repository and build one.
 #
-#   git tag -a v0.7.0-beta1 -m 'Release 0.7.0~beta1'
-#   git push origin v0.7.0-beta1
+#   git tag -a v0.7.1 -m 'Release 0.7.1'
+#   git push origin v0.7.1
+#
+# Versioning: the patch number increments per release and runs to .99 before
+# the minor number moves, so 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0.
 #
 # The tag drives the release; debian/changelog drives the package version.
 # The two are checked against each other below, because a release whose file
@@ -86,9 +89,10 @@ jobs:
           files: |
             artifacts/*.deb
             artifacts/SHA256SUMS
-          # Every 0.x release is a beta: nothing has been verified against
-          # physical hardware yet.
-          prerelease: ${{ contains(steps.version.outputs.deb, 'beta') }}
+          # Every 0.x release is a prerelease: nothing has been verified
+          # against physical hardware yet. 1.0.0 is the on-hardware test
+          # pass, so that is when this stops being true.
+          prerelease: ${{ startsWith(steps.version.outputs.deb, '0.') }}
           generate_release_notes: true
           body: |
             ## ⚠️ Beta software — read before installing

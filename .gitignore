@@ -1,4 +1,5 @@
 *.deb
+!releases/*.deb
 *.changes
 *.buildinfo
 *.substvars

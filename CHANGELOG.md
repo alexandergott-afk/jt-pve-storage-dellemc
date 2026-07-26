@@ -3,6 +3,10 @@
 All notable changes to this project are documented here.
 繁體中文版本：[CHANGELOG_zh-TW.md](CHANGELOG_zh-TW.md)
 
+Versioning: the patch number increments per release and runs to .99 before
+the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
+release is a prerelease; 1.0.0 is the on-hardware test pass.
+
 ## [0.7.0~beta1] - 2026-07-26
 
 Adds the `dellpowerflex` storage type for PowerFlex 3.x and 4.x.
