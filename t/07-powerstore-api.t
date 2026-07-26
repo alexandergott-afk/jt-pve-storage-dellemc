@@ -633,6 +633,15 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
     like($@, qr/Detach volumes|lower pstore-lun-id-base/, 'with a way out');
 }
 
+# The ceiling is 255 on purpose, and raising it is not a free win. Dell's
+# KB 000199943 says a Linux host with the Emulex FC driver scans LUN ids
+# 0-255 by default; a volume mapped above what the host scans is a volume
+# PVE never sees, and nothing at either end reports an error.
+cmp_ok($API->MAX_LUN_ID, '<=', 255,
+    'LUN ids stay inside what a default Linux FC driver scans');
+cmp_ok($API->MIN_LUN_ID, '>=', 1,
+    'and start at 1, because some initiators refuse LUN 0');
+
 # ---------------------------------------------------------------------------
 # Mappings
 # ---------------------------------------------------------------------------
@@ -649,6 +658,54 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
         'an existing mapping is found');
     is($api->is_mapped('1f3e5c88-0000-4000-8000-000000000001', 'h-0000-0009'), 0,
         'another host is not confused for it');
+}
+
+{
+    # A host that belongs to a host group can be reached by a mapping made to
+    # the group, and such a row carries host_group_id with no host_id.
+    # Reading only host_id calls the volume unmapped, so the plugin attaches
+    # it again and the array refuses a thing it is already doing.
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, [
+            { id => 'm1', host_id => undef, host_group_id => 'hg-1',
+              volume_id => 'v1', logical_unit_number => 7 },
+        ]) if $key eq 'GET /api/rest/host_volume_mapping';
+        return json_response(200, []);
+    });
+
+    is($api->is_mapped('v1', 'h-1'), 0,
+        'without a group, only a host-level mapping counts');
+    is($api->is_mapped('v1', 'h-1', group_id => 'hg-1'), 1,
+        "a mapping to the host's group counts as mapped");
+    is($api->is_mapped('v1', 'h-1', group_id => 'hg-2'), 0,
+        "another group's mapping does not");
+}
+
+{
+    # A LUN id is unique per host, and a group mapping occupies one on every
+    # host in the group. Ignoring those hands out an id already in use.
+    my @seen;
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/host_volume_mapping';
+        my %q = URI->new($req->uri)->query_form;
+        push @seen, $q{host_id} // $q{host_group_id} // '?';
+        return json_response(200, [
+            { id => 'm1', host_id => 'h-1', logical_unit_number => 1 },
+        ]) if defined $q{host_id};
+        return json_response(200, [
+            { id => 'm2', host_group_id => 'hg-1', logical_unit_number => 2 },
+        ]);
+    });
+
+    is($api->next_free_lun('h-1', group_id => 'hg-1'), 3,
+        'a LUN held by a group mapping is not handed out to a host in it');
+    is_deeply(\@seen, ['eq.h-1', 'eq.hg-1'],
+        'and both listings were asked for');
+
+    is($api->next_free_lun('h-1'), 2,
+        'with no group, only the host-level mappings are considered');
 }
 
 # ---------------------------------------------------------------------------

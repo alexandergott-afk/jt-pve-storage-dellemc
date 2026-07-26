@@ -78,6 +78,32 @@ what a host actually has:
 If you find high ids from before this plugin was in use, detach and reattach
 those volumes so they get a low id.
 
+Dell's own knowledge base article on this
+([KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/)) puts
+numbers on where the ceiling is: ESXi scans LUN ids 0–1023 by default, and
+**Linux with the Emulex FC driver scans only 0–255**. That is why this plugin
+stops at 255 rather than at whatever the array would allow — a LUN id the host
+will not scan is a volume that does not exist as far as PVE is concerned, and
+nothing anywhere reports an error.
+
+The same article gives the workaround for an array whose ids have already
+climbed, if you would rather not reattach: create a host object with the OS
+type **Windows**, which PowerStore limits to LUN ids 0–254, and it starts
+reusing low ids again.
+
+Dell's own knowledge base article on this
+([KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/)) puts
+numbers on where the ceiling is: ESXi scans LUN ids 0–1023 by default, and
+**Linux with the Emulex FC driver scans only 0–255**. That is why this plugin
+stops at 255 rather than at whatever the array would allow — a LUN id the host
+will not scan is a volume that does not exist as far as PVE is concerned, and
+nothing anywhere reports an error.
+
+The same article gives the workaround for an array whose ids have already
+climbed, if you would rather not reattach: create a host object with the OS
+type **Windows**, which PowerStore limits to LUN ids 0–254, and it starts
+reusing low ids again.
+
 ---
 
 ## `Cannot delete volume ... device is still in use`

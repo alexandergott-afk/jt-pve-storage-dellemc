@@ -7,6 +7,26 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.29~beta1] - 2026-07-27
+
+### Fixed
+- **A PowerStore host that belongs to a host group would have been given a LUN
+  id already in use.** A `host_volume_mapping` made to a group carries
+  `host_group_id` and no `host_id`, and such a mapping occupies a LUN id on
+  every host in the group. The LUN search looked only at host-level mappings,
+  so it handed out an id the group already held; the mapping check called the
+  volume unmapped and attached it again. This plugin never creates a host
+  group, but nothing stops an operator putting its host into one.
+- An unmap that finds only a group-level mapping now says so, naming the
+  group, instead of returning as though there were nothing to remove.
+
+### Added
+- `docs/TROUBLESHOOTING.md` carries the numbers from
+  [Dell KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/):
+  ESXi scans LUN ids 0–1023 by default, **Linux with the Emulex FC driver only
+  0–255**. That is why this plugin stops at 255 rather than at whatever the
+  array allows, and a test now pins the ceiling with the reason attached.
+
 ## [0.7.28~beta1] - 2026-07-27
 
 ### Fixed

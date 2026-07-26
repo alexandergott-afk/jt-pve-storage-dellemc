@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.29~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerStore: a host that belongs to a host group is now handled. A
+    host_volume_mapping made to a group carries host_group_id and no
+    host_id, and it occupies a LUN id on every host in the group. Reading
+    only host_id called such a volume unmapped and handed out a LUN id that
+    was already in use. The mapping check counts a group mapping, the LUN
+    search excludes the ids those mappings hold, and an unmap that finds
+    only a group mapping says so instead of silently doing nothing.
+  * docs/TROUBLESHOOTING.md carries the numbers from Dell KB 000199943: ESXi
+    scans LUN ids 0-1023, Linux with the Emulex FC driver only 0-255. That
+    is why this plugin stops at 255, and a test now pins it there.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:25:48 +0800
+
 jt-pve-storage-dellemc (0.7.28~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

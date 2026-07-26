@@ -593,7 +593,7 @@ sub volume_clone {
 sub host_list {
     my ($self, $prefix, %opts) = @_;
 
-    my $params = { select => 'id,name,os_type,host_initiators' };
+    my $params = { select => 'id,name,os_type,host_initiators,host_group_id' };
 
     return $self->_collection_prefixed('/host', $prefix, $params, %opts)
         if defined $prefix && length $prefix;
@@ -605,7 +605,8 @@ sub host_get_by_name {
     my ($self, $name, %opts) = @_;
 
     my $rows = $self->get('/host',
-        { name => "eq.$name", select => 'id,name,os_type,host_initiators' }, %opts);
+        { name => "eq.$name",
+          select => 'id,name,os_type,host_initiators,host_group_id' }, %opts);
 
     return (ref($rows) eq 'ARRAY' && @$rows) ? $rows->[0] : undef;
 }
@@ -666,8 +667,10 @@ sub mapping_list {
     my ($self, %opts) = @_;
 
     my $params = { select => 'id,host_id,host_group_id,volume_id,logical_unit_number' };
-    $params->{host_id}   = 'eq.' . $opts{host_id}   if defined $opts{host_id};
-    $params->{volume_id} = 'eq.' . $opts{volume_id} if defined $opts{volume_id};
+    $params->{host_id}       = 'eq.' . $opts{host_id}   if defined $opts{host_id};
+    $params->{volume_id}     = 'eq.' . $opts{volume_id} if defined $opts{volume_id};
+    $params->{host_group_id} = 'eq.' . $opts{host_group_id}
+        if defined $opts{host_group_id};
 
     return $self->_collection('/host_volume_mapping', $params, %opts);
 }
@@ -677,8 +680,16 @@ sub is_mapped {
 
     my $mappings = $self->mapping_list(volume_id => $volume_id, %opts);
 
+    # A host that belongs to a host group can be reached by a mapping made to
+    # the group, and such a row carries host_group_id with no host_id at all.
+    # Reading only host_id would call the volume unmapped, attach it again,
+    # and be refused by an array that is already doing what was asked.
+    my $group_id = $opts{group_id};
+
     for my $mapping (@$mappings) {
         return 1 if ($mapping->{host_id} // '') eq $host_id;
+        return 1 if defined $group_id && length $group_id
+                 && ($mapping->{host_group_id} // '') eq $group_id;
     }
 
     return 0;
@@ -699,6 +710,15 @@ sub next_free_lun {
     $base = MIN_LUN_ID if $base < MIN_LUN_ID;
 
     my $mappings = $self->mapping_list(host_id => $host_id, %opts);
+
+    # A LUN id is unique per host, and a mapping made to a host GROUP occupies
+    # one on every host in it. Those rows carry host_group_id instead of
+    # host_id, so a host in a group would otherwise be handed a LUN id one of
+    # its group mappings already holds.
+    if (defined $opts{group_id} && length $opts{group_id}) {
+        push @$mappings,
+            @{ $self->mapping_list(host_group_id => $opts{group_id}, %opts) };
+    }
 
     my %used;
     for my $mapping (@$mappings) {
@@ -729,8 +749,8 @@ sub volume_attach {
     if (defined $opts{lun}) {
         $body->{logical_unit_number} = $opts{lun};
     } elsif (defined $opts{host_id}) {
-        $body->{logical_unit_number} =
-            $self->next_free_lun($opts{host_id}, base => $opts{lun_base});
+        $body->{logical_unit_number} = $self->next_free_lun($opts{host_id},
+            base => $opts{lun_base}, group_id => $opts{group_id});
     }
 
     return $self->post("/volume/$volume_id/attach", $body, %opts);

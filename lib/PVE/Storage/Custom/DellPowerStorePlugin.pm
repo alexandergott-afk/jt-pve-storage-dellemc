@@ -239,6 +239,20 @@ sub _host_id {
     return $host ? $host->{id} : undef;
 }
 
+# (id, host_group_id) for a host, in one lookup.
+#
+# The group matters because a LUN id is unique per host and a mapping made to
+# a host GROUP occupies one on every host in it. This plugin never creates a
+# group, but nothing stops an operator putting its host into one.
+sub _host_identity {
+    my ($class, $scfg, $host_name, %opts) = @_;
+
+    my $host = $class->_api($scfg, %opts)->host_get_by_name($host_name, %opts)
+        or return (undef, undef);
+
+    return ($host->{id}, $host->{host_group_id});
+}
+
 # A row from the array turned into what BlockBase expects.
 sub _volume_row {
     my ($class, $row) = @_;
@@ -579,11 +593,12 @@ sub _array_map_to_host {
     my $api = $class->_api($scfg, %opts);
 
     my $volume_id = $class->_require_volume_id($scfg, $name, %opts);
-    my $host_id   = $class->_host_id($scfg, $host_name, %opts);
+    my ($host_id, $group_id) = $class->_host_identity($scfg, $host_name, %opts);
     die "Host '$host_name' is not registered on the array\n" unless $host_id;
 
     return $api->volume_attach($volume_id,
         host_id  => $host_id,
+        group_id => $group_id,
         lun_base => $scfg->{'pstore-lun-id-base'} // 1,
         %opts,
     );
@@ -597,10 +612,26 @@ sub _array_unmap_from_host {
     my $volume_id = $class->_volume_id($scfg, $name, %opts);
     return 1 unless $volume_id;
 
-    my $host_id = $class->_host_id($scfg, $host_name, %opts);
+    my ($host_id, $group_id) = $class->_host_identity($scfg, $host_name, %opts);
     return 1 unless $host_id;
 
-    return 1 unless $api->is_mapped($volume_id, $host_id, %opts);
+    # Deliberately without the group: a detach names a host or a group, and
+    # sending a host for a mapping the group holds is refused. What this asks
+    # is whether there is a host-level mapping to remove.
+    unless ($api->is_mapped($volume_id, $host_id, %opts)) {
+        # There may still be one at group level, and this plugin did not make
+        # it and will not remove it. Saying so beats a later 'volume is still
+        # attached' from the array with nothing to explain it.
+        if (defined $group_id && length $group_id
+            && $api->is_mapped($volume_id, $host_id, %opts, group_id => $group_id)) {
+            $class->_warn_once($opts{storeid} // '', "hostgroup-map",
+                "volume '$name' is mapped to host group '$group_id', not to"
+              . " host '$host_name' directly. This plugin does not change"
+              . " group mappings; remove it in PowerStore Manager if the"
+              . " volume needs to be detached from this node.");
+        }
+        return 1;
+    }
 
     return $api->volume_detach($volume_id, host_id => $host_id, %opts);
 }
@@ -609,9 +640,14 @@ sub _array_is_mapped {
     my ($class, $scfg, $name, $host_name, %opts) = @_;
 
     my $volume_id = $class->_volume_id($scfg, $name, %opts) or return 0;
-    my $host_id   = $class->_host_id($scfg, $host_name, %opts) or return 0;
+    my ($host_id, $group_id) = $class->_host_identity($scfg, $host_name, %opts);
+    return 0 unless $host_id;
 
-    return $class->_api($scfg, %opts)->is_mapped($volume_id, $host_id, %opts);
+    # A mapping made to a host group reaches this node just as well, so it
+    # counts: the question here is whether the node can already see the
+    # volume, not who made the mapping.
+    return $class->_api($scfg, %opts)->is_mapped($volume_id, $host_id,
+        %opts, group_id => $group_id);
 }
 
 sub _array_mapped_hosts {

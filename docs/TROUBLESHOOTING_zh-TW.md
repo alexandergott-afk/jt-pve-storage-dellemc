@@ -57,6 +57,10 @@ PowerStore 對 UI 與 REST／PSTCLI **各自維護一組自動 LUN ID 序列**�
 
 若發現有本外掛啟用之前留下的高 ID，請把那些 volume 卸載後重新掛載，讓它們取得較低的 ID。
 
+Dell 自己的知識庫文章（[KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/)）替這道天花板標出了實際數字：ESXi 預設掃描 LUN ID 0～1023，而 **Linux 搭配 Emulex FC 驅動只掃描 0～255**。這正是本外掛止於 255、而不是止於陣列所允許上限的原因 —— 主機不會掃描的 LUN ID，對 PVE 而言就等於那個 volume 不存在，而且任何一端都不會回報錯誤。
+
+同一篇文章也給了「ID 已經爬高、又不想重新掛載」時的解法：建立一個 OS 類型為 **Windows** 的 host 物件，PowerStore 會把它限制在 LUN ID 0～254，於是又會開始重複使用低位 ID。
+
 ---
 
 ## `Cannot delete volume ... device is still in use`

@@ -5,6 +5,15 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.29~beta1] - 2026-07-27
+
+### 修正
+- **屬於某個 host group 的 PowerStore host，會被配到一個已經在使用中的 LUN ID。** 對 host group 建立的 `host_volume_mapping` 帶的是 `host_group_id` 而沒有 `host_id`，而這樣的對應會在群組中的每一台 host 上都佔用一個 LUN ID。原本尋找可用 LUN 時只看 host 層級的對應，於是配出了群組已經佔用的 ID；對應檢查也會判定該 volume 未對映而再掛載一次。本外掛從不建立 host group，但沒有任何機制阻止管理者把它的 host 放進某個群組。
+- 解除對應時若只找到群組層級的對應，現在會指名該群組並說明，而不是當作沒有東西要移除就直接返回。
+
+### 新增
+- `docs/TROUBLESHOOTING.md` 收錄了 [Dell KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/) 的數字：ESXi 預設掃描 LUN ID 0～1023，而 **Linux 搭配 Emulex FC 驅動只掃描 0～255**。這正是本外掛止於 255、而非止於陣列允許上限的原因，而且現在有測試把這道上限連同理由一起釘住。
+
 ## [0.7.28~beta1] - 2026-07-27
 
 ### 修正
