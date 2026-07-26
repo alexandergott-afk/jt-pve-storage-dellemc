@@ -47,15 +47,31 @@ uninstall:
 test: syntax unit check-multipath-flush
 	@echo "All checks passed."
 
+# Modules that subclass PVE::Storage::Plugin cannot be compiled without a
+# Proxmox VE installation. On a build host or CI runner that is expected, and
+# reporting it as a failure would train everyone to ignore this target — so
+# only that specific cause is tolerated, and it is named in the output.
 syntax:
 	@echo "Running Perl syntax checks..."
 	@if [ -z "$(strip $(PERL_MODULES))$(strip $(BIN_SCRIPTS))" ]; then \
 		echo "  (no Perl sources yet — skeleton stage)"; \
 	fi
-	@set -e; for f in $(PERL_MODULES) $(BIN_SCRIPTS); do \
-		echo "  checking $$f"; \
-		perl -Ilib -c $$f || exit 1; \
-	done
+	@set -e; skipped=0; for f in $(PERL_MODULES) $(BIN_SCRIPTS); do \
+		out=$$(perl -Ilib -c $$f 2>&1) || { \
+			if echo "$$out" | grep -q "Can't locate PVE/"; then \
+				echo "  skipped $$f (needs Proxmox VE)"; \
+				skipped=1; \
+				continue; \
+			fi; \
+			echo "$$out"; \
+			exit 1; \
+		}; \
+		echo "  checking $$f ... OK"; \
+	done; \
+	if [ "$$skipped" = "1" ]; then \
+		echo "  NOTE: some modules were skipped. Run 'make syntax' on a"; \
+		echo "        Proxmox VE node to check them."; \
+	fi
 
 unit:
 	@if [ -n "$(strip $(UNIT_TESTS))" ]; then \
