@@ -235,4 +235,35 @@ ok(!$N->is_valid_volume_name(undef), 'undef invalid');
 ok($N->is_valid_snapshot_name('pve-ps1-100-disk0.pve-snap-x'), 'valid snapshot name');
 ok(!$N->is_valid_snapshot_name('.leading-dot'), 'snapshot must start alphanumeric');
 
+# ---------------------------------------------------------------------------
+# Anchors and vmids
+#
+# Perl's $ also matches immediately before a trailing newline, so a name with
+# one attached would pass a pattern meant to be exact. And a run of digits
+# longer than a vmid becomes a float the moment it is used as a number: '1e+30'
+# would then travel inside a volid.
+# ---------------------------------------------------------------------------
+
+{
+    is($N->decode_volume_name("pve-ps1-100-disk0\n"), undef,
+        'a name with a trailing newline is not one of ours');
+    is($N->decode_snapshot_name("pve-ps1-100-disk0.pve-snap-x\n"), undef,
+        'and neither is a snapshot name with one');
+    is($N->is_pve_managed_volume("pve-ps1-100-disk0\n", 'ps1'), 0,
+        'so the ownership gate refuses it');
+
+    is(eval { $N->pve_volname_to_array('ps1', "vm-100-disk-0\n") }, undef,
+        'a PVE volume name with a trailing newline does not translate');
+
+    is($N->decode_volume_name('pve-ps1-' . ('9' x 30) . '-disk0'), undef,
+        'a vmid too long to be one is refused');
+    is($N->decode_volume_name('pve-ps1-0-disk0'), undef,
+        'and so is a vmid of zero');
+
+    my $max = $N->decode_volume_name('pve-ps1-999999999-disk0');
+    ok($max, 'the largest real vmid still decodes');
+    is($max->{vmid}, 999999999, '... as an integer');
+    ok($max->{vmid} !~ /e/i, '... not in scientific notation');
+}
+
 done_testing();

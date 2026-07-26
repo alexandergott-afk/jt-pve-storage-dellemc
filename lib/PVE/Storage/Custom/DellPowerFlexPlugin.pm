@@ -52,7 +52,7 @@ sub api {
         PVE::Storage->can('APIVER') ? PVE::Storage::APIVER() : undef;
     };
 
-    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+$/;
+    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+\z/;
 
     my $claim = $pve < APIVERSION_MAX ? $pve : APIVERSION_MAX;
     $claim = APIVERSION_MIN if $claim < APIVERSION_MIN;
@@ -256,20 +256,20 @@ sub _parse_volname {
     return undef unless defined $volname;
     $volname =~ s|^images/||;
 
-    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)$|) {
+    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)\z|) {
         return { vmid => $4, diskid => $5, type => 'disk', isBase => 0,
                  basename => $1, basevmid => $2 };
     }
-    if ($volname =~ /^vm-(\d+)-disk-(\d+)$/) {
+    if ($volname =~ /^vm-(\d+)-disk-(\d+)\z/) {
         return { vmid => $1, diskid => $2, type => 'disk', isBase => 0 };
     }
-    if ($volname =~ /^base-(\d+)-disk-(\d+)$/) {
+    if ($volname =~ /^base-(\d+)-disk-(\d+)\z/) {
         return { vmid => $1, diskid => $2, type => 'disk', isBase => 1 };
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit\z/) {
         return { vmid => $1, type => 'cloudinit', isBase => 0 };
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return { vmid => $1, snapname => $2, type => 'state', isBase => 0 };
     }
 
@@ -342,6 +342,7 @@ sub _list_own_volumes {
 
     my @out;
     for my $row (@$rows) {
+        next unless ref($row) eq 'HASH';
         my $name = $row->{name} // next;
         next unless index($name, $prefix) == 0;
 
@@ -542,7 +543,7 @@ sub alloc_image {
     my $pool = $class->_storage_pool($scfg, storeid => $storeid);
 
     my ($array_name, $pve_volname);
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
         $array_name  = $class->_array_name($storeid, $name);
         $pve_volname = $name;
     } else {

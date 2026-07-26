@@ -7,6 +7,28 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.7~beta1] - 2026-07-27
+
+### Fixed
+- **Names are anchored exactly.** Perl's `$` also matches immediately before a
+  trailing newline, so `"vm-100-disk-0\n"` passed a pattern meant to be exact
+  and resolved to the same array object as the clean name. Every name pattern
+  in the plugin now ends at `\z`.
+- **A run of digits too long to be a vmid is refused.** Perl turns it into a
+  float on first numeric use, so a volume named with thirty nines decoded to a
+  vmid of `1e+30` — which would then travel inside a volid.
+- **A listing row that is not a hash no longer kills the caller.** Dereferencing
+  it raised a Perl type error rather than skipping the row, so one unexpected
+  response shape would have taken out the whole listing.
+
+### Added
+- `t/14-parsing.t`: missing, renamed and wrongly typed fields thrown at every
+  parser — WWN conversion, the PowerVault CLI status object, size fields,
+  volume rows, array object names, and PVE volume names. Every field name in
+  these clients comes from documentation rather than from an array, so some
+  will be wrong; the test asserts that a wrong one fails safe rather than
+  being acted on.
+
 ## [0.7.6~beta1] - 2026-07-27
 
 ### Fixed

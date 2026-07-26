@@ -126,7 +126,7 @@ sub api {
         PVE::Storage->can('APIVER') ? PVE::Storage::APIVER() : undef;
     };
 
-    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+$/;
+    return APIVERSION_FALLBACK unless defined $pve && $pve =~ /^\d+\z/;
 
     my $claim = $pve < APIVERSION_MAX ? $pve : APIVERSION_MAX;
     $claim = APIVERSION_MIN if $claim < APIVERSION_MIN;
@@ -326,22 +326,22 @@ sub _parse_volname {
     $volname =~ s|^images/||;
 
     # Linked clone: base-100-disk-0/vm-101-disk-0
-    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)$|) {
+    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)\z|) {
         return {
             vmid => $4, diskid => $5, format => 'raw', type => 'disk',
             isBase => 0, basename => $1, basevmid => $2,
         };
     }
-    if ($volname =~ /^vm-(\d+)-disk-(\d+)$/) {
+    if ($volname =~ /^vm-(\d+)-disk-(\d+)\z/) {
         return { vmid => $1, diskid => $2, format => 'raw', type => 'disk', isBase => 0 };
     }
-    if ($volname =~ /^base-(\d+)-disk-(\d+)$/) {
+    if ($volname =~ /^base-(\d+)-disk-(\d+)\z/) {
         return { vmid => $1, diskid => $2, format => 'raw', type => 'disk', isBase => 1 };
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit\z/) {
         return { vmid => $1, format => 'raw', type => 'cloudinit', isBase => 0 };
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return { vmid => $1, snapname => $2, format => 'raw', type => 'state', isBase => 0 };
     }
 
@@ -1079,7 +1079,7 @@ sub alloc_image {
     my $size_bytes = $size * 1024;   # PVE passes KiB
     my ($array_name, $pve_volname);
 
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
         # PVE dictates these names and uses the device immediately after this
         # call returns.
         $array_name  = $class->_array_volname($storeid, $name);
@@ -1098,7 +1098,7 @@ sub alloc_image {
     # A state or cloud-init volume left behind by a failed attempt is
     # reclaimable: PVE dictates its name, which is derived from the snapshot,
     # so it cannot belong to anything else and cannot be moved out of the way.
-    my $dictated = ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) ? 1 : 0;
+    my $dictated = ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) ? 1 : 0;
 
     if ($dictated && eval { $class->_array_get_volume($scfg, $array_name) }) {
         warn "Reclaiming orphaned volume '$array_name' from a previous"
@@ -1135,7 +1135,7 @@ sub alloc_image {
         die "Volume '$array_name' already exists on the array. This indicates"
           . " a naming conflict or an orphaned volume from a previous failed"
           . " operation.\n"
-            unless !$dictated && $pve_volname =~ /^vm-\d+-disk-\d+$/;
+            unless !$dictated && $pve_volname =~ /^vm-\d+-disk-\d+\z/;
 
         die "Could not find a free disk id for VM $vmid on storage '$storeid'"
           . " after $attempt attempts; allocations from other nodes kept"
@@ -1166,7 +1166,7 @@ sub alloc_image {
 
     # PVE uses state and cloud-init volumes the moment this returns, so the
     # device has to be there before we hand the name back.
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
         my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
         unless ($wwid) {
             eval { $class->_release_volume($scfg, $storeid, $array_name) };
@@ -1419,7 +1419,7 @@ sub free_image {
     }
 
     # The last disk of a VM takes its config backup volumes with it.
-    if ($volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-disk-\d+\z/) {
         my $vmid = $1;
         my $prefix = $class->naming->volume_prefix($storeid) . "${vmid}-disk";
         my $remaining = eval { $class->_array_list_volumes($scfg, $storeid, $prefix) } // [];
@@ -2059,7 +2059,7 @@ sub volume_snapshot {
     die "Failed to create snapshot '$snap' of volume '$volname': $@" if $@;
 
     if ($class->_config_backup_enabled($scfg)
-        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
+        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+\z/) {
         my $vmid = $1;
         eval { $class->_backup_vm_config($scfg, $storeid, $vmid, $snap) };
         warn "VM config backup failed (not fatal): $@" if $@;
@@ -2098,7 +2098,7 @@ sub volume_snapshot_delete {
     # Clean up even when the feature is now switched off: a storage that had
     # it enabled before still has the volumes.
     if ($class->supports_config_backup()
-        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
+        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+\z/) {
         my $vmid = $1;
         eval { $class->_delete_config_volume($scfg, $storeid, $vmid, $snap) };
         warn "Config volume cleanup failed (not fatal): $@" if $@;

@@ -61,15 +61,15 @@ sub name_charclass_re        { qr/[^A-Za-z0-9_-]/ }
 
 my $PFX = qr/[A-Za-z0-9_]+/;
 
-my $RE_DISK      = qr/^pve-($PFX)-(\d+)-disk(\d+)$/;
-my $RE_CLOUDINIT = qr/^pve-($PFX)-(\d+)-cloudinit$/;
-my $RE_EFIDISK   = qr/^pve-($PFX)-(\d+)-efidisk(\d+)$/;
-my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-tpmstate(\d+)$/;
-my $RE_STATE     = qr/^pve-($PFX)-(\d+)-state-(.+)$/;
-my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vmconf-(.+)$/;
+my $RE_DISK      = qr/^pve-($PFX)-(\d+)-disk(\d+)\z/;
+my $RE_CLOUDINIT = qr/^pve-($PFX)-(\d+)-cloudinit\z/;
+my $RE_EFIDISK   = qr/^pve-($PFX)-(\d+)-efidisk(\d+)\z/;
+my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-tpmstate(\d+)\z/;
+my $RE_STATE     = qr/^pve-($PFX)-(\d+)-state-(.+)\z/;
+my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vmconf-(.+)\z/;
 
-my $RE_SNAPSHOT  = qr/^(.+)\.pve-snap-(.+)$/;
-my $RE_BASESNAP  = qr/^(.+)\.pve-base$/;
+my $RE_SNAPSHOT  = qr/^(.+)\.pve-snap-(.+)\z/;
+my $RE_BASESNAP  = qr/^(.+)\.pve-base\z/;
 
 use constant SNAPSHOT_INFIX => '.pve-snap-';
 use constant BASE_SUFFIX    => '.pve-base';
@@ -305,6 +305,23 @@ sub encode_host_group_name {
 # Returns a hashref describing the object, or undef when the name is not one
 # this plugin created. Snapshots decode to undef here; use
 # decode_snapshot_name() for those.
+# A vmid, or 0 if the digits are not one.
+#
+# PVE vmids are integers from 1 to 999999999. A longer run of digits is not a
+# name this plugin wrote, and passing it on would hand the caller something
+# Perl has already turned into a float: '1e+30' would reach PVE inside a
+# volid, where nothing expects it. 0 is not a vmid either, which is what lets
+# every caller write `my $vmid = _valid_vmid($2) or return undef`.
+sub _valid_vmid {
+    my ($digits) = @_;
+
+    return 0 unless defined $digits && $digits =~ /\A\d{1,9}\z/;
+
+    my $vmid = $digits + 0;
+
+    return $vmid >= 1 ? $vmid : 0;
+}
+
 sub decode_volume_name {
     my ($class, $name) = @_;
 
@@ -313,22 +330,28 @@ sub decode_volume_name {
     return undef if $name =~ /\./;
 
     if ($name =~ $RE_DISK) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'disk' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'disk' };
     }
     if ($name =~ $RE_CLOUDINIT) {
-        return { storage => $1, vmid => int($2), type => 'cloudinit' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, type => 'cloudinit' };
     }
     if ($name =~ $RE_EFIDISK) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'efidisk' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'efidisk' };
     }
     if ($name =~ $RE_TPMSTATE) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'tpmstate' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'tpmstate' };
     }
     if ($name =~ $RE_STATE) {
-        return { storage => $1, vmid => int($2), snapname => $3, type => 'state' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, snapname => $3, type => 'state' };
     }
     if ($name =~ $RE_VMCONF) {
-        return { storage => $1, vmid => int($2), snapname => $3, type => 'vmconf' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, snapname => $3, type => 'vmconf' };
     }
 
     return undef;
@@ -409,23 +432,23 @@ sub pve_volname_to_array {
     $volname =~ s|^images/||;
 
     # Linked clone: only the clone half has its own array object.
-    if ($volname =~ m|^base-\d+-disk-\d+/(.+)$|) {
+    if ($volname =~ m|^base-\d+-disk-\d+/(.+)\z|) {
         $volname = $1;
     }
 
-    if ($volname =~ /^(?:vm|base)-(\d+)-disk-(\d+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-disk-(\d+)\z/) {
         return $class->encode_volume_name($storeid, $1, $2);
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit\z/) {
         return $class->encode_cloudinit_name($storeid, $1);
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-efidisk(\d+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-efidisk(\d+)\z/) {
         return $class->encode_efidisk_name($storeid, $1, $2);
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-tpmstate(\d+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-tpmstate(\d+)\z/) {
         return $class->encode_tpmstate_name($storeid, $1, $2);
     }
-    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)$/) {
+    if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return $class->encode_state_name($storeid, $1, $2);
     }
 
@@ -462,7 +485,7 @@ sub is_valid_volume_name {
 
     return 0 unless defined $name && length($name);
     return 0 if length($name) > $class->max_volume_name_length;
-    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*\z/;
 
     return 1;
 }
@@ -472,7 +495,7 @@ sub is_valid_snapshot_name {
 
     return 0 unless defined $name && length($name);
     return 0 if length($name) > $class->max_snapshot_name_length;
-    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_.-]*\z/;
 
     return 1;
 }

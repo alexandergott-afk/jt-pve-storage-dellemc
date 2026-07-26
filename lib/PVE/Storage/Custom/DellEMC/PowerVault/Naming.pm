@@ -66,15 +66,21 @@ sub name_charclass_re { qr/[^A-Za-z0-9_-]/ }
 
 my $PFX = qr/[A-Za-z0-9_]+/;
 
-my $RE_DISK      = qr/^pve-($PFX)-(\d+)-d(\d+)$/;
-my $RE_CLOUDINIT = qr/^pve-($PFX)-(\d+)-ci$/;
-my $RE_EFIDISK   = qr/^pve-($PFX)-(\d+)-e(\d+)$/;
-my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-t(\d+)$/;
-my $RE_STATE     = qr/^pve-($PFX)-(\d+)-st-(.+)$/;
-my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vc-(.+)$/;
+# Same rule as the parent class: a digit run too long to be a PVE vmid is not
+# a name this plugin wrote.
+sub _valid_vmid {
+    return PVE::Storage::Custom::DellEMC::Common::Naming::_valid_vmid($_[0]);
+}
 
-my $RE_SNAPSHOT  = qr/^(.+)-s-(.+)$/;
-my $RE_BASESNAP  = qr/^(.+)-base$/;
+my $RE_DISK      = qr/^pve-($PFX)-(\d+)-d(\d+)\z/;
+my $RE_CLOUDINIT = qr/^pve-($PFX)-(\d+)-ci\z/;
+my $RE_EFIDISK   = qr/^pve-($PFX)-(\d+)-e(\d+)\z/;
+my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-t(\d+)\z/;
+my $RE_STATE     = qr/^pve-($PFX)-(\d+)-st-(.+)\z/;
+my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vc-(.+)\z/;
+
+my $RE_SNAPSHOT  = qr/^(.+)-s-(.+)\z/;
+my $RE_BASESNAP  = qr/^(.+)-base\z/;
 
 # ---------------------------------------------------------------------------
 # Encoding
@@ -202,22 +208,28 @@ sub decode_volume_name {
     return undef if $name =~ $RE_BASESNAP;
 
     if ($name =~ $RE_DISK) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'disk' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'disk' };
     }
     if ($name =~ $RE_CLOUDINIT) {
-        return { storage => $1, vmid => int($2), type => 'cloudinit' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, type => 'cloudinit' };
     }
     if ($name =~ $RE_EFIDISK) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'efidisk' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'efidisk' };
     }
     if ($name =~ $RE_TPMSTATE) {
-        return { storage => $1, vmid => int($2), diskid => int($3), type => 'tpmstate' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'tpmstate' };
     }
     if ($name =~ $RE_STATE) {
-        return { storage => $1, vmid => int($2), snapname => $3, type => 'state' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, snapname => $3, type => 'state' };
     }
     if ($name =~ $RE_VMCONF) {
-        return { storage => $1, vmid => int($2), snapname => $3, type => 'vmconf' };
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, snapname => $3, type => 'vmconf' };
     }
 
     return undef;
@@ -275,7 +287,7 @@ sub is_valid_volume_name {
     return 0 if length($name) > $class->max_volume_name_length;
     # The array forbids " , . < \ ; this plugin never generates anything but
     # alphanumerics, '-' and '_' anyway.
-    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*\z/;
 
     return 1;
 }
@@ -285,7 +297,7 @@ sub is_valid_snapshot_name {
 
     return 0 unless defined $name && length($name);
     return 0 if length($name) > $class->max_snapshot_name_length;
-    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*\z/;
 
     return 1;
 }

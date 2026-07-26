@@ -243,7 +243,9 @@ sub _host_id {
 sub _volume_row {
     my ($class, $row) = @_;
 
-    return undef unless $row && $row->{name};
+    # ref() first: a row that is not a hash would die on the -> below, and a
+    # listing this client cannot parse should come back empty, not fatal.
+    return undef unless ref($row) eq 'HASH' && $row->{name};
 
     my $protection = $row->{protection_data};
 

@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.7~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * New test file t/14-parsing.t throws missing, renamed and wrongly typed
+    fields at every parser in the plugin. Each field name in these clients is
+    written from documentation rather than read off an array, so some of them
+    will be wrong; what matters is that a wrong one fails safe instead of
+    being acted on. It found three defects.
+  * Names are anchored exactly. Perl's $ also matches immediately before a
+    trailing newline, so 'vm-100-disk-0' followed by one was accepted as a
+    volume name and resolved to the same array object.
+  * A run of digits too long to be a vmid is no longer decoded as one. Perl
+    turns it into a float, and '1e+30' would have travelled inside a volid.
+  * A volume listing row that is not a hash no longer takes the process down
+    with a Perl type error; the listing comes back empty instead.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 07:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.6~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
