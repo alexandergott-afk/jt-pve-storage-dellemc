@@ -368,12 +368,14 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
 {
     my ($api, $ua) = make_api(handler => sub {
         my ($req, $path) = @_;
-        # The columns 'show volumes' documents are Total Size and Alloc
-        # Size, so those are the field names a real array answers with.
+        # The volumes basetype documents size, total-size and
+        # allocated-size, each with a -numeric twin in 512-byte blocks.
+        # Total Size and Alloc Size are only the printed column headings.
         return reply({ %{ ok_status() }, volumes => [
             { 'volume-name' => 'pve-me5-100-d0',
+              'size-numeric' => 67108864,
               'total-size-numeric' => 67108864,
-              'alloc-size-numeric' => 2048,
+              'allocated-size-numeric' => 2048,
               wwn => '600c0ff0001234560000000000000001' },
         ]}) if $path =~ m{/show/volumes};
         return reply(ok_status());
@@ -393,9 +395,9 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
 
     my $row = $volumes->[0];
     is($api->volume_size($row), 67108864 * 512,
-        'the size comes from the documented Total Size field, in 512-byte blocks');
+        'the size comes from the documented property, in 512-byte blocks');
     is($api->volume_used($row), 2048 * 512,
-        'and the used space from Alloc Size');
+        'and so does the allocated size');
 
     # A zero here is the damaging answer, not an error: volume_resize compares
     # against the current size, so every request would look like growth, and
@@ -404,10 +406,10 @@ like($@, qr/128 TiB/, 'a size beyond the array maximum is refused');
 
     # Older spellings stay behind the documented ones rather than being
     # dropped: a firmware that answers with them still works.
-    is($api->volume_size({ 'size-numeric' => 100 }), 100 * 512,
-        'the older Size spelling is still understood');
-    is($api->volume_used({ 'allocated-size-numeric' => 8 }), 8 * 512,
-        'and the older Allocated Size spelling');
+    is($api->volume_size({ 'total-size-numeric' => 100 }), 100 * 512,
+        'total-size answers when size is absent');
+    is($api->volume_used({ 'alloc-size-numeric' => 8 }), 8 * 512,
+        'and the printed column heading is accepted as a last resort');
     is($api->volume_wwid($row), '3600c0ff0001234560000000000000001',
         'the WWID is the WWN with the NAA prefix');
 }

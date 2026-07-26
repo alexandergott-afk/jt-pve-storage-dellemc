@@ -92,7 +92,8 @@ during development. Still unverified against hardware, but not guesswork:
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`; snapshot names max 32 bytes, unique system-wide | create snapshots |
 | `pattern` takes shell-style wildcards — `*`, `?`, `[]` — and matches names *containing* the string | show volumes |
-| `show volumes` output columns: Name, Total Size, Alloc Size, Serial Number, WWN, Pool, Class, Type, Role, Health | show volumes |
+| `show volumes` prints the columns Name, Total Size, Alloc Size, Serial Number, WWN, Pool, Class, Type, Role, Health | show volumes |
+| The **volumes basetype** — the property names the JSON actually carries — documents `volume-name`, `durable-id`, `serial-number`, `wwn`, `size`, `total-size`, `allocated-size` (each with a `-numeric` twin in blocks), `health`, `creation-date-time` and `creation-date-time-numeric`. **A printed column heading is not a property name** | volumes basetype |
 | A `show maps` row carries `nickname` (host or host group name, blank if unset), `identifier` (initiator WWPN or IQN), `lun`, `access`, `ports`, `parent-id` | volume-view-mappings basetype |
 | An initiator row carries `id` (WWPN or IQN) and `hba-nickname` | initiator-view basetype |
 
@@ -172,10 +173,10 @@ SSH, for PowerFlex through the API directly.
 |---|---|---|
 | `total-size-numeric` | pool capacity, in 512-byte blocks | documented as **Total Size** |
 | `avail-numeric` | pool free space | documented as **Avail** |
-| `total-size-numeric` (volume) | volume size | `show volumes` documents the column as **Total Size**, not Size |
-| `alloc-size-numeric` | volume space in use | `show volumes` documents the column as **Alloc Size**, not Allocated Size |
-| `size-numeric`, `allocated-size-numeric` | the older spellings, tried after the documented ones | — |
-| `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | `show volumes` documents **WWN** and **Serial Number** as columns; which one the host's WWID derives from is still **not verified** |
+| `size-numeric` (volume) | volume size | the volumes basetype documents `size` as the volume's capacity |
+| `allocated-size-numeric` | volume space in use | the volumes basetype documents `allocated-size` |
+| `total-size-numeric`, `alloc-size-numeric` | tried after the properties above; **Total Size** and **Alloc Size** are the printed column headings, which are not the same thing as the property names | — |
+| `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | the volumes basetype documents `wwn` as the volume's World Wide Name and `serial-number` as its serial; which one the host's WWID derives from is still **not verified** |
 | `volume-name`, `name` | object name | documented as **Name** |
 | `nickname` | the host or host group a mapping belongs to | `volume-view-mappings` documents it as the host or host group name, **blank if unset** |
 | `identifier` | the initiator a mapping belongs to (WWPN or IQN) | `volume-view-mappings`, documented |
@@ -184,7 +185,7 @@ SSH, for PowerFlex through the API directly.
 | `target-id` | the IQN of an iSCSI port | documented as **Target ID** |
 | `ip-address` | iSCSI portal address | documented |
 | `status`, `health` | whether a port is usable | documented |
-| `creation-date-time-numeric` | snapshot date | **not verified** |
+| `creation-date-time-numeric` | snapshot date | documented in the volumes basetype as an unformatted epoch |
 | `name-numeric`, `status-numeric` | fallback spellings tried when the plain field is absent | — |
 | `port-type`, `primary-ip-address` | older spellings of Media and IP Address | — |
 | `host-id`, `host`, `name` | further spellings a mapping row may use for who it belongs to | — |

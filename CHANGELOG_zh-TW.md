@@ -5,6 +5,15 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.27~beta1] - 2026-07-27
+
+### 修正
+- **0.7.26 調整的 PowerVault 欄位順序，弄錯了「哪一個名稱才是文件記載的」。** `show volumes` **印出**的欄位標題是 Total Size 與 Alloc Size，但 volumes basetype —— 也就是 JSON 實際帶的屬性名稱 —— 記載的是 `size`、`total-size` 與 `allocated-size`，而且各自都有以 512 位元組區塊計的 `-numeric` 版本。因此這幾個名稱重新排回最前面，欄位標題則保留為較後的備援。0.7.26 並沒有壞掉，因為備援鏈接住了它，但那個順序表達的意思與 Dell 文件正好相反。
+
+### 變更
+- `creation-date-time-numeric` 不再標示為未驗證：volumes basetype 記載它是未格式化的建立時間。
+- `docs/TESTING.md` 直接寫明當初讓推測出錯的那個分野：**列印出來的欄位標題不等於屬性名稱。** 對 `Avail` 而言兩者相同，對 `Alloc Size` 而言則不然。
+
 ## [0.7.26~beta1] - 2026-07-27
 
 ### 修正

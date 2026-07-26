@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.27~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault: the field order introduced in 0.7.26 is corrected. The
+    column headings 'show volumes' prints - Total Size, Alloc Size - are not
+    the property names the JSON carries. The volumes basetype documents
+    size, total-size and allocated-size, each with a -numeric twin in
+    512-byte blocks, so those lead again and the headings are kept only as
+    later fallbacks. Nothing broke in 0.7.26 because the fallback chain
+    covered it; the order was simply wrong about which name is documented.
+  * The snapshot timestamp field creation-date-time-numeric is no longer
+    marked unverified: the volumes basetype documents it.
+  * docs/TESTING.md states the distinction plainly, because it is what made
+    the guess wrong: a printed column heading is not a property name.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:10:58 +0800
+
 jt-pve-storage-dellemc (0.7.26~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

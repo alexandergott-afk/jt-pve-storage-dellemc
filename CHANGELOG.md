@@ -7,6 +7,24 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.27~beta1] - 2026-07-27
+
+### Fixed
+- **The PowerVault field order from 0.7.26 was wrong about which name is
+  documented.** `show volumes` *prints* the columns Total Size and Alloc Size,
+  but the volumes basetype — the property names the JSON actually carries —
+  documents `size`, `total-size` and `allocated-size`, each with a `-numeric`
+  twin in 512-byte blocks. Those lead again; the column headings stay as later
+  fallbacks. Nothing broke in 0.7.26, because the fallback chain covered it,
+  but the ordering said the opposite of what Dell documents.
+
+### Changed
+- `creation-date-time-numeric` is no longer marked unverified: the volumes
+  basetype documents it as an unformatted creation timestamp.
+- `docs/TESTING.md` states the distinction that made the guess wrong in the
+  first place: **a printed column heading is not a property name.** It was for
+  `Avail`; it is not for `Alloc Size`.
+
 ## [0.7.26~beta1] - 2026-07-27
 
 ### Fixed

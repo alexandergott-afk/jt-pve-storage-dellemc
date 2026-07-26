@@ -76,7 +76,8 @@ ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放�
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`；快照名稱上限 32 bytes 且全系統唯一 | create snapshots |
 | `pattern` 接受 shell 風格的萬用字元 —— `*`、`?`、`[]` —— 比對的是名稱中**是否含有**該字串 | show volumes |
-| `show volumes` 的輸出欄位：Name、Total Size、Alloc Size、Serial Number、WWN、Pool、Class、Type、Role、Health | show volumes |
+| `show volumes` 印出的欄位為 Name、Total Size、Alloc Size、Serial Number、WWN、Pool、Class、Type、Role、Health | show volumes |
+| **volumes basetype**（JSON 實際帶的屬性名稱）記載了 `volume-name`、`durable-id`、`serial-number`、`wwn`、`size`、`total-size`、`allocated-size`（各自都有以區塊計的 `-numeric` 版本）、`health`、`creation-date-time` 與 `creation-date-time-numeric`。**列印出來的欄位標題不等於屬性名稱** | volumes basetype |
 | `show maps` 的每一列帶有 `nickname`（host 或 host group 名稱，未設定時為空白）、`identifier`（initiator 的 WWPN 或 IQN）、`lun`、`access`、`ports`、`parent-id` | volume-view-mappings basetype |
 | initiator 的資料列帶有 `id`（WWPN 或 IQN）與 `hba-nickname` | initiator-view basetype |
 
@@ -144,10 +145,10 @@ help create host
 |---|---|---|
 | `total-size-numeric` | 儲存池容量，單位為 512 位元組區塊 | 文件記載為 **Total Size** |
 | `avail-numeric` | 儲存池可用空間 | 文件記載為 **Avail** |
-| `total-size-numeric`（volume） | volume 大小 | `show volumes` 記載的欄位是 **Total Size**，不是 Size |
-| `alloc-size-numeric` | volume 已使用空間 | `show volumes` 記載的欄位是 **Alloc Size**，不是 Allocated Size |
-| `size-numeric`、`allocated-size-numeric` | 較舊的拼法，排在已記載的名稱之後 | — |
-| `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | `show volumes` 記載了 **WWN** 與 **Serial Number** 兩個欄位；主機的 WWID 究竟由哪一個推導出來，仍**未驗證** |
+| `size-numeric`（volume） | volume 大小 | volumes basetype 記載 `size` 就是該 volume 的容量 |
+| `allocated-size-numeric` | volume 已使用空間 | volumes basetype 記載為 `allocated-size` |
+| `total-size-numeric`、`alloc-size-numeric` | 排在上面兩者之後；**Total Size** 與 **Alloc Size** 是列印出來的欄位標題，與屬性名稱並不是同一回事 | — |
+| `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | volumes basetype 記載 `wwn` 為該 volume 的 World Wide Name、`serial-number` 為序號；主機的 WWID 究竟由哪一個推導出來，仍**未驗證** |
 | `volume-name`、`name` | 物件名稱 | 文件記載為 **Name** |
 | `nickname` | 一列對應屬於哪個 host 或 host group | `volume-view-mappings` 記載為 host 或 host group 名稱，**未設定時為空白** |
 | `identifier` | 一列對應屬於哪個 initiator（WWPN 或 IQN） | `volume-view-mappings`，已記載 |
@@ -156,7 +157,7 @@ help create host
 | `target-id` | iSCSI 連接埠的 IQN | 文件記載為 **Target ID** |
 | `ip-address` | iSCSI portal 位址 | 已記載 |
 | `status`、`health` | 連接埠是否可用 | 已記載 |
-| `creation-date-time-numeric` | 快照時間 | **未驗證** |
+| `creation-date-time-numeric` | 快照時間 | volumes basetype 記載為未格式化的 epoch 時間 |
 | `name-numeric`、`status-numeric` | 主要欄位不存在時嘗試的替代拼法 | — |
 | `port-type`、`primary-ip-address` | Media 與 IP Address 的舊拼法 | — |
 | `host-id`、`host`、`name` | 對應資料列可能用來表示「屬於誰」的其他拼法 | — |

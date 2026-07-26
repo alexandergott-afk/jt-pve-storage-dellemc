@@ -527,19 +527,25 @@ sub volume_rename {
 
 # Bytes, from the numeric field. The bare field is a formatted string.
 #
-# 'show volumes' documents its output columns as Total Size and Alloc Size —
-# not Size and Allocated Size, which is what these used to look for first.
-# The documented spelling leads; the others stay behind it because a wrong
-# guess here is silent. A volume whose size reads as zero makes every resize
-# request look like growth and shows the disk as empty in PVE.
+# The column headings 'show volumes' prints are NOT the property names the
+# JSON carries. It prints Total Size and Alloc Size; the volumes basetype
+# documents 'size' ("volume capacity"), 'total-size' and 'allocated-size',
+# each with a '-numeric' twin in 512-byte blocks. So the property names are
+# what these look for, and the headings are only kept as later fallbacks.
+#
+# 'size' leads for the capacity because that is the one the basetype defines
+# as the volume's capacity, which is what PVE means by a disk's size. A zero
+# here is worse than an approximation: volume_resize compares against the
+# current size, so every request would look like growth, and PVE would show
+# the disk as empty.
 sub volume_size {
     my ($self, $row) = @_;
-    return $self->_blocks_to_bytes($row, 'total-size', 'size');
+    return $self->_blocks_to_bytes($row, 'size', 'total-size');
 }
 
 sub volume_used {
     my ($self, $row) = @_;
-    return $self->_blocks_to_bytes($row, 'alloc-size', 'allocated-size',
+    return $self->_blocks_to_bytes($row, 'allocated-size', 'alloc-size',
         'storage-size');
 }
 
