@@ -861,4 +861,59 @@ SKIP: {
         'but a real failure still is one');
 }
 
+# ---------------------------------------------------------------------------
+# Pool capacity
+#
+# 'show pools' reports Total Size, Avail and Snap Size. Reading the wrong
+# spelling of Avail leaves available at 0, which makes every pool look full:
+# PVE then refuses to allocate and the capacity alert fires on the first poll.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({
+            status => [{ 'response-type' => 'Success', 'return-code' => 0 }],
+            pools => [
+                { name => 'A', 'total-size-numeric' => 2_000_000,
+                  'avail-numeric' => 1_500_000, 'snap-size-numeric' => 100_000 },
+            ],
+        }) if $path =~ m{/show/pools};
+        return reply(ok_status());
+    });
+
+    my ($total, $used, $avail) = $api->get_managed_capacity();
+
+    is($total, 2_000_000 * 512, 'the total comes from Total Size');
+    is($avail, 1_500_000 * 512, 'the available comes from Avail');
+    is($used,  500_000 * 512,   'and used is what is left over');
+    cmp_ok($avail, '>', 0, 'a healthy pool never reads as full');
+}
+
+{
+    # Two pools, and only one of them asked for.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({
+            status => [{ 'response-type' => 'Success', 'return-code' => 0 }],
+            pools => [
+                { name => 'A', 'total-size-numeric' => 1000, 'avail-numeric' => 400 },
+                { name => 'B', 'total-size-numeric' => 3000, 'avail-numeric' => 3000 },
+            ],
+        }) if $path =~ m{/show/pools};
+        return reply(ok_status());
+    });
+
+    my ($total, $used, $avail) = $api->get_managed_capacity(pool => 'B');
+    is($total, 3000 * 512, 'only the named pool is counted');
+
+    ($total, $used, $avail) = $api->get_managed_capacity();
+    is($total, 4000 * 512, 'and without a name, all of them are');
+
+    ok(!eval { $api->get_managed_capacity(pool => 'nosuch'); 1 },
+        'a pool that does not exist is an error');
+    like($@, qr/does not exist.*A, B|Available pools/s,
+        '... listing the pools that do');
+}
+
 done_testing();

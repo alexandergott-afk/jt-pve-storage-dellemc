@@ -7,6 +7,16 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.22~beta1] - 2026-07-27
+
+### Fixed
+- **Every PowerVault pool would have looked completely full.** `show pools`
+  reports Total Size, Avail and Snap Size. The code looked for a field named
+  `avail-size`, which does not exist, so available space read as zero and used
+  space as the entire pool — PVE would have refused to allocate anything and
+  the capacity alert would have fired on the first poll. It reads `avail` now,
+  with the other spellings kept as fallbacks.
+
 ## [0.7.21~beta1] - 2026-07-27
 
 ### Fixed

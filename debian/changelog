@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.7.22~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Every PowerVault pool would have looked completely full. 'show pools'
+    reports Total Size, Avail and Snap Size; the code read a field named
+    'avail-size', which does not exist, so available space came back as zero
+    and used space as the whole pool. PVE would have refused to allocate and
+    the capacity alert would have fired on the first poll.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 22:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.21~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

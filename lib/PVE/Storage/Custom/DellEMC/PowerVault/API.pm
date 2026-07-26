@@ -348,8 +348,13 @@ sub get_managed_capacity {
         next if defined $want && length $want && lc($name) ne lc($want);
         $matched++;
 
-        $total     += $self->_blocks_to_bytes($pool, 'total-size');
-        $available += $self->_blocks_to_bytes($pool, 'avail-size', 'available-size');
+        # 'show pools' reports Total Size, Avail and Snap Size. The JSON
+        # spelling of Avail is 'avail', not 'avail-size': reading the wrong
+        # one leaves available at 0, which makes every pool look full — PVE
+        # then refuses to allocate and the capacity alert fires immediately.
+        $total     += $self->_blocks_to_bytes($pool, 'total-size', 'total');
+        $available += $self->_blocks_to_bytes($pool, 'avail', 'avail-size',
+                                              'available-size', 'available');
     }
 
     if (defined $want && length $want && !$matched) {
