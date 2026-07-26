@@ -1,0 +1,18 @@
+[
+  {
+    "id": "h-0000-0001",
+    "name": "pve-mycluster-node1",
+    "os_type": "Linux",
+    "host_initiators": [
+      { "port_name": "iqn.1993-08.org.debian:01:node1", "port_type": "iSCSI" }
+    ]
+  },
+  {
+    "id": "h-0000-0002",
+    "name": "pve-mycluster-node2",
+    "os_type": "Linux",
+    "host_initiators": [
+      { "port_name": "iqn.1993-08.org.debian:01:node2", "port_type": "iSCSI" }
+    ]
+  }
+]

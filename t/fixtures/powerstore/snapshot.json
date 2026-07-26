@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1f3e5c88-0000-4000-8000-00000000000a",
+    "name": "pve-ps1-100-disk0.pve-snap-before-upgrade",
+    "size": 34359738368,
+    "wwn": "naa.68ccf09800a1b2c3d4e5f60718293a50",
+    "type": "Snapshot",
+    "state": "Ready",
+    "creation_timestamp": "2026-07-26T10:00:00.000Z",
+    "protection_data": { "source_id": "1f3e5c88-0000-4000-8000-000000000001" }
+  }
+]

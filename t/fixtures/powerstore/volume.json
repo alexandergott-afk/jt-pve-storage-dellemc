@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1f3e5c88-0000-4000-8000-000000000001",
+    "name": "pve-ps1-100-disk0",
+    "size": 34359738368,
+    "wwn": "naa.68ccf09800a1b2c3d4e5f60718293a4b",
+    "type": "Primary",
+    "state": "Ready",
+    "appliance_id": "A1",
+    "logical_used": 1073741824,
+    "creation_timestamp": "2026-07-26T09:00:00.000Z",
+    "protection_data": { "source_id": null }
+  },
+  {
+    "id": "1f3e5c88-0000-4000-8000-000000000002",
+    "name": "pve-ps1-101-disk0",
+    "size": 8589934592,
+    "wwn": "naa.68ccf09800a1b2c3d4e5f60718293a4c",
+    "type": "Primary",
+    "state": "Ready",
+    "appliance_id": "A1",
+    "logical_used": 0,
+    "creation_timestamp": "2026-07-26T09:05:00.000Z",
+    "protection_data": { "source_id": null }
+  }
+]

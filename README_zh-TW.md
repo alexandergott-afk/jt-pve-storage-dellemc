@@ -25,6 +25,22 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 完整開發規格請見 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md)。
 
+## 產品系列
+
+Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，因此每個系列各自對應一個 type，原因詳見 [ARCHITECTURE_zh-TW.md](docs/ARCHITECTURE_zh-TW.md)。各系列共用主機端底層，所以新增一個系列只需要一個 plugin 檔加一個 API 客戶端，不必重構。
+
+| 系列 | PVE storage type | 資料路徑 | 狀態 |
+|---|---|---|---|
+| **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
+| PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
+| PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | 規劃中，視需求 |
+| PowerScale | `dellpowerscale` | NFS（目錄語意） | 規劃中，低優先 |
+| Unity XT | `dellunity` | iSCSI／FC | 未排入 |
+| PowerVault ME5 | `dellme5` | iSCSI／FC／SAS | 未排入 |
+| ObjectScale、PowerProtect | — | — | 不列入範圍 |
+
+物件儲存與備份設備類產品是刻意排除的：它們並不適合 PVE storage plugin 的模型。
+
 ---
 
 ## 重要：Multipath 安全規則

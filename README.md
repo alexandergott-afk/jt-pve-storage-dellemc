@@ -32,6 +32,26 @@ all operate on a single VM disk as their natural unit.
 The full development specification lives in
 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md).
 
+## Product families
+
+Dell EMC's product lines differ too much to share one PVE storage type, so
+each family gets its own — see [ARCHITECTURE.md](docs/ARCHITECTURE.md) for
+why. They share the host-side layer, so adding a family is a plugin file and
+an API client, not a restructuring.
+
+| Family | PVE storage type | Data path | Status |
+|---|---|---|---|
+| **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
+| PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
+| PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned, on demand |
+| PowerScale | `dellpowerscale` | NFS (directory semantics) | planned, low priority |
+| Unity XT | `dellunity` | iSCSI / FC | not scheduled |
+| PowerVault ME5 | `dellme5` | iSCSI / FC / SAS | not scheduled |
+| ObjectScale, PowerProtect | — | — | out of scope |
+
+Object and backup-appliance products are out of scope on purpose: they do not
+fit the PVE storage plugin model.
+
 ---
 
 ## CRITICAL: Multipath safety rules

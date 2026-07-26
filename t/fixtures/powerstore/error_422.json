@@ -1,0 +1,9 @@
+{
+  "messages": [
+    {
+      "code": "0xE0201001000B",
+      "severity": "Error",
+      "message_l10n": "The volume name is already in use."
+    }
+  ]
+}
