@@ -1196,6 +1196,10 @@ sub alloc_image {
 # opts:
 #   keep_base   leave the template marker snapshot in place
 #   base_only   remove nothing but the template marker
+#   errors      arrayref that collects the reason for each one that would not
+#               go. The array's refusal here is usually the real explanation
+#               for the delete that follows — "this snapshot has dependent
+#               clones" rather than the volume's own "it still has snapshots".
 sub _purge_own_snapshots {
     my ($class, $scfg, $storeid, $array_name, %opts) = @_;
 
@@ -1224,7 +1228,10 @@ sub _purge_own_snapshots {
 
         eval { $class->_array_snapshot_delete($scfg, $storeid, $name) };
         if ($@) {
-            warn "Could not delete snapshot '$name' of '$array_name': $@";
+            my $err = $@;
+            chomp $err;
+            warn "Could not delete snapshot '$name' of '$array_name': $err\n";
+            push @{ $opts{errors} }, $err if ref($opts{errors}) eq 'ARRAY';
             next;
         }
         $removed++;
@@ -1367,7 +1374,9 @@ sub free_image {
     # An array refuses to delete a volume that still has snapshots, and PVE
     # does not remove them first: 'qm destroy' calls vdisk_free straight away.
     # The template marker is deliberately left for now — see below.
-    $class->_purge_own_snapshots($scfg, $storeid, $array_name, keep_base => 1);
+    my @snapshot_errors;
+    $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+        keep_base => 1, errors => \@snapshot_errors);
 
     eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
 
@@ -1388,7 +1397,7 @@ sub free_image {
         if ($delete_error) {
             if ($delete_error !~ /clone|dependent|child|in use/i
                 && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
-                    base_only => 1)) {
+                    base_only => 1, errors => \@snapshot_errors)) {
                 eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
                 $delete_error = $@;
             }
@@ -1400,6 +1409,14 @@ sub free_image {
 
     if ($delete_error) {
         my $err = $delete_error;
+        chomp $err;
+
+        # A snapshot that would not go usually explains the volume that would
+        # not go, and in more useful terms: the array tells you a snapshot has
+        # dependent clones, while the volume only says it still has snapshots.
+        $err .= "\n  While clearing its snapshots: "
+              . join('; ', @snapshot_errors) if @snapshot_errors;
+
         if ($err =~ /clone|dependent|child|in use/i) {
             die "Cannot delete volume '$volname': the array reports dependent"
               . " objects, which usually means thin clones were made from it."

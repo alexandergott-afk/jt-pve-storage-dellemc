@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.11~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * New test t/17-lifecycle.t walks a whole VM's life against an array that
+    refuses what a real one refuses — deleting a volume that still has
+    snapshots, deleting a snapshot something was cloned from, creating a name
+    that already exists — and checks after every step that the array holds
+    exactly what it should and that nothing was left behind.
+  * It found a misleading error: deleting a template that still has a linked
+    clone reported "the volume still has snapshots", because that was the
+    array's answer about the volume. The array's answer about the SNAPSHOT
+    said the useful thing — it has dependent clones — and that is now carried
+    into the message the operator sees.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 11:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.10~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

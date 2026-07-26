@@ -690,7 +690,9 @@ sub free_image {
     # the template marker is left until the delete has been tried, so a
     # template whose clones still depend on it is not stripped of its identity
     # by a delete that fails anyway.
-    $class->_purge_own_snapshots($scfg, $storeid, $array_name, keep_base => 1);
+    my @snapshot_errors;
+    $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+        keep_base => 1, errors => \@snapshot_errors);
 
     eval { $api->volume_delete($id, storeid => $storeid) };
 
@@ -702,7 +704,7 @@ sub free_image {
         if ($delete_error) {
             if ($delete_error !~ /descendant|snapshot|child|depend/i
                 && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
-                    base_only => 1)) {
+                    base_only => 1, errors => \@snapshot_errors)) {
                 eval { $api->volume_delete($id, storeid => $storeid) };
                 $delete_error = $@;
             }
@@ -714,6 +716,11 @@ sub free_image {
 
     if ($delete_error) {
         my $err = $delete_error;
+        chomp $err;
+
+        $err .= "\n  While clearing its snapshots: "
+              . join('; ', @snapshot_errors) if @snapshot_errors;
+
         die "Cannot delete volume '$volname': the array reports dependent"
           . " objects, which on PowerFlex means snapshots or clones made from"
           . " it. Delete those first.\n  Array error: $err"
@@ -729,6 +736,8 @@ sub free_image {
 # Delete the snapshots this plugin created for one volume, including the
 # template marker. A linked clone is a snapshot with a volume-shaped name, so
 # it does not decode here and is never removed.
+# $opts{errors} collects the reason each snapshot would not go; see the same
+# method in Common::BlockBase.
 sub _purge_own_snapshots {
     my ($class, $scfg, $storeid, $array_name, %opts) = @_;
 
@@ -747,8 +756,11 @@ sub _purge_own_snapshots {
 
         eval { $api->volume_delete($volume->{id}, storeid => $storeid) };
         if ($@) {
+            my $err = $@;
+            chomp $err;
             warn "Could not delete snapshot '$volume->{name}' of"
-               . " '$array_name': $@";
+               . " '$array_name': $err\n";
+            push @{ $opts{errors} }, $err if ref($opts{errors}) eq 'ARRAY';
             next;
         }
         $removed++;

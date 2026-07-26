@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.11~beta1] - 2026-07-27
+
+### Fixed
+- **Deleting a template with a linked clone blamed the wrong thing.** The
+  message said the volume still had snapshots, which was the array's answer
+  about the volume; the array's answer about the snapshot said what actually
+  mattered — it has dependent clones. The snapshot's refusal is now carried
+  into the message, so the operator is told which object is in the way rather
+  than being sent to look for snapshots to delete.
+
+### Added
+- `t/17-lifecycle.t`: a whole VM's life against an array that refuses what a
+  real one refuses. Create two disks, resize, snapshot, roll back, refuse a
+  rollback past a newer snapshot, make a template, take a linked clone, refuse
+  to delete the template while the clone exists, delete both, destroy a VM
+  whose disks still have snapshots, and read a snapshot through a clone and
+  then delete it — checking after every step that the array holds exactly what
+  it should and that nothing is left mapped.
+
 ## [0.7.10~beta1] - 2026-07-27
 
 ### Fixed
