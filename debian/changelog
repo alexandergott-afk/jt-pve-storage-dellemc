@@ -1,3 +1,28 @@
+jt-pve-storage-dellemc (0.5.0-1) unstable; urgency=medium
+
+  * Phases 2 to 4: the dellpowerstore storage type now exists. It has NOT
+    been run against a PowerStore array - see docs/TESTING.md, where every
+    array-facing detail is still listed as unverified.
+  * Common::BlockBase: the abstract PVE plugin base. Activation, allocation,
+    device discovery and teardown, snapshots, templates, clones, the
+    multipath drop-in and the background orphan reaper, all independent of
+    which array is behind them.
+  * PowerStore::API: REST client for volumes, snapshots, thin clones, hosts,
+    mappings and the transport endpoints. Listing filters server-side and
+    follows pages; LUN ids are assigned by the client rather than by the
+    array, because PowerStore's REST-side sequence starts at 200 and never
+    reuses an id.
+  * DellPowerStorePlugin: the storage type itself.
+  * bin/pve-dell-config-get: reads a VM configuration back out of the config
+    backup volume written alongside each snapshot, including in recover mode
+    where it talks to the array directly and never touches the PVE stack.
+  * Documentation: quick start, configuration reference, architecture,
+    troubleshooting, naming conventions and the hardware test matrix, all in
+    English and Traditional Chinese, plus the project page under docs/.
+  * 713 unit tests, none of which need an array or a device.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sun, 26 Jul 2026 19:00:00 +0800
+
 jt-pve-storage-dellemc (0.2.0-1) unstable; urgency=medium
 
   * Phase 1: the shared Common layer. Still no PVE storage type — these are

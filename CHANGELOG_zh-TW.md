@@ -3,6 +3,26 @@
 本專案所有值得記錄的變更都寫在這裡。
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## [0.5.0] - 2026-07-26
+
+Phase 2 至 4。`dellpowerstore` storage type 已經存在。
+
+> 它**尚未**在任何 PowerStore 陣列上執行過。所有面向陣列的細節在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 中仍標記為未驗證。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
+
+### 新增
+- `Common/BlockBase.pm`：抽象的 PVE plugin 基底。SAN 啟用、配置、裝置探索與拆除、快照、範本、複製、multipath drop-in，以及背景 orphan 清理 —— 全部與「背後是哪一台陣列」無關。系列 plugin 只需實作 `_array_*` 方法，其餘全部繼承。
+- `PowerStore/API.pm`：涵蓋 volume、快照、精簡複製、host、對應關係與傳輸端點的 REST 客戶端，附 fixture 與 96 項請求格式測試。
+- `PowerStore/Naming.pm`：PowerStore 較寬鬆的名稱限制。
+- `DellPowerStorePlugin.pm`：storage type 本身，以及 PVE 要註冊的 schema。
+- `bin/pve-dell-config-get`：把每次快照旁邊那個設定備份卷裡的 VM 設定讀回來。復原模式下它會自己解析 `storage.cfg`，或直接由命令列取得陣列資訊，完全不經過 pvesm —— 因為這個工具存在的情境，正是 `/etc/pve` 已經不在、或 pvedaemon 起不來的時候。
+- 文件：快速上手、設定參數說明、架構說明、疑難排解、命名慣例與實機測試矩陣，皆有英文與繁體中文版本，另有 `docs/` 底下的專案頁面。
+
+### 值得知道的行為
+- Volume 在建立時就會對應到所有節點，讓線上遷移不必先重新對應；而解除對應一律在刪除之前 —— 相反的順序會讓任何節點上正在進行的重新掃描把該 LUN 重新匯入，在刪除的背後又把裝置建回來。
+- LUN ID 由外掛自行配發，從 `pstore-lun-id-base` 往上補空號。PowerStore 自己的 REST 端序列從 200 開始且不重用 ID，因此不斷掛載卸載的叢集，最終會把它推到超過主機掃描範圍，新磁碟就再也不會出現。
+- Volume 容量會向上對齊 PowerStore 要求的 8 KiB 粒度。向下取整會交回一個比 PVE 要求還小的 volume。
+- `make syntax` 對需要 Proxmox VE 的模組會回報為「已跳過」而不是失敗，讓一般 CI runner 上的結果是誠實的，而不是碰巧變綠。
+
 ## [0.2.0] - 2026-07-26
 
 Phase 1 — 共用的 Common 層。尚未註冊任何 storage type，這些是各系列 plugin 之後要建立在其上的模組。

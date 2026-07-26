@@ -10,18 +10,18 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.2.0 — 共用 Common 層（Phase 1）。**
-> 本套件仍**尚未**註冊任何 storage type，目前包含建置系統、打包、安全檢查工具，以及各系列 plugin 之後要建立在其上的模組。請勿當成可用的儲存後端部署。
+> **版本 0.5.0 — `dellpowerstore` plugin 程式碼已完成，但**尚未**在任何 PowerStore 陣列上實際執行過。**
+> 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
 |---|---|---|
 | 0 | 骨架：Makefile、`debian/`、CI、README | **已完成** |
 | 1 | Common 層：Naming、REST、Multipath、ISCSI、FC、WwidState、Health | **已完成** |
-| 2 | `Common::BlockBase` 抽象 plugin 基底 | 規劃中 |
-| 3 | PowerStore REST API 客戶端 | 規劃中 |
-| 4 | `dellpowerstore` plugin、文件、iSCSI 實機測試 | 規劃中 |
-| 5 | FC 驗證、PVE 9.2 驗證、發佈 1.0.0 | 規劃中 |
-| 6+ | PowerMax／PowerFlex／PowerScale（另立子規格） | 未開始 |
+| 2 | `Common::BlockBase` 抽象 plugin 基底 | **已完成** |
+| 3 | PowerStore REST API 客戶端 | **已完成** |
+| 4 | `dellpowerstore` plugin、災難復原工具、文件 | **程式碼已完成**，實機測試未進行 |
+| 5 | FC 驗證、PVE 9.2 驗證、發佈 1.0.0 | 需要實機 |
+| 6+ | PowerScale → PowerFlex → PowerMax（各自另立子規格） | 未開始 |
 
 完整開發規格請見 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md)。
 
@@ -29,15 +29,17 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，因此每個系列各自對應一個 type，原因詳見 [ARCHITECTURE_zh-TW.md](docs/ARCHITECTURE_zh-TW.md)。各系列共用主機端底層，所以新增一個系列只需要一個 plugin 檔加一個 API 客戶端，不必重構。
 
-| 系列 | PVE storage type | 資料路徑 | 狀態 |
-|---|---|---|---|
-| **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
-| PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
-| PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | 規劃中，視需求 |
-| PowerScale | `dellpowerscale` | NFS（目錄語意） | 規劃中，低優先 |
-| Unity XT | `dellunity` | iSCSI／FC | 未排入 |
-| PowerVault ME5 | `dellme5` | iSCSI／FC／SAS | 未排入 |
-| ObjectScale、PowerProtect | — | — | 不列入範圍 |
+| 順序 | 系列 | PVE storage type | 資料路徑 | 狀態 |
+|---|---|---|---|---|
+| 1 | **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
+| 2 | PowerScale | `dellpowerscale` | NFS（目錄語意） | 規劃中 |
+| 3 | PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | 規劃中 |
+| 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
+| — | Unity XT | `dellunity` | iSCSI／FC | 未排入 |
+| — | PowerVault ME5 | `dellme5` | iSCSI／FC／SAS | 未排入 |
+| — | ObjectScale、PowerProtect | — | — | 不列入範圍 |
+
+PowerScale 與 PowerFlex 不會繼承 block 基底類別：前者是 NAS 的目錄語意，後者有自己的 kernel module 資料路徑。
 
 物件儲存與備份設備類產品是刻意排除的：它們並不適合 PVE storage plugin 的模型。
 
@@ -63,7 +65,7 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 
 - 本專案為**獨立的社群專案**，與 Dell Technologies 無隸屬關係，亦未經其背書或提供支援。「Dell」、「Dell EMC」、「PowerStore」、「PowerMax」、「PowerFlex」、「PowerScale」為各自所有權人之商標。
 - 以 MIT 授權提供，**不附帶任何形式的保固**。是否適用於您的硬體、韌體版本與工作負載，需由您自行驗證後再投入正式環境。
-- **尚未於實機驗證**的項目，會在 `docs/TESTING.md` 標記 `NOT VERIFIED ON HARDWARE`。截至 0.1.0，所有面向陣列的行為都屬於此類：REST 端點與欄位名稱、multipath 比對用的 SCSI vendor／product 字串，以及 WWN 轉 WWID 的換算方式。
+- **尚未於實機驗證**的項目，會在 `docs/TESTING.md` 標記 `NOT VERIFIED ON HARDWARE`。截至 0.5.0，所有面向陣列的行為都屬於此類：REST 端點與欄位名稱、multipath 比對用的 SCSI vendor／product 字串、WWN 轉 WWID 的換算方式，以及整條 Fibre Channel 路徑。
 - 請務必先在非正式環境的叢集與陣列上測試，並對放在本儲存上的資料另行保留獨立備份。
 
 ---
@@ -102,7 +104,7 @@ apt install ./jt-pve-storage-dellemc_<version>_all.deb
 
 ## 設定
 
-Phase 4 完成後，新增 PowerStore 儲存的方式如下：
+新增 PowerStore 儲存的方式如下：
 
 ```bash
 pvesm add dellpowerstore ps1 \

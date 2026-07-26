@@ -1,7 +1,10 @@
 # Naming Conventions
 
-> **Status: skeleton (Phase 0).** Authoritative rules land with
-> `Common::Naming` in Phase 1. 繁體中文：[NAMING_CONVENTIONS_zh-TW.md](NAMING_CONVENTIONS_zh-TW.md)
+繁體中文：[NAMING_CONVENTIONS_zh-TW.md](NAMING_CONVENTIONS_zh-TW.md)
+
+Implemented in `Common::Naming`, with the PowerStore limits in
+`PowerStore::Naming`. `t/01-naming.t` covers the round trips and the
+ownership gate.
 
 ## Prefix isolation
 
@@ -10,7 +13,7 @@ Every list, delete and cleanup path filters on that prefix first. Objects that
 do not carry it are never read, renamed or deleted — this is the safety
 boundary that lets the plugin share an array with other workloads.
 
-## Planned mapping
+## Mapping
 
 | PVE object | Array object | Name pattern |
 |---|---|---|
@@ -26,5 +29,11 @@ boundary that lets the plugin share an array with other workloads.
 | PVE node | Host | `pve-{cluster}-{node}` |
 | Shared host | Host group | `pve-{cluster}-shared` |
 
-PowerStore name length and character restrictions are still to be confirmed
-against hardware; see `docs/TESTING.md`.
+The storeid inside a name is sanitized: characters outside `[A-Za-z0-9_-]`
+become `_`, and hyphens become underscores. The underscore conversion is what
+keeps one storage's prefix from containing another's — `ps` and `ps-1` would
+otherwise yield `pve-ps-` and `pve-ps-1-`, and storage `ps` would claim
+`ps-1`'s volumes.
+
+PowerStore's own name length and character limits are still to be confirmed
+against hardware; see [TESTING.md](TESTING.md).

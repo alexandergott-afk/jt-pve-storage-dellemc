@@ -1,24 +1,50 @@
 # Testing and Hardware Verification Status
 
-> **Status: skeleton (Phase 0).** 繁體中文：[TESTING_zh-TW.md](TESTING_zh-TW.md)
+繁體中文：[TESTING_zh-TW.md](TESTING_zh-TW.md)
 
 ## Hardware verification status
 
-Nothing in this project has been verified against a physical PowerStore yet.
-Every item below is marked `NOT VERIFIED ON HARDWARE` until it has been
-executed on a real array and the result recorded here with the PowerStore OS
+**Nothing in this project has been run against a physical PowerStore.**
+
+Everything below is `NOT VERIFIED ON HARDWARE` until it has been executed on a
+real array and the result recorded here together with the PowerStore OS
 version it was observed on.
 
-| Item | Status |
-|---|---|
-| REST endpoint paths and response field names | NOT VERIFIED ON HARDWARE |
-| Authentication flow (`login_session`, `DELL-EMC-TOKEN`) | NOT VERIFIED ON HARDWARE |
-| SCSI vendor / product strings used for multipath matching | NOT VERIFIED ON HARDWARE |
-| WWN to multipath WWID conversion | NOT VERIFIED ON HARDWARE |
-| Volume name length and character limits | NOT VERIFIED ON HARDWARE |
-| LUN ID assignment behaviour | NOT VERIFIED ON HARDWARE |
-| Fibre Channel data path | NOT VERIFIED ON HARDWARE |
-| NVMe-TCP data path | out of scope for 1.0 |
+| Item | Where | Status |
+|---|---|---|
+| REST endpoint paths | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Response field names (`size`, `wwn`, `logical_used`, `protection_data`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Filter syntax (`eq.`, `ilike.`, `cs.{...}`, `->>`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Authentication (`login_session`, `DELL-EMC-TOKEN`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Capacity source (`space_metrics_by_cluster`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| SCSI vendor / product strings for multipath | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
+| WWN to multipath WWID conversion | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Volume name length and character limits | `PowerStore/Naming.pm` | NOT VERIFIED ON HARDWARE |
+| LUN id assignment behaviour | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Multipath device settings | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
+| Fibre Channel data path | everywhere | NOT VERIFIED ON HARDWARE |
+| NVMe-TCP | — | out of scope for 1.0 |
+
+### Verifying the four that matter most
+
+Do these first on any array this plugin is pointed at. Each one is cheap, and
+each one is a silent failure if it is wrong.
+
+```bash
+# 1. Endpoints and field names: the array documents itself
+#    https://<mgmt-ip>/swaggerui
+
+# 2. The SCSI vendor and product strings, which decide which devices the
+#    plugin will ever touch
+sg_inq /dev/sdX | head -5
+multipathd show config | grep -A3 -i dell
+
+# 3. WWN to WWID. The array reports naa.68ccf098...; this must match.
+/lib/udev/scsi_id -g -u /dev/sdX
+
+# 4. Whether LUN ids stay low over time
+#    PowerStore Manager > Compute > Host Information > <host> > Mapped Volumes
+```
 
 ## Automated checks
 
@@ -29,10 +55,55 @@ make check-multipath-flush   # fails on any system-wide multipath flush
 make test                    # all of the above
 ```
 
+713 unit tests currently run without an array or a device. They cover naming
+and the ownership gate, the REST retry policy, the reap guards, request shape
+against fixtures, and the plugin's PVE schema. Tests that need
+`PVE::Storage::Plugin` skip themselves on a machine without Proxmox VE.
+
+What the unit tests cannot tell you: whether the endpoints exist, whether the
+field names are right, or whether a device ever appears. That is what the
+matrix below is for.
+
 ## Manual test matrix
 
-The full 26-item matrix (install, cluster consistency, capacity reporting,
-array-offline behaviour, disk lifecycle, snapshots, templates and clones,
-containers, live migration, path failure, reboot recovery, orphan reaping,
-LUN ID growth, FC, PVE upgrade) is defined in chapter 12 of
-`jt-pve-storage-dellemc.md` and gets recorded here as each item is executed.
+Run on a cluster of at least three nodes with a real array. Record the result
+and the PowerStore OS version in the Result column.
+
+| # | Test | Precondition | Pass criteria | Result |
+|---|---|---|---|---|
+| 1 | Package install | clean node | `apt install ./deb` resolves dependencies, postinst reports no error | — |
+| 2 | Cluster-wide install | 3 nodes | `pvesm status` agrees on every node | — |
+| 3 | `pvesm add` validation | — | a missing required option is rejected | — |
+| 4 | Capacity reporting | — | matches PowerStore Manager within 1% | — |
+| 5 | Array unreachable | management network pulled | storage goes `inactive` within ~5s, sibling storages unaffected | — |
+| 6 | Create a VM disk | — | volume on the array, multipath device on the node | — |
+| 7 | Online grow | VM running | guest sees the new size after a rescan | — |
+| 8 | Shrink | — | refused, with both sizes named | — |
+| 9 | Delete a disk | VM stopped | volume gone, no device or map left behind | — |
+| 10 | Delete an in-use disk | VM running | refused, with the reason | — |
+| 11 | Snapshot create/list/delete | — | array snapshot matches | — |
+| 12 | Snapshot rollback | VM stopped | data restored, no stale cache | — |
+| 13 | RAM snapshot (vmstate) | VM running | state volume created, VM resumes correctly | — |
+| 14 | Config backup + `pve-dell-config-get` | — | configuration is readable back | — |
+| 15 | Template + linked clone | — | clone is instant | — |
+| 16 | Delete a template with clones | — | refused, dependants named | — |
+| 17 | Full clone | — | completes via qemu-img | — |
+| 18 | LXC container rootfs | — | creates and starts | — |
+| 19 | EFI disk, TPM state, cloud-init | — | each is created | — |
+| 20 | Live migration | 2 nodes | completes with no I/O interruption | — |
+| 21 | Single path failure | pull one iSCSI link | I/O continues, multipath shows the failed path | — |
+| 22 | Node reboot | — | logs in and devices reappear automatically | — |
+| 23 | Orphan reaper | delete a volume from another node | the stale device is removed after the grace period, others untouched | — |
+| 24 | LUN id growth | 300 attach/detach cycles | ids stay low and dense | — |
+| 25 | Fibre Channel | FC fabric | items 1–24 repeated | — |
+| 26 | PVE 9.1 to 9.2 upgrade | — | plugin still works, `get_identity` returns cleanly | — |
+
+## Soak criteria for 1.0.0
+
+Beyond the matrix:
+
+- 72 hours of pvestatd polling with no false `inactive` and no error
+  accumulation in the journal
+- management network cut for 10 minutes and restored: the storage returns to
+  `active` on its own, and running VMs see no I/O interruption
+- LUN ids still low after item 24

@@ -14,20 +14,22 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.2.0 — shared Common layer (Phase 1).**
-> This package still registers **no** storage type. It contains the build
-> system, packaging, safety tooling and the modules the family plugins will
-> be built on. Do not deploy it expecting a working storage backend yet.
+> **Version 0.5.0 — the `dellpowerstore` plugin is code complete, and has
+> NOT been run against a PowerStore array.**
+> Every array-facing detail — REST paths and field names, the SCSI vendor and
+> product strings, the WWN to WWID conversion — is still unverified, so this
+> is a release to test with, on a non-production cluster and a non-production
+> array. 1.0.0 is the on-hardware test pass, not more code.
 
 | Phase | Content | State |
 |---|---|---|
 | 0 | Skeleton: Makefile, `debian/`, CI, README | **done** |
 | 1 | Common layer: Naming, REST, Multipath, ISCSI, FC, WwidState, Health | **done** |
-| 2 | `Common::BlockBase` abstract plugin base | planned |
-| 3 | PowerStore REST API client | planned |
-| 4 | `dellpowerstore` plugin, docs, on-hardware iSCSI test pass | planned |
-| 5 | FC verification, PVE 9.2 verification, 1.0.0 release | planned |
-| 6+ | PowerMax / PowerFlex / PowerScale (separate specs) | not started |
+| 2 | `Common::BlockBase` abstract plugin base | **done** |
+| 3 | PowerStore REST API client | **done** |
+| 4 | `dellpowerstore` plugin, recovery tool, docs | **code done**, on-hardware pass outstanding |
+| 5 | FC verification, PVE 9.2 verification, 1.0.0 release | needs hardware |
+| 6+ | PowerScale, then PowerFlex, then PowerMax (separate specs) | not started |
 
 The full development specification lives in
 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md).
@@ -39,15 +41,18 @@ each family gets its own — see [ARCHITECTURE.md](docs/ARCHITECTURE.md) for
 why. They share the host-side layer, so adding a family is a plugin file and
 an API client, not a restructuring.
 
-| Family | PVE storage type | Data path | Status |
-|---|---|---|---|
-| **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
-| PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
-| PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned, on demand |
-| PowerScale | `dellpowerscale` | NFS (directory semantics) | planned, low priority |
-| Unity XT | `dellunity` | iSCSI / FC | not scheduled |
-| PowerVault ME5 | `dellme5` | iSCSI / FC / SAS | not scheduled |
-| ObjectScale, PowerProtect | — | — | out of scope |
+| Order | Family | PVE storage type | Data path | Status |
+|---|---|---|---|---|
+| 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
+| 2 | PowerScale | `dellpowerscale` | NFS (directory semantics) | planned |
+| 3 | PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned |
+| 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
+| — | Unity XT | `dellunity` | iSCSI / FC | not scheduled |
+| — | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS | not scheduled |
+| — | ObjectScale, PowerProtect | — | — | out of scope |
+
+PowerScale and PowerFlex do not inherit the block base class: one is NAS with
+directory semantics, the other has its own kernel-module data path.
 
 Object and backup-appliance products are out of scope on purpose: they do not
 fit the PVE storage plugin model.
@@ -98,10 +103,10 @@ including storage that has nothing to do with this plugin — out of service.
   responsible for validating it against your own hardware, firmware version
   and workload before production use.
 - Items **not yet verified on physical hardware** are marked
-  `NOT VERIFIED ON HARDWARE` in `docs/TESTING.md`. As of 0.1.0 that includes
-  every array-facing behaviour: REST endpoint set and field names, the
-  SCSI vendor/product strings used for multipath matching, and the
-  WWN-to-WWID conversion.
+  `NOT VERIFIED ON HARDWARE` in `docs/TESTING.md`. As of 0.5.0 that is every
+  array-facing behaviour: the REST endpoint set and field names, the SCSI
+  vendor and product strings used for multipath matching, the WWN to WWID
+  conversion, and the whole Fibre Channel path.
 - Always test on a non-production cluster and a non-production array first,
   and keep independent backups of any data you place on this storage.
 
@@ -144,7 +149,7 @@ does not reliably replace already-loaded Perl modules.
 
 ## Configuration
 
-Once Phase 4 lands, a PowerStore storage is added like this:
+Add a PowerStore storage:
 
 ```bash
 pvesm add dellpowerstore ps1 \

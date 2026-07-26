@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 繁體中文版本：[CHANGELOG_zh-TW.md](CHANGELOG_zh-TW.md)
 
+## [0.5.0] - 2026-07-26
+
+Phases 2 to 4. The `dellpowerstore` storage type now exists.
+
+> It has **not** been run against a PowerStore array. Every array-facing
+> detail is still listed as unverified in [docs/TESTING.md](docs/TESTING.md).
+> 1.0.0 is the on-hardware test pass, not more code.
+
+### Added
+- `Common/BlockBase.pm`: the abstract PVE plugin base. SAN activation,
+  allocation, device discovery and teardown, snapshots, templates, clones,
+  the multipath drop-in and the background orphan reaper — all independent of
+  which array is behind them. A family plugin implements the `_array_*`
+  methods and inherits the rest.
+- `PowerStore/API.pm`: REST client for volumes, snapshots, thin clones, hosts,
+  mappings and the transport endpoints, with fixtures and 96 request-shape
+  tests.
+- `PowerStore/Naming.pm`: PowerStore's wider name limits.
+- `DellPowerStorePlugin.pm`: the storage type, plus the schema PVE registers.
+- `bin/pve-dell-config-get`: reads a VM configuration back out of the config
+  backup volume written beside each snapshot. In recover mode it parses
+  `storage.cfg` itself, or takes the array details on the command line, and
+  never goes through pvesm — the situation it exists for is the one where
+  `/etc/pve` is gone or pvedaemon will not start.
+- Documentation: quick start, configuration reference, architecture,
+  troubleshooting, naming conventions and the hardware test matrix, in English
+  and Traditional Chinese, plus the project page under `docs/`.
+
+### Notes on behaviour worth knowing
+- Volumes are mapped to every node at creation, so live migration does not
+  have to remap first, and unmapping always precedes deletion — the other
+  order lets an in-flight rescan on any node re-import the LUN and rebuild the
+  device behind the delete.
+- LUN ids are assigned by the plugin, filling gaps from `pstore-lun-id-base`.
+  PowerStore's own REST-side sequence starts at 200 and never reuses an id, so
+  a cluster that attaches and detaches constantly eventually walks it past
+  what the host scans, and new disks stop appearing.
+- Volume sizes round up to PowerStore's 8 KiB granularity. Rounding down would
+  hand back a volume smaller than PVE asked for.
+- `make syntax` reports modules that need Proxmox VE as skipped rather than
+  failing, so CI on a plain runner stays honest instead of green by accident.
+
 ## [0.2.0] - 2026-07-26
 
 Phase 1 — the shared Common layer. Still no storage type: these are the

@@ -1,24 +1,129 @@
 # Configuration Reference
 
-> **Status: skeleton (Phase 0).** Filled in as parameters are implemented in
-> Phases 2–4. 繁體中文：[CONFIGURATION_zh-TW.md](CONFIGURATION_zh-TW.md)
+繁體中文：[CONFIGURATION_zh-TW.md](CONFIGURATION_zh-TW.md)
 
-Parameter naming follows a fixed convention: options shared by every Dell EMC
-block family use the `dell-` prefix and are declared once in
-`DellEMC::Common::BlockBase`; family-specific options use a family prefix
-(`pstore-` for PowerStore). PVE registers storage properties in one shared
-schema, so a name may only ever have one definition across all plugins.
+Options shared by every Dell EMC block family use the `dell-` prefix.
+PowerStore-specific options use `pstore-`. PVE registers storage properties in
+one shared schema, so a name may only ever have one definition across all
+plugins — that is why the prefixes exist.
 
-Planned sections:
+## Common options
 
-- Common options (`dell-portal`, `dell-username`, `dell-password`,
-  `dell-ssl-verify`, `dell-protocol`, `dell-host-mode`, `dell-cluster-name`,
-  `dell-device-timeout`, `dell-portal-probe-timeout`, `dell-status-timeout`,
-  `dell-activate-deadline`, `dell-config-backup-timeout`).
-- PowerStore options (`pstore-appliance`, `pstore-volume-group`,
-  `pstore-performance-policy`, `pstore-protection-policy`,
-  `pstore-lun-id-base`).
-- Standard PVE options (`nodes`, `disable`, `content`, `shared`).
-- Worked `storage.cfg` examples for iSCSI and FC.
-- Timeout tuning: how `dell-status-timeout` keeps a slow array from stalling
-  the whole `pvestatd` polling cycle.
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `dell-portal` | string | yes, fixed | — | Management IP or FQDN of the array. Cannot be changed after the storage is created |
+| `dell-username` | string | yes | — | REST API user |
+| `dell-password` | string | yes | — | REST API password |
+| `dell-ssl-verify` | boolean | no | `0` | Verify the array's TLS certificate |
+| `dell-protocol` | `iscsi` \| `fc` | no | `iscsi` | SAN protocol |
+| `dell-host-mode` | `per-node` \| `shared` | no | `per-node` | One host object per node, or one for the cluster |
+| `dell-cluster-name` | string | no | `pve` | Cluster name used in host object names |
+| `dell-device-timeout` | 10–300 | no | `60` | Seconds to wait for a volume's device to appear |
+| `dell-portal-probe-timeout` | 0–30 | no | `2` | TCP pre-check per iSCSI portal; 0 disables it |
+| `dell-status-timeout` | 2–60 | no | `5` | REST timeout on the pvestatd health path |
+| `dell-activate-deadline` | 0–300 | no | `30` | Wall-clock budget for the portal login loop; 0 disables it |
+| `dell-config-backup-timeout` | 5–60 | no | `15` | Device wait for the config backup volume |
+| `dell-rescan-interval` | 0–3600 | no | `300` | Minimum seconds between periodic SAN rescans; 0 rescans every time |
+
+## PowerStore options
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `pstore-appliance` | string | no | — | Appliance for new volumes in a multi-appliance cluster. Unset lets PowerStore choose |
+| `pstore-volume-group` | string | no | — | Put every volume in this volume group. Must already exist |
+| `pstore-performance-policy` | `High` \| `Medium` \| `Low` | no | `Medium` | Performance policy for new volumes |
+| `pstore-protection-policy` | string | no | — | Protection policy (snapshot and replication rules). Must already exist |
+| `pstore-lun-id-base` | 1–200 | no | `1` | Lowest LUN id the plugin assigns |
+
+## Standard PVE options
+
+`nodes`, `disable`, `content`, `shared` — all optional. Use `content
+images,rootdir` for VM disks and container root filesystems, and `shared 1` on
+a cluster.
+
+## Examples
+
+`/etc/pve/storage.cfg`:
+
+```
+dellpowerstore: ps1
+    dell-portal 192.168.1.50
+    dell-username pveadmin
+    dell-password SecurePassword
+    dell-protocol iscsi
+    dell-host-mode per-node
+    dell-cluster-name mycluster
+    pstore-volume-group pve-vg
+    content images,rootdir
+    shared 1
+```
+
+Fibre Channel, restricted to the nodes that are on the fabric:
+
+```
+dellpowerstore: ps-fc
+    dell-portal 192.168.1.50
+    dell-username pveadmin
+    dell-password SecurePassword
+    dell-protocol fc
+    nodes node1,node2
+    content images
+    shared 1
+```
+
+## The options that matter under load
+
+Most defaults can be left alone. These three are the ones worth understanding
+before a storage misbehaves.
+
+### `dell-status-timeout`
+
+PVE polls every storage roughly every ten seconds, **sequentially**. A storage
+that takes 30 seconds to answer does not just delay itself — it delays every
+storage polled after it, and those show up as `inactive` in the GUI even
+though nothing is wrong with them.
+
+The health path therefore uses a short timeout and makes a **single attempt**.
+Losing the retry costs nothing: the next poll is the retry. Raise this only if
+the array's management network is genuinely slow, and expect the whole poll
+cycle to slow with it.
+
+### `dell-activate-deadline`
+
+Per-portal timeouts bound each portal but not the loop over all of them. An
+array publishing eight portals, three of which accept a TCP connection and
+then never answer, can hold `activate_storage` for minutes.
+
+Once the budget is spent **and at least one path is up**, the remaining
+portals are deferred to a later activation and a warning names them. The
+budget is never applied while zero paths are up: with no path, the storage
+must fail honestly rather than report success.
+
+### `dell-rescan-interval`
+
+`activate_storage` runs on every poll. Rescanning the SAN unconditionally
+means a host-wide `multipathd reconfigure` and a `udevadm trigger` six times a
+minute on every node, which keeps device-mapper in flux exactly while a VM
+start or a backup is trying to discover a device.
+
+A rescan still happens **immediately** whenever this node logs in to a new
+portal, so newly mapped volumes are not delayed. The interval only bounds the
+periodic safety net for volumes mapped out of band.
+
+## Host modes
+
+`per-node` (default) registers one host object per PVE node, named
+`pve-{cluster}-{node}`. Every volume is mapped to every node, so live
+migration does not have to remap anything first, and the array can report
+per-node connectivity.
+
+`shared` registers one host group for the whole cluster. Fewer objects on the
+array, but the array can no longer tell you which node a path belongs to.
+
+## Verifying a configuration
+
+```bash
+pvesm status                     # capacity and whether it is active
+pvesm list ps1                   # volumes PVE knows about
+journalctl -t pvestatd | grep dellpowerstore    # what the plugin is saying
+```

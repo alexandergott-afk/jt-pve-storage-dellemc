@@ -1,13 +1,103 @@
 # 設定參數說明
 
-> **狀態：骨架（Phase 0）。** 隨 Phase 2〜4 實作參數時逐步補齊。English: [CONFIGURATION.md](CONFIGURATION.md)
+English: [CONFIGURATION.md](CONFIGURATION.md)
 
-參數命名採固定慣例：所有 Dell EMC block 系列共通的選項使用 `dell-` 前綴，且只在 `DellEMC::Common::BlockBase` 定義一次；各系列專屬選項使用系列前綴（PowerStore 為 `pstore-`）。PVE 的 storage property 註冊在同一份共用 schema，因此同一個名稱在所有外掛之間只能有一種定義。
+所有 Dell EMC block 系列共通的選項使用 `dell-` 前綴，PowerStore 專屬選項使用 `pstore-`。PVE 的 storage property 註冊在同一份共用 schema，同一個名稱在所有外掛之間只能有一種定義，前綴就是為此而存在。
 
-預計章節：
+## 共通選項
 
-- 共通選項（`dell-portal`、`dell-username`、`dell-password`、`dell-ssl-verify`、`dell-protocol`、`dell-host-mode`、`dell-cluster-name`、`dell-device-timeout`、`dell-portal-probe-timeout`、`dell-status-timeout`、`dell-activate-deadline`、`dell-config-backup-timeout`）。
-- PowerStore 專屬選項（`pstore-appliance`、`pstore-volume-group`、`pstore-performance-policy`、`pstore-protection-policy`、`pstore-lun-id-base`）。
-- PVE 標準選項（`nodes`、`disable`、`content`、`shared`）。
-- iSCSI 與 FC 的 `storage.cfg` 完整範例。
-- 逾時調校：`dell-status-timeout` 如何避免反應緩慢的陣列拖垮整輪 `pvestatd` 輪詢。
+| 選項 | 型別 | 必填 | 預設 | 說明 |
+|---|---|---|---|---|
+| `dell-portal` | string | 是，且不可變更 | — | 陣列的管理 IP 或 FQDN，儲存建立後不能改 |
+| `dell-username` | string | 是 | — | REST API 帳號 |
+| `dell-password` | string | 是 | — | REST API 密碼 |
+| `dell-ssl-verify` | boolean | 否 | `0` | 是否驗證陣列的 TLS 憑證 |
+| `dell-protocol` | `iscsi` \| `fc` | 否 | `iscsi` | SAN 協定 |
+| `dell-host-mode` | `per-node` \| `shared` | 否 | `per-node` | 每個節點一個 host 物件，或整個叢集共用一個 |
+| `dell-cluster-name` | string | 否 | `pve` | host 物件命名所使用的叢集名稱 |
+| `dell-device-timeout` | 10–300 | 否 | `60` | 等待 volume 裝置出現的秒數 |
+| `dell-portal-probe-timeout` | 0–30 | 否 | `2` | 每個 iSCSI portal 的 TCP 預檢秒數，0 表示停用 |
+| `dell-status-timeout` | 2–60 | 否 | `5` | pvestatd 健康路徑的 REST 逾時 |
+| `dell-activate-deadline` | 0–300 | 否 | `30` | portal 登入迴圈的總時間預算，0 表示停用 |
+| `dell-config-backup-timeout` | 5–60 | 否 | `15` | 等待 config 備份卷裝置的秒數 |
+| `dell-rescan-interval` | 0–3600 | 否 | `300` | 週期性 SAN 重新掃描的最小間隔，0 表示每次都掃 |
+
+## PowerStore 專屬選項
+
+| 選項 | 型別 | 必填 | 預設 | 說明 |
+|---|---|---|---|---|
+| `pstore-appliance` | string | 否 | — | 多 appliance 叢集中，新 volume 要放在哪一台。留空由 PowerStore 自行決定 |
+| `pstore-volume-group` | string | 否 | — | 把所有 volume 放進指定的 volume group，該群組必須已存在 |
+| `pstore-performance-policy` | `High` \| `Medium` \| `Low` | 否 | `Medium` | 新 volume 的效能原則 |
+| `pstore-protection-policy` | string | 否 | — | 套用 protection policy（快照與複寫規則），必須已存在 |
+| `pstore-lun-id-base` | 1–200 | 否 | `1` | 外掛配發 LUN ID 的起始值 |
+
+## PVE 標準選項
+
+`nodes`、`disable`、`content`、`shared` 全部為選填。要放 VM 磁碟與容器根檔案系統請設 `content images,rootdir`；叢集環境請設 `shared 1`。
+
+## 範例
+
+`/etc/pve/storage.cfg`：
+
+```
+dellpowerstore: ps1
+    dell-portal 192.168.1.50
+    dell-username pveadmin
+    dell-password SecurePassword
+    dell-protocol iscsi
+    dell-host-mode per-node
+    dell-cluster-name mycluster
+    pstore-volume-group pve-vg
+    content images,rootdir
+    shared 1
+```
+
+Fibre Channel，並限定在有接上 fabric 的節點：
+
+```
+dellpowerstore: ps-fc
+    dell-portal 192.168.1.50
+    dell-username pveadmin
+    dell-password SecurePassword
+    dell-protocol fc
+    nodes node1,node2
+    content images
+    shared 1
+```
+
+## 高負載時真正會影響結果的幾個選項
+
+多數預設值不需要動。以下三個是在儲存出狀況之前值得先理解的。
+
+### `dell-status-timeout`
+
+PVE 大約每十秒輪詢一次所有儲存，而且是**依序**進行。一個要三十秒才回應的儲存，拖到的不只是自己，還包括排在它後面的每一個儲存 —— 那些儲存會在 GUI 顯示 `inactive`，儘管它們本身完全正常。
+
+因此健康路徑使用較短的逾時，而且**只嘗試一次**。少了重試沒有任何損失：下一次輪詢本身就是重試。只有在陣列的管理網路確實很慢時才調高它，並且要預期整個輪詢週期會跟著變慢。
+
+### `dell-activate-deadline`
+
+每個 portal 各自有逾時限制，但整個迴圈沒有。一台公布八個 portal、其中三個可以建立 TCP 連線卻不再回應的陣列，可以讓 `activate_storage` 卡上好幾分鐘。
+
+當預算用盡**且至少已有一條路徑可用**時，剩下的 portal 會延後到下一次啟用，並以警告列出是哪幾個。零路徑時絕不套用這個預算：一條路徑都沒有的情況下，儲存應該誠實地失敗，而不是回報成功。
+
+### `dell-rescan-interval`
+
+`activate_storage` 每次輪詢都會執行。若無條件重新掃描 SAN，等於每台節點每分鐘要做六次全主機的 `multipathd reconfigure` 與 `udevadm trigger`，而那段時間往往正好有 VM 啟動或備份在嘗試探索裝置，device-mapper 會一直處於變動狀態。
+
+只要本節點登入了新的 portal，仍然會**立即**重新掃描，所以新對應的 volume 不會被延遲。這個間隔只用來限制「為了其他管道對應進來的 volume」而做的週期性保險掃描。
+
+## Host 模式
+
+`per-node`（預設）為每個 PVE 節點註冊一個 host 物件，名稱為 `pve-{cluster}-{node}`。每個 volume 都會對應到所有節點，讓線上遷移不必先重新對應，陣列也能回報各節點的連線狀態。
+
+`shared` 則為整個叢集註冊一個 host group。陣列上的物件較少，但陣列就無法分辨某條路徑屬於哪一台節點。
+
+## 驗證設定
+
+```bash
+pvesm status                     # 容量與是否為 active
+pvesm list ps1                   # PVE 認得的 volume
+journalctl -t pvestatd | grep dellpowerstore    # 外掛輸出的訊息
+```

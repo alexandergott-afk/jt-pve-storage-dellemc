@@ -1,0 +1,464 @@
+#!/usr/bin/perl
+# Read a VM configuration back out of a Dell EMC config backup volume.
+# Copyright (c) 2026 Jason Cheng (Jason Tools)
+# Licensed under the MIT License
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config no_ignore_case bundling);
+use File::Temp ();
+use POSIX ();
+
+use PVE::Storage::Custom::DellEMC::Common::Naming;
+use PVE::Storage::Custom::DellEMC::PowerStore::API;
+use PVE::Storage::Custom::DellEMC::PowerStore::Naming;
+use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(
+    get_initiator_name probe_portal discover_targets login_target
+);
+use PVE::Storage::Custom::DellEMC::Common::FC qw(
+    is_fc_available get_fc_wwpns_raw
+);
+use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
+    wait_for_multipath_device get_device_by_wwid cleanup_lun_devices
+);
+
+# Every snapshot taken by this plugin also writes the VM's configuration to a
+# 1 MB volume beside the disk, because a storage snapshot restores the disk
+# and nothing else — the configuration lives in /etc/pve.
+#
+# This tool reads those volumes back. It deliberately does NOT go through
+# pvesm or the PVE storage layer: the situation it exists for is the one where
+# /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
+# when it can, and takes credentials on the command line when it cannot.
+
+my $VERSION = '0.5.0';
+
+my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
+
+sub usage {
+    my ($exit) = @_;
+
+    print <<"EOF";
+pve-dell-config-get $VERSION - recover VM configurations from Dell EMC storage
+
+Usage:
+  pve-dell-config-get [options] <storeid> [vmid] [snapshot]
+  pve-dell-config-get -l [options] <storeid> [vmid]
+
+Options:
+  -l, --list             List the config backups on the storage and exit
+  -o, --output FILE      Write the configuration to FILE instead of stdout
+  -r, --recover          Standalone mode: do not read /etc/pve/storage.cfg,
+                         take the array details from the options below
+      --portal HOST      Array management address       (recover mode)
+      --username USER    REST API user                  (recover mode)
+      --password PASS    REST API password              (recover mode)
+      --protocol PROTO   iscsi (default) or fc          (recover mode)
+      --cluster NAME     Cluster name used in host names, default 'pve'
+      --insecure         Do not verify the array's TLS certificate
+      --timeout SECONDS  Device wait timeout, default 60
+  -q, --quiet            Only print the configuration itself
+  -h, --help             This text
+
+Examples:
+  # What is available for VM 100
+  pve-dell-config-get -l ps1 100
+
+  # Restore the configuration captured with snapshot 'before-upgrade'
+  pve-dell-config-get ps1 100 before-upgrade > /etc/pve/qemu-server/100.conf
+
+  # /etc/pve is gone: talk to the array directly
+  pve-dell-config-get -r --portal 10.0.0.5 --username pveadmin \\
+      --password secret ps1 100 before-upgrade
+
+The volume is attached to this node read-only for the duration and detached
+again afterwards, including when the tool fails partway.
+EOF
+
+    exit($exit // 0);
+}
+
+# ---------------------------------------------------------------------------
+# Options
+# ---------------------------------------------------------------------------
+
+my %opt = (protocol => 'iscsi', cluster => 'pve', timeout => 60);
+
+GetOptions(
+    'l|list'       => \$opt{list},
+    'o|output=s'   => \$opt{output},
+    'r|recover'    => \$opt{recover},
+    'portal=s'     => \$opt{portal},
+    'username=s'   => \$opt{username},
+    'password=s'   => \$opt{password},
+    'protocol=s'   => \$opt{protocol},
+    'cluster=s'    => \$opt{cluster},
+    'insecure'     => \$opt{insecure},
+    'timeout=i'    => \$opt{timeout},
+    'q|quiet'      => \$opt{quiet},
+    'h|help'       => \$opt{help},
+) or usage(1);
+
+usage(0) if $opt{help};
+
+my ($storeid, $vmid, $snapshot) = @ARGV;
+usage(1) unless defined $storeid;
+
+die "vmid must be a number\n" if defined $vmid && $vmid !~ /^\d+$/;
+
+sub info {
+    my ($message) = @_;
+    print STDERR "$message\n" unless $opt{quiet};
+    return;
+}
+
+# ---------------------------------------------------------------------------
+# Storage configuration
+#
+# Parsed here rather than through PVE::Storage on purpose: this tool has to
+# work when the PVE stack does not.
+# ---------------------------------------------------------------------------
+
+sub read_storage_cfg {
+    my ($want) = @_;
+
+    my $file = '/etc/pve/storage.cfg';
+    open(my $fh, '<', $file) or return undef;
+
+    my ($current, %config);
+    while (my $line = <$fh>) {
+        chomp $line;
+        next if $line =~ /^\s*#/;
+
+        if ($line =~ /^(\S+):\s*(\S+)\s*$/) {
+            my ($type, $id) = ($1, $2);
+            $current = ($id eq $want && $type =~ /^dell/) ? {} : undef;
+            $config{type} = $type if $current;
+            next;
+        }
+
+        next unless $current;
+        next unless $line =~ /^\s+(\S+)\s+(.*?)\s*$/;
+        $config{$1} = $2;
+    }
+    close($fh);
+
+    return keys(%config) ? \%config : undef;
+}
+
+my $scfg;
+
+if ($opt{recover}) {
+    for my $required (qw(portal username password)) {
+        die "--$required is required in recover mode\n" unless defined $opt{$required};
+    }
+    $scfg = {
+        'dell-portal'       => $opt{portal},
+        'dell-username'     => $opt{username},
+        'dell-password'     => $opt{password},
+        'dell-protocol'     => $opt{protocol},
+        'dell-cluster-name' => $opt{cluster},
+        'dell-ssl-verify'   => $opt{insecure} ? 0 : 0,
+    };
+} else {
+    $scfg = read_storage_cfg($storeid);
+    unless ($scfg) {
+        die "Storage '$storeid' was not found in /etc/pve/storage.cfg.\n"
+          . "If PVE is not available, use recover mode:\n"
+          . "  pve-dell-config-get -r --portal <ip> --username <user>"
+          . " --password <pass> $storeid"
+          . (defined $vmid ? " $vmid" : '') . "\n";
+    }
+    # Command-line credentials still win, for the case where storage.cfg is
+    # readable but its password is not the one that works.
+    $scfg->{'dell-portal'}   = $opt{portal}   if defined $opt{portal};
+    $scfg->{'dell-username'} = $opt{username} if defined $opt{username};
+    $scfg->{'dell-password'} = $opt{password} if defined $opt{password};
+}
+
+die "Storage '$storeid' has no dell-portal configured\n"
+    unless $scfg->{'dell-portal'};
+die "Storage '$storeid' has no credentials configured. Pass --username and"
+  . " --password.\n"
+    unless $scfg->{'dell-username'} && defined $scfg->{'dell-password'};
+
+my $protocol = $scfg->{'dell-protocol'} // 'iscsi';
+my $cluster  = $scfg->{'dell-cluster-name'} // 'pve';
+
+# ---------------------------------------------------------------------------
+# Array connection
+# ---------------------------------------------------------------------------
+
+my $api = PVE::Storage::Custom::DellEMC::PowerStore::API->new(
+    portal     => $scfg->{'dell-portal'},
+    username   => $scfg->{'dell-username'},
+    password   => $scfg->{'dell-password'},
+    ssl_verify => $scfg->{'dell-ssl-verify'} // 0,
+    storeid    => $storeid,
+    type       => 'dellpowerstore',
+);
+
+sub nodename {
+    # /etc/hostname rather than PVE::INotify: this must work without PVE.
+    if (open(my $fh, '<', '/etc/hostname')) {
+        my $name = <$fh>;
+        close($fh);
+        if (defined $name) {
+            chomp $name;
+            $name =~ s/\..*$//;
+            return $name if length $name;
+        }
+    }
+
+    return (POSIX::uname())[1] =~ /^([^.]+)/ ? $1 : 'unknown';
+}
+
+my $host_name = $NAMING->encode_host_name($cluster, nodename());
+
+# ---------------------------------------------------------------------------
+# Listing
+# ---------------------------------------------------------------------------
+
+my $prefix = $NAMING->volume_prefix($storeid);
+$prefix .= "${vmid}-vmconf-" if defined $vmid;
+
+sub list_backups {
+    my $volumes = $api->volume_list(defined $vmid ? $prefix : $prefix) // [];
+
+    my @backups;
+    for my $volume (@$volumes) {
+        my $decoded = $NAMING->decode_volume_name($volume->{name}) or next;
+        next unless $decoded->{type} eq 'vmconf';
+        next if defined $vmid && $decoded->{vmid} != $vmid;
+        push @backups, {
+            name     => $volume->{name},
+            id       => $volume->{id},
+            vmid     => $decoded->{vmid},
+            snapshot => $decoded->{snapname},
+            wwn      => $volume->{wwn},
+        };
+    }
+
+    return [ sort { $a->{vmid} <=> $b->{vmid} || $a->{snapshot} cmp $b->{snapshot} }
+             @backups ];
+}
+
+if ($opt{list}) {
+    my $backups = list_backups();
+
+    unless (@$backups) {
+        print STDERR "No configuration backups found on storage '$storeid'"
+            . (defined $vmid ? " for VM $vmid" : '') . ".\n";
+        exit(1);
+    }
+
+    printf("%-8s %-30s %s\n", 'VMID', 'SNAPSHOT', 'VOLUME');
+    printf("%-8s %-30s %s\n", $_->{vmid}, $_->{snapshot}, $_->{name}) for @$backups;
+
+    exit(0);
+}
+
+# ---------------------------------------------------------------------------
+# Reading one backup
+# ---------------------------------------------------------------------------
+
+die "A vmid is required unless --list is used.\n" unless defined $vmid;
+
+my $backups = list_backups();
+unless (@$backups) {
+    die "No configuration backup found for VM $vmid on storage '$storeid'.\n"
+      . "Run with --list to see what is available.\n";
+}
+
+my $chosen;
+if (defined $snapshot) {
+    # The snapshot name went through sanitizing when the volume was created,
+    # so compare against the encoded form as well as the literal one.
+    my $wanted = $NAMING->encode_config_volume_name($storeid, $vmid, $snapshot);
+    ($chosen) = grep { $_->{name} eq $wanted || $_->{snapshot} eq $snapshot } @$backups;
+
+    unless ($chosen) {
+        die "No configuration backup for snapshot '$snapshot' of VM $vmid.\n"
+          . "Available: " . join(', ', map { $_->{snapshot} } @$backups) . "\n";
+    }
+} elsif (@$backups == 1) {
+    $chosen = $backups->[0];
+} else {
+    die "VM $vmid has " . scalar(@$backups) . " configuration backups; name the"
+      . " snapshot to use.\n"
+      . "Available: " . join(', ', map { $_->{snapshot} } @$backups) . "\n";
+}
+
+info("Using volume $chosen->{name}");
+
+# Log in to the SAN, so the volume can appear at all.
+sub ensure_transport {
+    return if $protocol eq 'fc';
+
+    my $portals = eval { $api->iscsi_portals() } // [];
+    unless (@$portals) {
+        die "The array published no iSCSI portals. If this node uses Fibre"
+          . " Channel, pass --protocol fc.\n";
+    }
+
+    for my $portal (@$portals) {
+        my ($ip, $port) = split(/:/, $portal->{portal});
+        $port //= 3260;
+        next unless probe_portal($ip, $port, timeout => 2);
+        eval {
+            discover_targets($ip, port => $port);
+            login_target($ip, $portal->{iqn}, port => $port);
+        };
+        info("Portal $ip:$port: $@") if $@;
+    }
+
+    return;
+}
+
+# Register this node if it is not on the array yet: after a reinstall it will
+# not be, and that is exactly when this tool gets used.
+sub ensure_host {
+    my $host = eval { $api->host_get_by_name($host_name) };
+    return $host->{id} if $host;
+
+    my $initiators;
+    if ($protocol eq 'fc') {
+        die "Protocol 'fc' was selected but this node has no FC HBA.\n"
+            unless is_fc_available();
+        my $wwpns = get_fc_wwpns_raw(online_only => 1);
+        die "No online FC HBA ports on this node.\n" unless @$wwpns;
+        $initiators = [ map { { port_name => $_, port_type => 'FC' } } @$wwpns ];
+    } else {
+        $initiators = [ { port_name => get_initiator_name(), port_type => 'iSCSI' } ];
+    }
+
+    info("Registering host '$host_name' on the array");
+
+    return $api->host_create($host_name, $initiators);
+}
+
+my $host_id = ensure_host();
+ensure_transport();
+
+my $wwid = PVE::Storage::Custom::DellEMC::PowerStore::API->wwn_to_wwid($chosen->{wwn});
+die "The array reported no usable WWN for volume $chosen->{name}\n" unless $wwid;
+
+# Everything below has to be undone even when it fails partway, or the node is
+# left with a mapped volume and a mount.
+my $attached = 0;
+my $mounted;
+
+sub cleanup {
+    if ($mounted) {
+        system('/bin/umount', $mounted) == 0
+            or print STDERR "Warning: could not unmount $mounted\n";
+        rmdir($mounted);
+        $mounted = undef;
+    }
+    if ($attached) {
+        eval { cleanup_lun_devices($wwid) };
+        eval { $api->volume_detach($chosen->{id}, host_id => $host_id) };
+        $attached = 0;
+    }
+    return;
+}
+
+END { cleanup() }
+$SIG{$_} = sub { cleanup(); exit(1) } for qw(INT TERM HUP);
+
+my $config;
+
+my $ok = eval {
+    unless ($api->is_mapped($chosen->{id}, $host_id)) {
+        info("Attaching the volume to this node");
+        $api->volume_attach($chosen->{id}, host_id => $host_id);
+    }
+    $attached = 1;
+
+    info("Waiting for the device (WWID $wwid)");
+    my $device = get_device_by_wwid($wwid);
+    $device = wait_for_multipath_device($wwid, timeout => $opt{timeout})
+        unless $device && -b $device;
+
+    die "The device for WWID $wwid did not appear within $opt{timeout}s.\n"
+      . "  Check that this node can reach the array over $protocol, and that\n"
+      . "  multipathd is running.\n" unless $device && -b $device;
+
+    $mounted = File::Temp::tempdir('/tmp/pve-dell-config-XXXXXX');
+
+    # Read-only, and noload so a dirty journal does not stop the mount: the
+    # volume was written once and never touched again.
+    system('/bin/mount', '-o', 'ro,noload', $device, $mounted) == 0
+        or system('/bin/mount', '-o', 'ro', $device, $mounted) == 0
+        or die "Could not mount $device: $!\n";
+
+    my $path = "$mounted/${vmid}.conf";
+    open(my $fh, '<', $path) or die "The volume holds no ${vmid}.conf: $!\n";
+    local $/;
+    $config = <$fh>;
+    close($fh);
+
+    if (!$opt{quiet} && open(my $mfh, '<', "$mounted/metadata.txt")) {
+        info('--- backup metadata ---');
+        while (my $line = <$mfh>) {
+            chomp $line;
+            info("  $line");
+        }
+        close($mfh);
+        info('-----------------------');
+    }
+
+    1;
+};
+my $error = $@;
+
+cleanup();
+
+die $error unless $ok;
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+if ($opt{output}) {
+    open(my $fh, '>', $opt{output}) or die "Cannot write $opt{output}: $!\n";
+    print $fh $config;
+    close($fh);
+    info("Configuration written to $opt{output}");
+} else {
+    print $config;
+}
+
+exit(0);
+
+__END__
+
+=head1 NAME
+
+pve-dell-config-get - recover a VM configuration from a Dell EMC config
+backup volume
+
+=head1 DESCRIPTION
+
+Each snapshot this plugin takes also writes the VM's configuration to a 1 MB
+volume beside the disk, because a storage snapshot restores the disk and
+nothing else.
+
+This tool reads those volumes back. It parses /etc/pve/storage.cfg directly
+and talks to the array itself rather than going through pvesm, so it still
+works when the PVE stack does not. With C<--recover> it does not read
+storage.cfg at all and takes the array details from its options.
+
+The volume is attached read-only for the duration and detached again
+afterwards, including on failure and on SIGINT.
+
+=head1 AUTHOR
+
+Jason Cheng (Jason Tools) <jason@jason.tools>
+
+=head1 LICENSE
+
+MIT License
+
+=cut

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jt-pve-storage-dellemc — Dell EMC storage plugins for Proxmox VE</title>
+<meta name="description" content="Dell EMC storage plugins for Proxmox VE. PowerStore over iSCSI or Fibre Channel, with direct volume provisioning, array snapshots and thin clones.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+
+<header>
+    <h1>jt-pve-storage-dellemc</h1>
+    <p class="tagline">Dell EMC storage plugins for Proxmox VE</p>
+    <p class="lang">
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc">GitHub</a>
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README.md">README</a>
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README_zh-TW.md">繁體中文</a>
+    </p>
+</header>
+
+<div class="notice">
+    <strong>Version 0.5.0 — not yet run against a PowerStore array.</strong>
+    The code is complete for PowerStore, but every array-facing detail — REST
+    paths and field names, the SCSI vendor and product strings, the WWN to
+    WWID conversion, the whole Fibre Channel path — is still unverified. Use a
+    non-production cluster and a non-production array. 1.0.0 is the
+    on-hardware test pass, not more code.
+</div>
+
+<p>
+    One package, one shared host-side layer, and one PVE storage type per Dell
+    EMC product family. The first family implemented is <strong>PowerStore</strong>
+    over iSCSI or Fibre Channel, using direct volume provisioning — one VM disk
+    is one array volume — so that array snapshots, thin clones, compression and
+    replication all act on a single VM disk as their natural unit.
+</p>
+
+<h2>Product families</h2>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>Order</th><th>Family</th><th>PVE storage type</th><th>Data path</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><strong>PowerStore</strong></td><td><code>dellpowerstore</code></td><td>iSCSI / FC (dm-multipath)</td><td><strong>in development</strong></td></tr>
+<tr><td>2</td><td>PowerScale</td><td><code>dellpowerscale</code></td><td>NFS (directory semantics)</td><td>planned</td></tr>
+<tr><td>3</td><td>PowerFlex</td><td><code>dellpowerflex</code></td><td>SDC kernel module</td><td>planned</td></tr>
+<tr><td>4</td><td>PowerMax</td><td><code>dellpowermax</code></td><td>FC / iSCSI (dm-multipath)</td><td>planned</td></tr>
+<tr><td>—</td><td>Unity XT, PowerVault ME5</td><td>—</td><td>iSCSI / FC / SAS</td><td>not scheduled</td></tr>
+<tr><td>—</td><td>ObjectScale, PowerProtect</td><td>—</td><td>—</td><td>out of scope</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+    Each family gets its own storage type because a single type cannot describe
+    both block and NAS storage: PVE asks a plugin for its content types and
+    disk formats before any configuration is parsed. The host-side layer is
+    shared, so adding a family is a plugin file and an API client rather than a
+    restructuring — see
+    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.
+</p>
+
+<h2>Features</h2>
+
+<ul>
+    <li>Direct volume provisioning: one VM disk is one PowerStore volume</li>
+    <li>Snapshots, with the VM configuration captured alongside each one</li>
+    <li>Templates and linked clones through PowerStore thin clones</li>
+    <li>Multipath I/O, with automatic cleanup of devices whose volume is gone</li>
+    <li>Cluster-aware mapping, so live migration does not have to remap first</li>
+    <li>Disaster recovery tool that reads a VM configuration back from the
+        array even when <code>/etc/pve</code> is gone</li>
+</ul>
+
+<h2>Requirements</h2>
+
+<div class="table-wrap">
+<table>
+<tbody>
+<tr><th>Proxmox VE</th><td>9.1 or later (Storage API 13)</td></tr>
+<tr><th>PowerStore OS</th><td>3.0 or later; 4.x is the primary target</td></tr>
+<tr><th>Perl</th><td><code>libwww-perl</code>, <code>libjson-perl</code>, <code>liburi-perl</code></td></tr>
+<tr><th>Tools</th><td><code>open-iscsi</code>, <code>multipath-tools</code>, <code>sg3-utils</code>, <code>psmisc</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Install</h2>
+
+<pre><code>make test                 # syntax checks, unit tests, safety guard
+make deb                  # builds ../jt-pve-storage-dellemc_&lt;version&gt;_all.deb
+
+# on EVERY node of the cluster
+apt install ./jt-pve-storage-dellemc_&lt;version&gt;_all.deb</code></pre>
+
+<p>
+    Use <code>apt install ./file.deb</code> rather than <code>dpkg -i</code>:
+    <code>dpkg -i</code> does not install dependencies, and the missing
+    binaries only surface much later as failures inside the plugin. A node
+    without the package cannot be a live migration target.
+</p>
+
+<pre><code>pvesm add dellpowerstore ps1 \
+    --dell-portal 192.168.1.50 \
+    --dell-username pveadmin \
+    --dell-password 'SecurePassword' \
+    --dell-protocol iscsi \
+    --content images,rootdir \
+    --shared 1</code></pre>
+
+<h2>Multipath safety</h2>
+
+<p>
+    These rules are not stylistic. Breaking any of them can take a whole node
+    out of service, including storage that has nothing to do with this plugin.
+</p>
+
+<ul>
+    <li><strong>Never run <code>multipath -F</code></strong> (capital F). It
+        flushes every unused map on the node, including other vendors' storage
+        that happens to be idle. Flush one map:
+        <code>multipath -f /dev/mapper/&lt;wwid&gt;</code>. The build fails if
+        the capital-F form appears anywhere in this repository.</li>
+    <li><strong>Use <code>systemctl restart multipathd</code></strong>, never
+        <code>reload</code>. Reload only re-reads the file; restart reapplies
+        device-mapper state.</li>
+    <li><strong>Avoid <code>no_path_retry queue</code> and
+        <code>dev_loss_tmo infinity</code>.</strong> With every path down,
+        queued I/O that can never complete puts processes into uninterruptible
+        sleep, and the node has to be power-cycled.</li>
+    <li>The plugin never rewrites a multipath file it did not create. Its own
+        drop-in carries a version marker; a file without one is yours.</li>
+</ul>
+
+<h2>Documentation</h2>
+
+<ul class="doc-links">
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/QUICKSTART.md">Quick start</a> — first storage, step by step</li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION.md">Configuration</a> — every option, and the three that matter under load</li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/ARCHITECTURE.md">Architecture</a> — the multi-family design and how to add a family</li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a> — symptoms, causes, recovery</li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/NAMING_CONVENTIONS.md">Naming conventions</a> — what the plugin owns on the array</li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">Testing</a> — what has and has not been verified</li>
+</ul>
+
+<p>Traditional Chinese versions of each document are alongside them, named
+<code>*_zh-TW.md</code>.</p>
+
+<h2>Known limitations</h2>
+
+<ul>
+    <li><strong>Full Clone does not use array-side cloning.</strong> PVE
+        implements it as a block-by-block <code>qemu-img</code> copy and never
+        calls the plugin. Use Linked Clone for the array's instant thin
+        clone.</li>
+    <li><strong>Volumes cannot be shrunk.</strong> A shrink is refused rather
+        than silently truncating a guest filesystem.</li>
+    <li><strong>Only objects the plugin owns are touched.</strong> Every list,
+        delete and cleanup path filters on the <code>pve-&lt;storeid&gt;-</code>
+        prefix.</li>
+</ul>
+
+<h2>Related projects</h2>
+
+<ul>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage">jt-pve-storage-purestorage</a></li>
+    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp">jt-pve-storage-netapp</a></li>
+</ul>
+
+<footer>
+    <p>
+        MIT licensed. An independent community project, not affiliated with,
+        endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC",
+        "PowerStore", "PowerMax", "PowerFlex" and "PowerScale" are trademarks
+        of their respective owners.
+    </p>
+    <p>Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</p>
+</footer>
+
+</main>
+</body>
+</html>
