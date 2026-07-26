@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.29~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.30~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.30~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Moving a linked clone's disk to another type of storage would have asked the target for a volume named after a base image it has never heard of. The volume-name contract is now measured against PVE's own RBD plugin rather than against a value someone wrote down.</span>
+            <span class="lang-zh">把連結複製的磁碟搬到另一種型別的儲存時，會要求目標端建立一個以「它從未聽過的範本映像」命名的 volume。volume 名稱的約定現在直接與 PVE 自己的 RBD 外掛比對，而不是比對某人當初寫下來的值。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.29~beta1</div>

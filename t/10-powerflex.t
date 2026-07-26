@@ -544,6 +544,14 @@ SKIP: {
     is_deeply([$P->parse_volname('vm-100-disk-0')],
         ['images', 'vm-100-disk-0', 100, undef, undef, 0, 'raw'], 'volume name parsing');
 
+    # The second element is the LEAF name. PVE builds a target volume name out
+    # of it when a disk moves to a storage of another type, and the whole
+    # 'base-.../vm-...' string there would name a base image the target
+    # storage has never heard of.
+    is_deeply([$P->parse_volname('base-100-disk-0/vm-101-disk-0')],
+        ['images', 'vm-101-disk-0', 101, 'base-100-disk-0', 100, 0, 'raw'],
+        'a linked clone reports its own name, with the base beside it');
+
     # The NVMe timeout is the ctrl-loss-tmo equivalent of no_path_retry, and
     # the schema must not allow it to be set to something unbounded.
     my $tmo = $props->{'pflex-nvme-ctrl-loss-tmo'};

@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.30~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Moving a linked clone's disk to a storage of another type would have
+    failed. parse_volname returned the whole volname as its name element for
+    a linked clone; PVE builds the target volume name out of that element,
+    so the target would have been asked for a volume named
+    'base-100-disk-0/vm-101-disk-0' - a base image the target storage has
+    never heard of. It returns the leaf name now, which is what RBDPlugin
+    returns for the same volname form.
+  * t/15-pve-contract.t compares this plugin's parse_volname against
+    RBDPlugin's directly, on the installed PVE, so the contract cannot drift
+    back without a test saying so.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:32:01 +0800
+
 jt-pve-storage-dellemc (0.7.29~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

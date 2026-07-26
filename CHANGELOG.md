@@ -7,6 +7,23 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.30~beta1] - 2026-07-27
+
+### Fixed
+- **Moving a linked clone's disk to a storage of another type would have
+  failed.** `parse_volname` returned the whole volname as its name element for
+  a linked clone. `PVE::Storage::storage_migrate` builds the target volume name
+  out of that element, so the target storage would have been asked for a volume
+  named `base-100-disk-0/vm-101-disk-0` — naming a base image it has never
+  heard of. It returns the leaf name now, which is what `RBDPlugin` returns for
+  the same two-part volname form.
+
+### Added
+- `t/15-pve-contract.t` compares this plugin's `parse_volname` against
+  `RBDPlugin`'s directly, on the installed PVE. The contract cannot drift back
+  without a test saying so, and it names the plugin it is being measured
+  against rather than a value someone once wrote down.
+
 ## [0.7.29~beta1] - 2026-07-27
 
 ### Fixed

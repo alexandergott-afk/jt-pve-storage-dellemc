@@ -261,4 +261,42 @@ for my $plugin (@PLUGINS) {
     ok(!$data->{format}[0]{subvol}, "$plugin does not claim subvol");
 }
 
+# ---------------------------------------------------------------------------
+# parse_volname, against how PVE actually consumes it
+# ---------------------------------------------------------------------------
+
+# PVE::Storage::storage_migrate builds the target volume name for a move to a
+# storage of another type out of element 1, and for a storage without a
+# 'path' it uses that string as the whole volume name. RBDPlugin — the plugin
+# whose 'base-X/vm-Y' volname form this one copies — returns the LEAF there.
+# Returning the whole volname instead would make the target name refer to a
+# base image the target storage has never heard of, and the failure would
+# name the wrong volume.
+{
+    my $rbd = 'PVE::Storage::RBDPlugin';
+
+  SKIP: {
+        skip 'RBDPlugin is not installed', 1 + scalar(@PLUGINS)
+            unless eval { require PVE::Storage::RBDPlugin; 1 };
+
+        my @rbd = $rbd->parse_volname('base-100-disk-0/vm-101-disk-0');
+        is($rbd[1], 'vm-101-disk-0',
+            'RBD, the reference for this volname form, returns the leaf name');
+
+        for my $plugin (@PLUGINS) {
+            my @ours = $plugin->parse_volname('base-100-disk-0/vm-101-disk-0');
+
+            # isBase is compared as a truth value: RBD leaves it undef for a
+            # clone where this plugin returns 0, and every consumer asks
+            # `if ($isBase)`.
+            is_deeply(
+                [@ours[0 .. 4], ($ours[5] ? 1 : 0), $ours[6]],
+                [@rbd[0 .. 4],  ($rbd[5]  ? 1 : 0), $rbd[6]],
+                "$plugin parses a linked clone the way RBDPlugin does")
+                or diag("ours: @{[ map { $_ // 'undef' } @ours ]}\n"
+                      . " rbd: @{[ map { $_ // 'undef' } @rbd  ]}");
+        }
+    }
+}
+
 done_testing();

@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.29~beta1). It has never been run against a
+> **This is a beta release (0.7.30~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.29~beta1 — three storage types are code complete, and
+> **Version 0.7.30~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this

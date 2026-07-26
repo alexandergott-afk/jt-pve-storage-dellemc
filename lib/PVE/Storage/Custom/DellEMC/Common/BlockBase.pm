@@ -326,10 +326,10 @@ sub _parse_volname {
     $volname =~ s|^images/||;
 
     # Linked clone: base-100-disk-0/vm-101-disk-0
-    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)\z|) {
+    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/(vm-(\d+)-disk-(\d+))\z|) {
         return {
-            vmid => $4, diskid => $5, format => 'raw', type => 'disk',
-            isBase => 0, basename => $1, basevmid => $2,
+            vmid => $5, diskid => $6, format => 'raw', type => 'disk',
+            isBase => 0, basename => $1, basevmid => $2, leafname => $4,
         };
     }
     if ($volname =~ /^vm-(\d+)-disk-(\d+)\z/) {
@@ -348,21 +348,32 @@ sub _parse_volname {
     return undef;
 }
 
+# ('images', $name, $vmid, $basename, $basevmid, $isBase, $format)
+#
+# $name is the LEAF name, not the volname. For a linked clone the volname is
+# 'base-100-disk-0/vm-101-disk-0' and $name is 'vm-101-disk-0', which is what
+# RBD and every other plugin using this two-part form return. PVE builds a
+# target volume name out of $name when a disk moves to a storage of another
+# type: 'base-100-disk-0/vm-101-disk-0' as a name there would name a base
+# image that does not exist on the target, so moving a linked clone off this
+# storage would fail with a message about the wrong volume.
 sub parse_volname {
     my ($class, $volname) = @_;
 
     my $parsed = $class->_parse_volname($volname);
     die "unable to parse volume name '$volname'\n" unless $parsed;
 
+    my $name = $parsed->{leafname} // $volname;
+
     if ($parsed->{type} eq 'disk') {
         return (
-            'images', $volname, $parsed->{vmid},
+            'images', $name, $parsed->{vmid},
             $parsed->{basename}, $parsed->{basevmid},
             $parsed->{isBase} ? 1 : 0, 'raw',
         );
     }
 
-    return ('images', $volname, $parsed->{vmid}, undef, undef, 0, 'raw');
+    return ('images', $name, $parsed->{vmid}, undef, undef, 0, 'raw');
 }
 
 # Lowest disk id not already used by this VM on this storage.

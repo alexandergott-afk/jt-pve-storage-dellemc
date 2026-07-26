@@ -261,8 +261,12 @@ is_deeply([$P->parse_volname('vm-100-disk-0')],
     ['images', 'vm-100-disk-0', 100, undef, undef, 0, 'raw'], 'parse a VM disk');
 is_deeply([$P->parse_volname('base-100-disk-0')],
     ['images', 'base-100-disk-0', 100, undef, undef, 1, 'raw'], 'parse a base disk');
+# The second element is the LEAF name, as RBD and every other plugin using
+# this two-part form returns. PVE builds a target volume name out of it when a
+# disk moves to a storage of another type, and 'base-.../vm-...' there would
+# name a base image the target storage has never heard of.
 is_deeply([$P->parse_volname('base-100-disk-0/vm-101-disk-0')],
-    ['images', 'base-100-disk-0/vm-101-disk-0', 101, 'base-100-disk-0', 100, 0, 'raw'],
+    ['images', 'vm-101-disk-0', 101, 'base-100-disk-0', 100, 0, 'raw'],
     'parse a linked clone');
 is_deeply([$P->parse_volname('vm-100-cloudinit')],
     ['images', 'vm-100-cloudinit', 100, undef, undef, 0, 'raw'], 'parse cloud-init');

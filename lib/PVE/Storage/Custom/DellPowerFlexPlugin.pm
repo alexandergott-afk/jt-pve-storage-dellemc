@@ -256,9 +256,9 @@ sub _parse_volname {
     return undef unless defined $volname;
     $volname =~ s|^images/||;
 
-    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/vm-(\d+)-disk-(\d+)\z|) {
-        return { vmid => $4, diskid => $5, type => 'disk', isBase => 0,
-                 basename => $1, basevmid => $2 };
+    if ($volname =~ m|^(base-(\d+)-disk-(\d+))/(vm-(\d+)-disk-(\d+))\z|) {
+        return { vmid => $5, diskid => $6, type => 'disk', isBase => 0,
+                 basename => $1, basevmid => $2, leafname => $4 };
     }
     if ($volname =~ /^vm-(\d+)-disk-(\d+)\z/) {
         return { vmid => $1, diskid => $2, type => 'disk', isBase => 0 };
@@ -276,14 +276,17 @@ sub _parse_volname {
     return undef;
 }
 
+# See BlockBase::parse_volname: the second element is the LEAF name, so a
+# linked clone reports 'vm-101-disk-0' and not the whole volname.
 sub parse_volname {
     my ($class, $volname) = @_;
 
     my $parsed = $class->_parse_volname($volname);
     die "unable to parse volume name '$volname'\n" unless $parsed;
 
-    return ('images', $volname, $parsed->{vmid}, $parsed->{basename},
-        $parsed->{basevmid}, $parsed->{isBase} ? 1 : 0, 'raw');
+    return ('images', $parsed->{leafname} // $volname, $parsed->{vmid},
+        $parsed->{basename}, $parsed->{basevmid},
+        $parsed->{isBase} ? 1 : 0, 'raw');
 }
 
 sub _array_name {
