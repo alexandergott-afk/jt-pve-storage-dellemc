@@ -671,9 +671,12 @@ sub host_list {
 sub host_get_by_name {
     my ($self, $name, %opts) = @_;
 
+    # Both spellings are matched, not just whichever is defined first: a row
+    # that carries both would otherwise be judged on one of them alone.
     for my $host (@{ $self->host_list(%opts) }) {
-        my $host_name = $host->{name} // $host->{'host-name'} // '';
-        return $host if $host_name eq $name;
+        my @names = grep { defined && length }
+            $host->{name}, $host->{'host-name'};
+        return $host if grep { $_ eq $name } @names;
     }
 
     return undef;

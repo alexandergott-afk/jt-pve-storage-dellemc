@@ -205,6 +205,7 @@ help create host
 | `ancestorVolumeId` | 快照是從哪個 volume 來的 | **未驗證** |
 | `creationTime` | 快照時間 | **未驗證** |
 | `mappedSdcInfo`、`sdcId`、`hostId` | 對應 | 已旁證 |
+| `mappedHostInfo` | NVMe host 的對應，與 `mappedSdcInfo` 一併讀取 —— 因為這裡回答「空的」等於「再對映一次」 | **未驗證** |
 | `sdcGuid`、`sdcIp` | 找出本節點的 SDC | **未驗證** |
 | `maxCapacityInKb`、`capacityInUseInKb`、`thinCapacityInUseInKb` | 儲存池容量 | **未驗證** |
 | `protectionDomainId`、`protectionDomainName` | 解析有歧義的儲存池名稱 | **未驗證** |

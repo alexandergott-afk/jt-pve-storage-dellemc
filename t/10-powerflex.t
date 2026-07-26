@@ -308,6 +308,39 @@ ok($API->align_size(9 * 1024 ** 3) >= 9 * 1024 ** 3, 'never rounds down');
     is($api->is_mapped($volume, undef), 0, 'undef is never mapped');
 }
 
+{
+    # A mapping entry names its target as an SDC id or, for an NVMe host, a
+    # host id — and an entry may carry both. Taking whichever is defined
+    # first drops the other, so a node that goes by its host id would find
+    # the volume unmapped on every activation, map it again, and later unmap
+    # it by an id that is not the one holding it.
+    my $volume = { id => 'vol-42', mappedSdcInfo => [
+        { sdcId => 'sdc-1', hostId => 'host-1' },
+        { hostId => 'host-2' },
+        { sdcId => 'sdc-1' },          # the same id twice
+        'not a hash',
+    ]};
+    my ($api) = make_v4();
+
+    is_deeply($api->volume_mapped_hosts($volume),
+        ['sdc-1', 'host-1', 'host-2'],
+        'every id an entry names is reported, once each');
+    is($api->is_mapped($volume, 'host-1'), 1,
+        'a node known by its host id finds its own mapping');
+    is($api->is_mapped($volume, 'sdc-1'), 1, 'and so does one known by SDC id');
+}
+
+{
+    # PowerFlex 4.x reports NVMe host mappings in their own list on some
+    # versions. An empty answer here means "map it again", so read both.
+    my $volume = { id => 'vol-7',
+        mappedHostInfo => [ { hostId => 'host-9' } ] };
+    my ($api) = make_v4();
+
+    is_deeply($api->volume_mapped_hosts($volume), ['host-9'],
+        'a host-only mapping list is read too');
+}
+
 # ---------------------------------------------------------------------------
 # Snapshots
 # ---------------------------------------------------------------------------

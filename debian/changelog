@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.28~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerFlex: a volume mapped to an NVMe host could have looked unmapped
+    forever. A mapping entry names its target as an SDC id or a host id, and
+    an entry may carry both; the code took whichever was defined first and
+    dropped the other. A node that goes by its host id would have found the
+    volume unmapped on every activation, mapped it again, and later unmapped
+    it by an id that was not the one holding it. Every id an entry names is
+    now reported, and mappedHostInfo is read alongside mappedSdcInfo.
+  * PowerVault: host lookup by name matches both spellings a row may carry
+    rather than whichever is defined first. Same shape, same reason.
+  * t/16-docs.t now also sees fields read through a variable. A qw() list of
+    field names was invisible to it, which is how mappedHostInfo could have
+    reached a release without a line in the table.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:17:55 +0800
+
 jt-pve-storage-dellemc (0.7.27~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

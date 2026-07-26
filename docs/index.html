@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.27~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.28~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.28~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A PowerFlex volume mapped to an NVMe host could have looked unmapped forever, because a mapping entry that names both an SDC id and a host id had one of them dropped. The fourth appearance of the same mistake in this project, so the audit checklist now names the shape.</span>
+            <span class="lang-zh">對映到 NVMe host 的 PowerFlex volume 可能永遠看起來都未對映，因為同時帶有 SDC id 與 host id 的對應項目，其中一個被丟掉了。這是同一個錯誤在本專案第四次出現，因此稽核清單現在直接點名這個寫法。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.27~beta1</div>

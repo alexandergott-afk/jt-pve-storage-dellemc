@@ -224,8 +224,29 @@ SKIP: {
         my $text = slurp($file) // slurp("../$file") // '';
         next unless length $text;
 
+        # Direct reads, ->{field} and ->{'field'}.
+        my @fields;
         while ($text =~ /->\{'?([a-zA-Z][a-zA-Z0-9_.-]{3,})'?\}/g) {
-            my $field = $1;
+            push @fields, $1;
+        }
+
+        # And indirect ones. A field read through a variable —
+        # `for my $key (qw(sdcId hostId)) { $row->{$key} }` — is invisible to
+        # the pattern above, which is how mappedHostInfo reached a release
+        # without a line in the table. A qw() list of camelCase or
+        # hyphenated words in these files is a field list; nothing else in
+        # them looks like that.
+        while ($text =~ /\bqw\(\s*([^)]*?)\s*\)/gs) {
+            my $list = $1;
+            next unless $list =~ /^[\sA-Za-z0-9_.-]+$/;
+            for my $word (split /\s+/, $list) {
+                next unless length($word) > 3;
+                next unless $word =~ /[a-z][A-Z]/ || $word =~ /-/;
+                push @fields, $word;
+            }
+        }
+
+        for my $field (@fields) {
             next if $not_a_response_field{$field};
             # Keys this plugin puts into its own hashes.
             next if $field =~ /^(?:portal|iqn|wwid|ctime|used|size|volume|

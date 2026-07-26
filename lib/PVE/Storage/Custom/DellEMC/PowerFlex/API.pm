@@ -672,6 +672,12 @@ sub volume_unmap {
 }
 
 # The hosts a volume is mapped to, as ids.
+#
+# A mapping entry names its target as an SDC id or, for an NVMe host, a host
+# id. Taking whichever is defined first would drop the other, and a row that
+# carries both would then never match the id this node actually goes by: the
+# volume would look unmapped on every activation, be mapped again, and be
+# unmapped by an id that is not the one holding it.
 sub volume_mapped_hosts {
     my ($self, $volume, %opts) = @_;
 
@@ -679,9 +685,16 @@ sub volume_mapped_hosts {
     return [] unless $row;
 
     my @ids;
-    for my $mapping (@{ $row->{mappedSdcInfo} // [] }) {
-        my $id = $mapping->{sdcId} // $mapping->{hostId} // next;
-        push @ids, $id;
+    my %seen;
+    for my $list (qw(mappedSdcInfo mappedHostInfo)) {
+        for my $mapping (@{ $row->{$list} // [] }) {
+            next unless ref($mapping) eq 'HASH';
+            for my $key (qw(sdcId hostId)) {
+                my $id = $mapping->{$key};
+                next unless defined $id && length $id;
+                push @ids, $id unless $seen{$id}++;
+            }
+        }
     }
 
     return \@ids;

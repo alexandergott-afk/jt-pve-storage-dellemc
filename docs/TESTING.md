@@ -240,6 +240,7 @@ The field names below are still **unverified**. So are the endpoints.
 | `ancestorVolumeId` | which volume a snapshot came from | **not verified** |
 | `creationTime` | snapshot date | **not verified** |
 | `mappedSdcInfo`, `sdcId`, `hostId` | mappings | corroborated |
+| `mappedHostInfo` | NVMe host mappings, read alongside `mappedSdcInfo` because an empty answer here means "map it again" | **not verified** |
 | `sdcGuid`, `sdcIp` | finding this node's SDC | **not verified** |
 | `maxCapacityInKb`, `capacityInUseInKb`, `thinCapacityInUseInKb` | pool capacity | **not verified** |
 | `protectionDomainId`, `protectionDomainName` | resolving an ambiguous pool name | **not verified** |

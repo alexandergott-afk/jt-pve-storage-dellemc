@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.28~beta1] - 2026-07-27
+
+### Fixed
+- **A PowerFlex volume mapped to an NVMe host could have looked unmapped
+  forever.** A mapping entry names its target as an SDC id or a host id, and
+  an entry may carry both; the code read `sdcId // hostId` and dropped the
+  other. A node that goes by its host id would have found the volume unmapped
+  on every activation, mapped it again, and later unmapped it by an id that
+  was not the one holding it. Every id an entry names is now collected, and
+  `mappedHostInfo` is read alongside `mappedSdcInfo`.
+- PowerVault host lookup by name matches both spellings a row may carry
+  instead of whichever is defined first. The same shape, for the same reason:
+  it is the fourth time this project has had it.
+
+### Changed
+- `t/16-docs.t` now also sees fields read through a variable. A `qw()` list of
+  field names was invisible to it, which is exactly how `mappedHostInfo` could
+  have reached a release with no line in the table it is supposed to be in.
+
 ## [0.7.27~beta1] - 2026-07-27
 
 ### Fixed
