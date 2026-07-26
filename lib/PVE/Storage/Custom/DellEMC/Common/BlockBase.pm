@@ -99,6 +99,12 @@ use constant APIVERSION_FALLBACK => 13;
 
 use constant MIN_APIVERSION => APIVERSION_MIN;
 
+# How many times a disk-id collision is worked around before giving up. Each
+# attempt re-reads the array, so a worker only needs another round when it
+# loses the race again; ten is far past what concurrent allocation for a
+# single VM produces in practice.
+use constant ALLOC_MAX_ATTEMPTS => 10;
+
 use constant MULTIPATH_CONF_DIR    => '/etc/multipath/conf.d';
 use constant MULTIPATH_CONF_MARKER => 'dellemc-multipath-config-version: ';
 
@@ -1084,43 +1090,57 @@ sub alloc_image {
         $pve_volname = "vm-${vmid}-disk-${diskid}";
     }
 
-    my $existing = eval { $class->_array_get_volume($scfg, $array_name) };
-    if ($existing) {
-        # A state or cloud-init volume left behind by a failed attempt is
-        # reclaimable: its name is derived from the snapshot, so it cannot
-        # belong to anything else.
-        if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) {
-            warn "Reclaiming orphaned volume '$array_name' from a previous"
-               . " failed attempt\n";
-            eval { $class->_release_volume($scfg, $storeid, $array_name) };
-            die "Volume '$array_name' already exists on the array and could not"
-              . " be reclaimed: $@\n" if $@;
-        } else {
-            die "Volume '$array_name' already exists on the array. This"
-              . " indicates a naming conflict or an orphaned volume from a"
-              . " previous failed operation.\n";
-        }
+    # A state or cloud-init volume left behind by a failed attempt is
+    # reclaimable: PVE dictates its name, which is derived from the snapshot,
+    # so it cannot belong to anything else and cannot be moved out of the way.
+    my $dictated = ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)$/) ? 1 : 0;
+
+    if ($dictated && eval { $class->_array_get_volume($scfg, $array_name) }) {
+        warn "Reclaiming orphaned volume '$array_name' from a previous"
+           . " failed attempt\n";
+        eval { $class->_release_volume($scfg, $storeid, $array_name) };
+        die "Volume '$array_name' already exists on the array and could not"
+          . " be reclaimed: $@\n" if $@;
     }
 
-    # _find_free_diskid and the create are not atomic: two concurrent
-    # allocations for one VM can choose the same id and one will lose.
+    # Choosing a disk id and creating it are two steps, and PVE runs
+    # allocations in parallel across the cluster. Between them, another worker
+    # can take the id — so the existence check belongs INSIDE this loop
+    # together with the create. Outside it, the worker that lost the race
+    # would die on a name it was still free to change.
     my $attempt = 0;
     while (1) {
         $attempt++;
-        eval { $class->_array_create_volume($scfg, $storeid, $array_name, $size_bytes) };
-        last unless $@;
 
-        my $err = $@;
-        if ($pve_volname =~ /^vm-\d+-disk-\d+$/ && $attempt < 5
-            && $err =~ /already exists|duplicate|conflict|409/i) {
-            my $diskid = $class->_find_free_diskid($scfg, $storeid, $vmid);
-            $array_name  = $class->naming->encode_volume_name($storeid, $vmid, $diskid);
-            $pve_volname = "vm-${vmid}-disk-${diskid}";
-            warn "alloc_image: disk id collision, retrying as '$pve_volname'\n";
-            next;
+        my $taken = eval { $class->_array_get_volume($scfg, $array_name) } ? 1 : 0;
+        my $error;
+
+        unless ($taken) {
+            eval { $class->_array_create_volume($scfg, $storeid, $array_name, $size_bytes) };
+            last unless $@;
+
+            $error = $@;
+            $taken = $error =~ /already exists|duplicate|conflict|409/i ? 1 : 0;
+
+            die "Failed to create volume '$array_name': $error" unless $taken;
         }
 
-        die "Failed to create volume '$array_name': $err";
+        # The name is taken by something else. A name this plugin chose can be
+        # moved along to the next free id; one PVE dictated cannot.
+        die "Volume '$array_name' already exists on the array. This indicates"
+          . " a naming conflict or an orphaned volume from a previous failed"
+          . " operation.\n"
+            unless !$dictated && $pve_volname =~ /^vm-\d+-disk-\d+$/;
+
+        die "Could not find a free disk id for VM $vmid on storage '$storeid'"
+          . " after $attempt attempts; allocations from other nodes kept"
+          . " taking it first. Retry the operation.\n"
+            if $attempt >= ALLOC_MAX_ATTEMPTS;
+
+        my $diskid = $class->_find_free_diskid($scfg, $storeid, $vmid);
+        $array_name  = $class->naming->encode_volume_name($storeid, $vmid, $diskid);
+        $pve_volname = "vm-${vmid}-disk-${diskid}";
+        warn "alloc_image: disk id collision, retrying as '$pve_volname'\n";
     }
 
     # Map to every node, so live migration works without a remap.

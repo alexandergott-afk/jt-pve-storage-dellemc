@@ -111,7 +111,34 @@ dmsetup remove --force --retry <wwid>
 
 ---
 
-## 行程卡在 D state、節點失去回應
+### 手動移除儲存之後殘留的 sd 路徑
+
+把 map flush 掉並不是全部。一顆 LUN 每條路徑都會在本節點形成一個 `/dev/sd*`，而在陣列不再提供它之後，這些裝置仍會留在 kernel 裡 —— 沒有任何機制會自動移除 sd 裝置。它們平時是安靜的，直到 multipathd 被 reload：此時它會試著為每一個殘留裝置建立 map，journal 就會出現：
+
+```
+device-mapper: table: multipath: error getting device (-EBUSY)
+multipathd: dm_addmap: libdm task=0 error: Device or resource busy
+```
+
+判斷特徵是：某個 WWID 已經沒有 `/dev/mapper` 項目、`dmsetup ls` 也查不到，但 `/dev/disk/by-id/scsi-*` 底下還在。外掛只會清理自己刪掉的 volume；在陣列端手動移除的 LUN、或整台儲存下架，都不在這個範圍內。請在**每一台節點**上逐條移除：
+
+```bash
+# 先確認沒有任何東西在使用它。
+grep -rl '<wwid>' /etc/pve/qemu-server/ /etc/pve/lxc/ 2>/dev/null   # 預期沒有輸出
+mount | grep '<wwid>'                                              # 預期沒有輸出
+
+while ls /dev/disk/by-id/scsi-<wwid> >/dev/null 2>&1; do
+    dev=$(readlink -f /dev/disk/by-id/scsi-<wwid>)
+    echo 1 > /sys/block/$(basename $dev)/device/delete
+    sleep 0.5
+done
+```
+
+每移除一條，by-id 連結就會指向下一條路徑，因此迴圈要跑到全部清完為止。
+
+---
+
+## 行程卡在 D state、節點無回應
 
 不可中斷睡眠無法被任何訊號清除，包括 SIGKILL。一旦 PVE 服務進入這個狀態，該節點只能重開機。
 

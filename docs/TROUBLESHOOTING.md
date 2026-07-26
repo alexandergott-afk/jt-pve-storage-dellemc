@@ -142,6 +142,41 @@ including maps belonging to storage this plugin does not manage.
 
 ---
 
+### Residual sd paths after removing a storage by hand
+
+Flushing the map is not the whole job. A LUN reaches this node once per path,
+as one `/dev/sd*` each, and those stay in the kernel after the array stops
+serving them — nothing removes an sd device automatically. They are silent
+until multipathd is reloaded, at which point it tries to build a map for each
+one and the journal fills with:
+
+```
+device-mapper: table: multipath: error getting device (-EBUSY)
+multipathd: dm_addmap: libdm task=0 error: Device or resource busy
+```
+
+The tell is a WWID with no `/dev/mapper` entry and nothing in `dmsetup ls`,
+but still present under `/dev/disk/by-id/scsi-*`. The plugin sweeps these for
+volumes it deleted itself; a LUN removed on the array by hand, or a whole
+storage decommissioned, is outside that. Remove each path, on **every** node:
+
+```bash
+# Confirm first that nothing uses it.
+grep -rl '<wwid>' /etc/pve/qemu-server/ /etc/pve/lxc/ 2>/dev/null   # expect nothing
+mount | grep '<wwid>'                                              # expect nothing
+
+while ls /dev/disk/by-id/scsi-<wwid> >/dev/null 2>&1; do
+    dev=$(readlink -f /dev/disk/by-id/scsi-<wwid>)
+    echo 1 > /sys/block/$(basename $dev)/device/delete
+    sleep 0.5
+done
+```
+
+Each removal makes the by-id link point at the next path, so the loop runs
+until every one is gone.
+
+---
+
 ## Processes stuck in D state, node unresponsive
 
 Uninterruptible sleep cannot be cleared by any signal, including SIGKILL. Once

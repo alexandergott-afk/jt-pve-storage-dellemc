@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.4~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.5~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -981,6 +981,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.5~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Two test files that put the plugin under conditions an array is actually found in: a server that misbehaves on purpose, corrupt state files, hostile storage ids, and sixteen-way concurrent allocation — which found a real defect in the disk-id retry loop.</span>
+            <span class="lang-zh">新增兩份測試，以陣列實際會出現的狀態來施壓：故意行為不良的伺服器、損毀的狀態檔、惡意的 storage id，以及 16 路並行配置 —— 後者找出了 disk id 重試迴圈中的一個真實缺陷。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.4~beta1</div>

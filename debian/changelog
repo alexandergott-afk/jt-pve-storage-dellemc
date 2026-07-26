@@ -1,3 +1,33 @@
+jt-pve-storage-dellemc (0.7.5~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Two new test files that put the plugin under conditions an array is
+    actually found in, rather than the ones it is documented to be in.
+  * t/12-adverse.t runs against a real HTTP server that misbehaves on
+    purpose: accepts the connection and never answers, stops mid-body,
+    replies 200 with HTML, closes without a response, refuses credentials,
+    or completes a login without returning a token. Each case must fail
+    quickly with a message naming the storage, and must never hang. It also
+    asserts that a create which fails with 5xx is sent exactly once: the
+    request may have taken effect, and a retry would make one PVE disk into
+    two volumes on the array.
+  * t/13-hostile.t attacks the plugin's own state files (empty, truncated,
+    binary, JSON of the wrong shape), the ownership gate that guards every
+    destructive path, storage ids containing path traversal, shell
+    metacharacters and non-ASCII text, size alignment at every family's
+    granularity boundary, and PowerVault's additive expand.
+  * It also allocates from sixteen concurrent processes against one shared
+    array, which found a real defect: the check for whether a disk id was
+    already taken sat outside the retry loop, so a worker that lost the race
+    died on a name it was still free to change. PVE runs allocations in
+    parallel, so this is reachable whenever two disks are added at once.
+  * A residual-sd-path section was added to TROUBLESHOOTING: after a LUN is
+    removed on the array by hand, its per-path sd devices stay in the kernel
+    and only show up as EBUSY the next time multipathd is reloaded.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 05:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.4~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

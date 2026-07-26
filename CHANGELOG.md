@@ -7,6 +7,36 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.5~beta1] - 2026-07-27
+
+Testing under conditions an array is actually found in.
+
+### Fixed
+- **Concurrent allocation could fail instead of retrying.** Choosing a disk id
+  and creating the volume are two steps and PVE runs allocations in parallel,
+  but the check for whether the id was already taken sat outside the retry
+  loop. A worker that lost the race died on a name it was still free to
+  change. Found by a test that allocates from sixteen processes at once
+  against one shared array.
+
+### Added
+- `t/12-adverse.t`: a real HTTP server that misbehaves on purpose — accepts
+  the connection and never answers, stops mid-body, replies 200 with HTML,
+  closes without a response, refuses credentials, completes a login without a
+  token. Every case must fail quickly, name the storage, and never hang. It
+  also proves a create that fails with 5xx is sent exactly once: the request
+  may have reached the array, and a retry would turn one PVE disk into two
+  volumes.
+- `t/13-hostile.t`: corrupt state files (empty, truncated, binary, JSON of the
+  wrong shape), the ownership gate that guards every destructive path,
+  storage ids with path traversal and shell metacharacters and non-ASCII
+  text, size alignment at each family's granularity boundary, PowerVault's
+  additive expand, and sixteen-way concurrent allocation.
+- `docs/TROUBLESHOOTING.md`: what to do about residual `sd` paths after a LUN
+  is removed on the array by hand. Nothing removes an sd device
+  automatically, and they stay silent until the next `multipathd` reload
+  fills the journal with EBUSY.
+
 ## [0.7.4~beta1] - 2026-07-27
 
 Continues the cross-check against the related projects' incident records, and
