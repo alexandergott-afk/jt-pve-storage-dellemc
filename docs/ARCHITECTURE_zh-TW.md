@@ -9,7 +9,7 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 | 順序 | 系列 | PVE type | 資料路徑 | 基底類別 |
 |---|---|---|---|---|
 | 1 | PowerStore | `dellpowerstore` | iSCSI／FC、dm-multipath | `Common::BlockBase` |
-| 2 | PowerVault ME5 | `dellme5` | iSCSI／FC／SAS、dm-multipath | `Common::BlockBase` |
+| 2 | PowerVault ME5 | `dellpowervault` | iSCSI／FC／SAS、dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module、`/dev/scini*` | 自有 |
 | 4 | PowerMax | `dellpowermax` | FC／iSCSI、dm-multipath | `Common::BlockBase` |
 

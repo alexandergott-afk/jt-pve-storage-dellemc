@@ -50,7 +50,8 @@ all operate on a single VM disk as their natural unit.
 | 3 | PowerStore REST API client | **done** |
 | 4 | `dellpowerstore` plugin, recovery tool, docs | **code done**, on-hardware pass outstanding |
 | 5 | FC verification, PVE 9.2 verification, 1.0.0 release | needs hardware |
-| 6+ | PowerVault ME5, then PowerFlex, then PowerMax (separate specs) | ME5 in progress |
+| 6 | `dellpowervault` plugin for PowerVault ME4/ME5 | **code done**, on-hardware pass outstanding |
+| 7+ | PowerFlex, then PowerMax (separate specs) | not started |
 
 The full development specification lives in
 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md).
@@ -65,7 +66,7 @@ an API client, not a restructuring.
 | Order | Family | PVE storage type | Data path | Status |
 |---|---|---|---|---|
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
-| 2 | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS (dm-multipath) | **next** |
+| 2 | **PowerVault ME4/ME5** | `dellpowervault` | iSCSI / FC / SAS (dm-multipath) | **in development** |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned |
 | 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
 | — | PowerScale | `dellpowerscale` | NFS (directory semantics) | not scheduled |

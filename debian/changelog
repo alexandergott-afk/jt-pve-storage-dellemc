@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.6.0~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. Neither storage type has been run
+    against physical hardware.
+  * Adds the dellpowervault storage type for PowerVault ME4 and ME5.
+  * The ME series exposes its CLI over HTTPS rather than a REST object model,
+    so HTTP 200 does not mean success: every command is judged by the CLI's
+    own status object instead.
+  * expand volume takes the amount to ADD, while PVE asks for the new total,
+    so the delta is computed by the plugin.
+  * Sizes are rounded UP to the array's 4 MiB granularity, because the array
+    rounds down and would return a volume smaller than requested.
+  * Names on this family are limited to 32 bytes and may not contain a dot,
+    which is why it has its own naming module and a 10-character budget for
+    the storage id. A name that would not fit is an error, not a silent
+    truncation that could collide with another VM's volume.
+  * Verified on a live PVE node that both Dell plugins load together without
+    the duplicate-property failure that would take down every storage.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sun, 26 Jul 2026 23:00:00 +0800
+
 jt-pve-storage-dellemc (0.5.0~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. See the disclaimer in README.md:

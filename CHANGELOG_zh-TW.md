@@ -3,6 +3,27 @@
 本專案所有值得記錄的變更都寫在這裡。
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## [0.6.0~beta1] - 2026-07-26
+
+新增 PowerVault ME4／ME5 系列的 `dellpowervault` storage type。
+
+仍是 beta，也仍未經實機驗證。這次不同的是：面向陣列的細節是實際讀取《Dell PowerVault ME5 Series CLI Reference Guide》而來，不是憑記憶撰寫；[docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 也把「來自官方文件」與「尚未查證」分開列出。
+
+### 新增
+- `PowerVault/API.pm`、`PowerVault/Naming.pm` 與 `DellPowerVaultPlugin.pm`。
+- 新增 154 個單元測試，總計 867 個。
+
+### 這個系列的不同之處，以及為什麼重要
+- **HTTP 200 不代表成功。** ME 是把 CLI 透過 HTTPS 開放出來；被拒絕的指令一樣回 200，判斷結果放在 `status` 物件裡。若以 HTTP 狀態碼為準，建立失敗的 volume 看起來會像成功，PVE 就會記錄一顆並不存在的磁碟。
+- **`expand volume` 收的是增量，不是總量。** PVE 給的是新的絕對容量。直接傳過去，會把使用者要求擴充到 33 GiB 的 32 GiB volume 變成 64 GiB。
+- **容量在這裡要向上取整。** 陣列以 4 MiB 對齊且**向下**取整，所以客戶端必須先向上取整，否則實際 volume 會小於 PVE 以為的大小。
+- **名稱上限 32 bytes 且不可含句點。** 因此這個系列有自己的命名模組：較短的物件名稱、以 `-s-` 而非句點作為快照分隔符號，以及 storeid 的 10 字元額度。放不下的名稱會直接報錯，而不是被截斷成可能與其他 VM 撞名的名稱。
+- **連結複製就是快照。** ME 的快照可寫入也可對應，所以複製即是「取一個 volume 形狀名稱的快照」—— 瞬間完成，且不複製資料。
+
+### 變更
+- 路線圖：PowerStore → PowerVault ME → PowerFlex → PowerMax；PowerScale 未排入。
+- type 字串為 `dellpowervault` 而非 `dellme5`：其他系列都以產品線而非型號命名，而且 ME4 與 ME5 共用同一套 API。
+
 ## [0.5.0~beta1] - 2026-07-26
 
 Phase 2 至 4。`dellpowerstore` storage type 已經存在。

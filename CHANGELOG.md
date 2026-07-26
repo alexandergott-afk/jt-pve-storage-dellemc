@@ -3,6 +3,45 @@
 All notable changes to this project are documented here.
 繁體中文版本：[CHANGELOG_zh-TW.md](CHANGELOG_zh-TW.md)
 
+## [0.6.0~beta1] - 2026-07-26
+
+Adds the `dellpowervault` storage type for the PowerVault ME4 and ME5 series.
+
+Still beta, and still unverified against hardware. What is different this time
+is that the array-facing details were read from the *Dell PowerVault ME5
+Series CLI Reference Guide* rather than written from memory, and
+[docs/TESTING.md](docs/TESTING.md) now separates what came from the official
+documentation from what did not.
+
+### Added
+- `PowerVault/API.pm`, `PowerVault/Naming.pm` and `DellPowerVaultPlugin.pm`.
+- 154 further unit tests, 867 in total.
+
+### Things this family does differently, and why they matter
+- **HTTP 200 does not mean success.** ME exposes its CLI over HTTPS; a
+  rejected command answers 200 with the verdict in a `status` object. Judging
+  by the HTTP code would let a failed volume create look like it worked, and
+  PVE would then record a disk that does not exist.
+- **`expand volume` takes a delta, not a total.** PVE asks for the new
+  absolute size. Passing it through would grow a 32 GiB volume to 64 GiB when
+  the user asked for 33.
+- **Sizes round up here.** The array aligns to 4 MiB and rounds *down*, so the
+  client rounds up first; otherwise the volume is smaller than PVE believes.
+- **Names are limited to 32 bytes and may not contain a dot.** This family
+  therefore has its own naming module: short object names, a snapshot
+  separator of `-s-` rather than a dot, and a 10-character budget for the
+  storage id. A name that will not fit raises an error rather than being
+  truncated into a collision with another VM's volume.
+- **A linked clone is a snapshot.** ME snapshots are writable and mappable, so
+  a clone is a snapshot given a volume-shaped name — instant, and no copy.
+
+### Changed
+- Roadmap: PowerStore, then PowerVault ME, then PowerFlex, then PowerMax.
+  PowerScale is not scheduled.
+- The type string is `dellpowervault`, not `dellme5`: every other family is
+  named for its product line rather than a model number, and ME4 and ME5 share
+  one API.
+
 ## [0.5.0~beta1] - 2026-07-26
 
 Phases 2 to 4. The `dellpowerstore` storage type now exists.

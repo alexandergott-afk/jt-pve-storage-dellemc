@@ -32,6 +32,23 @@ English: [CONFIGURATION.md](CONFIGURATION.md)
 | `pstore-protection-policy` | string | 否 | — | 套用 protection policy（快照與複寫規則），必須已存在 |
 | `pstore-lun-id-base` | 1–200 | 否 | `1` | 外掛配發 LUN ID 的起始值 |
 
+## PowerVault ME 專屬選項
+
+由 `dellpowervault` type 使用，涵蓋 ME4 與 ME5 系列。
+
+| 選項 | 型別 | 必填 | 預設 | 說明 |
+|---|---|---|---|---|
+| `pvault-pool` | string | 否 | — | 新 volume 建立在哪個 pool。陣列有多個 pool 時為必填 |
+| `pvault-volume-group` | string | 否 | — | 把所有 volume 放進指定的 volume group，該群組必須已存在 |
+| `pvault-tier-affinity` | `no-affinity` \| `archive` \| `performance` | 否 | `no-affinity` | 新 volume 的分層親和性 |
+| `pvault-lun-id-base` | 1–200 | 否 | `1` | 外掛配發 LUN ID 的起始值 |
+
+### 命名限制是這個系列最主要的約束
+
+PowerVault 的 volume 與 snapshot 名稱**上限為 32 bytes**，而且 volume 名稱不允許出現句點 —— 這兩點都記載於 ME5 CLI Reference Guide。因此外掛在這個系列使用較短的名稱（`pve-me5-100-d0`），並把 storeid 的額度限制在 **10 個字元**。
+
+若 storeid 長到放不下，外掛會在建立時直接報錯，而不是產生一個被截斷、可能與其他 VM 的 volume 撞名的名稱。在這個系列請使用簡短的 storage id。
+
 ## PVE 標準選項
 
 `nodes`、`disable`、`content`、`shared` 全部為選填。要放 VM 磁碟與容器根檔案系統請設 `content images,rootdir`；叢集環境請設 `shared 1`。

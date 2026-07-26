@@ -46,6 +46,62 @@ multipathd show config | grep -A3 -i dell
 #    PowerStore Manager > Compute > Host Information > <host> > Mapped Volumes
 ```
 
+## PowerVault ME (dellpowervault)
+
+The ME4 and ME5 series expose the CLI over HTTPS rather than a REST object
+model. What follows is split by provenance, because that distinction decides
+where to look first when something does not work.
+
+### Taken from the official Dell documentation
+
+Read from the *Dell PowerVault ME5 Series Storage System CLI Reference Guide*
+during development. Still unverified against hardware, but not guesswork:
+
+| Item | Source |
+|---|---|
+| `GET /api/login/<sha256("user_password")>`, lowercase hex | Using a script to access the CLI |
+| HTTP Basic alternative at `GET /api/login`; SHA-256 is not compatible with LDAP accounts | same |
+| Headers `sessionKey` and `dataType: json` | same |
+| 30-minute session inactivity timeout | same |
+| Command URL form `https://<ip>/api/<verb>/<object>/<args>` | same |
+| Response carries a `status` array with `response-type`, `response`, `return-code` | Using JSON API output |
+| `create volume [pool] [volume-group] size <n>[B\|GiB\|…] <name>` | create volume |
+| Volume names: max 32 bytes, may not contain `" , . < \` | create volume |
+| Sizes align to 4 MiB and are rounded **down** by the array | create volume, expand volume |
+| `expand volume size <amount> <volume>` — the amount is **additive** | expand volume |
+| Shrinking is not supported | expand volume |
+| `map volume [access rw] initiator <hosts> [lun <n>] <volumes>`; a LUN is required when an initiator is named | map volume |
+| `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
+| `create snapshots volumes <volumes> <snap-names>`; snapshot names max 32 bytes, unique system-wide | create snapshots |
+
+### NOT VERIFIED — check these first
+
+Dell's documentation site refused several requests during development, so
+these follow the same CLI grammar but were not read from the guide. They are
+marked `NOT VERIFIED` in `PowerVault/API.pm`:
+
+| Item | Where |
+|---|---|
+| `delete volumes <name>` | `volume_delete` |
+| `delete snapshot <name>` | `snapshot_delete` |
+| `set volume name <new> <volume>` | `volume_rename` |
+| `rollback volume <volume> snapshot <snapshot>` | `snapshot_rollback` |
+| `unmap volume initiator <host> <volume>` | `volume_unmap` |
+| `create host id <ids> <name>` and `set initiator host <name> <id>` | `host_create`, `host_add_initiators` |
+| Field names of `show pools`, `show maps`, `show ports`, `show snapshots` | capacity, mappings, portals |
+| SCSI vendor and product strings (`DellEMC` / `ME[45]…`) | `DellPowerVaultPlugin` |
+| WWN to WWID conversion | `wwn_to_wwid` |
+
+Verify the grammar of any of these in one command:
+
+```bash
+# on the array's own CLI, over SSH
+help delete volumes
+help unmap volume
+help create host
+```
+
+
 ## Automated checks
 
 ```bash
@@ -55,7 +111,7 @@ make check-multipath-flush   # fails on any system-wide multipath flush
 make test                    # all of the above
 ```
 
-713 unit tests currently run without an array or a device. They cover naming
+867 unit tests currently run without an array or a device. They cover naming
 and the ownership gate, the REST retry policy, the reap guards, request shape
 against fixtures, and the plugin's PVE schema. Tests that need
 `PVE::Storage::Plugin` skip themselves on a machine without Proxmox VE.

@@ -42,6 +42,57 @@ multipathd show config | grep -A3 -i dell
 #    PowerStore Manager > Compute > Host Information > <host> > Mapped Volumes
 ```
 
+## PowerVault ME（dellpowervault）
+
+ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放出來。以下依「資料來源」分成兩類，因為這個區分決定了出問題時該先查哪裡。
+
+### 來自 Dell 官方文件
+
+開發過程中實際讀取自《Dell PowerVault ME5 Series Storage System CLI Reference Guide》。仍未經實機驗證，但不是憑空推測：
+
+| 項目 | 出處 |
+|---|---|
+| `GET /api/login/<sha256("user_password")>`，小寫十六進位 | Using a script to access the CLI |
+| 另一種方式是 `GET /api/login` 搭配 HTTP Basic；SHA-256 不適用於 LDAP 帳號 | 同上 |
+| 標頭 `sessionKey` 與 `dataType: json` | 同上 |
+| session 閒置 30 分鐘逾時 | 同上 |
+| 指令 URL 形式 `https://<ip>/api/<verb>/<object>/<args>` | 同上 |
+| 回應帶有 `status` 陣列，含 `response-type`、`response`、`return-code` | Using JSON API output |
+| `create volume [pool] [volume-group] size <n>[B\|GiB\|…] <name>` | create volume |
+| Volume 名稱上限 32 bytes，不可含 `" , . < \` | create volume |
+| 容量對齊 4 MiB，且由陣列**向下**取整 | create volume、expand volume |
+| `expand volume size <amount> <volume>` —— 這個數值是**增量** | expand volume |
+| 不支援縮小 | expand volume |
+| `map volume [access rw] initiator <hosts> [lun <n>] <volumes>`；指定 initiator 時必須給 LUN | map volume |
+| `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
+| `create snapshots volumes <volumes> <snap-names>`；快照名稱上限 32 bytes 且全系統唯一 | create snapshots |
+
+### 尚未查證 —— 請優先確認這些
+
+開發期間 Dell 文件網站多次拒絕存取，因此以下項目雖然遵循同一套 CLI 語法，但並非直接讀自官方指南。它們在 `PowerVault/API.pm` 中都標記為 `NOT VERIFIED`：
+
+| 項目 | 位置 |
+|---|---|
+| `delete volumes <name>` | `volume_delete` |
+| `delete snapshot <name>` | `snapshot_delete` |
+| `set volume name <new> <volume>` | `volume_rename` |
+| `rollback volume <volume> snapshot <snapshot>` | `snapshot_rollback` |
+| `unmap volume initiator <host> <volume>` | `volume_unmap` |
+| `create host id <ids> <name>` 與 `set initiator host <name> <id>` | `host_create`、`host_add_initiators` |
+| `show pools`、`show maps`、`show ports`、`show snapshots` 的欄位名稱 | 容量、對應關係、portal |
+| SCSI vendor 與 product 字串（`DellEMC` / `ME[45]…`） | `DellPowerVaultPlugin` |
+| WWN 轉 WWID | `wwn_to_wwid` |
+
+在陣列上用一個指令就能確認語法：
+
+```bash
+# 透過 SSH 連到陣列自己的 CLI
+help delete volumes
+help unmap volume
+help create host
+```
+
+
 ## 自動化檢查
 
 ```bash
@@ -51,7 +102,7 @@ make check-multipath-flush   # 出現全系統 multipath flush 即失敗
 make test                    # 以上全部
 ```
 
-目前有 713 個單元測試，不需要陣列或實體裝置即可執行，涵蓋命名與歸屬檢查、REST 重試策略、orphan 清理防護、對照 fixture 的請求格式，以及外掛的 PVE schema。需要 `PVE::Storage::Plugin` 的測試在沒有 Proxmox VE 的機器上會自行跳過。
+目前有 867 個單元測試，不需要陣列或實體裝置即可執行，涵蓋命名與歸屬檢查、REST 重試策略、orphan 清理防護、對照 fixture 的請求格式，以及外掛的 PVE schema。需要 `PVE::Storage::Plugin` 的測試在沒有 Proxmox VE 的機器上會自行跳過。
 
 單元測試無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現。那是下面這份矩陣的工作。
 

@@ -29,7 +29,8 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 | 3 | PowerStore REST API 客戶端 | **已完成** |
 | 4 | `dellpowerstore` plugin、災難復原工具、文件 | **程式碼已完成**，實機測試未進行 |
 | 5 | FC 驗證、PVE 9.2 驗證、發佈 1.0.0 | 需要實機 |
-| 6+ | PowerVault ME5 → PowerFlex → PowerMax（各自另立子規格） | ME5 進行中 |
+| 6 | PowerVault ME4／ME5 的 `dellpowervault` plugin | **程式碼已完成**，實機測試未進行 |
+| 7+ | PowerFlex → PowerMax（各自另立子規格） | 未開始 |
 
 完整開發規格請見 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md)。
 
@@ -40,7 +41,7 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 | 順序 | 系列 | PVE storage type | 資料路徑 | 狀態 |
 |---|---|---|---|---|
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
-| 2 | PowerVault ME5 | `dellme5` | iSCSI／FC／SAS（dm-multipath） | **下一個** |
+| 2 | **PowerVault ME4／ME5** | `dellpowervault` | iSCSI／FC／SAS（dm-multipath） | **開發中** |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | 規劃中 |
 | 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
 | — | PowerScale | `dellpowerscale` | NFS（目錄語意） | 未排入 |

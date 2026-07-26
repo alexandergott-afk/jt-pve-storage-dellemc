@@ -49,7 +49,7 @@
 | 系列 | PVE plugin type | 資料路徑 | 本專案階段 |
 |---|---|---|---|
 | **PowerStore** | `dellpowerstore` | iSCSI / FC（dm-multipath） | **Phase 1〜4，本文件主體** |
-| PowerVault ME5 | `dellme5` | iSCSI / FC / SAS（dm-multipath） | Phase 6，開發中 |
+| PowerVault ME5 | `dellpowervault` | iSCSI / FC / SAS（dm-multipath） | Phase 6，開發中 |
 | PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | Phase 7，另立子規格 |
 | PowerMax | `dellpowermax` | FC / iSCSI（dm-multipath） | Phase 8，另立子規格 |
 | PowerScale | `dellpowerscale` | NFS（目錄語意） | 不排入（PVE 內建 NFS 已涵蓋） |
@@ -716,7 +716,7 @@ Description: Dell EMC Storage Plugins for Proxmox VE
 
 > **順序更新（2026-07-26）**：改為 PowerStore → PowerVault ME5 → PowerFlex → PowerMax。PowerScale 因為是 NFS、且 PVE 內建 NFS 儲存已涵蓋，改為不排入。
 
-- [ ] PowerVault ME5（`dellme5`）：SMC REST API、iSCSI／FC／SAS、**繼承 BlockBase** ← 開發中
+- [ ] PowerVault ME5（`dellpowervault`）：SMC REST API、iSCSI／FC／SAS、**繼承 BlockBase** ← 開發中
 - [ ] PowerFlex（`dellpowerflex`）：SDC kernel module、`/dev/scini*`、**不繼承 BlockBase**
 - [ ] PowerMax（`dellpowermax`）：Unisphere for PowerMax REST、storage group／masking view 模型、**繼承 BlockBase**
 

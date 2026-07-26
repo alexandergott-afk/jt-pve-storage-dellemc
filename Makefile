@@ -1,5 +1,5 @@
 PACKAGE = jt-pve-storage-dellemc
-VERSION = 0.5.0~beta1
+VERSION = 0.6.0~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -41,7 +41,7 @@ uninstall:
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerMaxPlugin.pm
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerFlexPlugin.pm
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerScalePlugin.pm
-	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellME5Plugin.pm
+	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerVaultPlugin.pm
 	rm -rf $(PERL5DIR)/PVE/Storage/Custom/DellEMC/
 	@for f in $(BIN_SCRIPTS); do rm -f $(BINDIR)/$$(basename $$f); done
 

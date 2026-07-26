@@ -10,7 +10,7 @@ so each family gets its own and they share the host-side layer.
 | Order | Family | PVE type | Data path | Base class |
 |---|---|---|---|---|
 | 1 | PowerStore | `dellpowerstore` | iSCSI / FC, dm-multipath | `Common::BlockBase` |
-| 2 | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS, dm-multipath | `Common::BlockBase` |
+| 2 | PowerVault ME5 | `dellpowervault` | iSCSI / FC / SAS, dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module, `/dev/scini*` | its own |
 | 4 | PowerMax | `dellpowermax` | FC / iSCSI, dm-multipath | `Common::BlockBase` |
 

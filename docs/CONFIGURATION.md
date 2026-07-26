@@ -35,6 +35,28 @@ plugins — that is why the prefixes exist.
 | `pstore-protection-policy` | string | no | — | Protection policy (snapshot and replication rules). Must already exist |
 | `pstore-lun-id-base` | 1–200 | no | `1` | Lowest LUN id the plugin assigns |
 
+## PowerVault ME options
+
+Used by the `dellpowervault` type, which covers the ME4 and ME5 series.
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `pvault-pool` | string | no | — | Pool new volumes are created in. Required on an array with more than one pool |
+| `pvault-volume-group` | string | no | — | Put every volume in this volume group. Must already exist |
+| `pvault-tier-affinity` | `no-affinity` \| `archive` \| `performance` | no | `no-affinity` | Tier affinity for new volumes |
+| `pvault-lun-id-base` | 1–200 | no | `1` | Lowest LUN id the plugin assigns |
+
+### Naming is the binding constraint on this family
+
+PowerVault accepts **32 bytes** for a volume or snapshot name and does not
+allow a dot in a volume name — both documented in the ME5 CLI Reference Guide.
+The plugin therefore uses short names (`pve-me5-100-d0`) and gives the storage
+id a **10-character budget**.
+
+A storage id that does not leave room raises an error at creation time rather
+than producing a truncated name that could collide with another VM's volume.
+Keep the storage id short on this family.
+
 ## Standard PVE options
 
 `nodes`, `disable`, `content`, `shared` — all optional. Use `content
