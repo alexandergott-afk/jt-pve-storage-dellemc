@@ -19,6 +19,11 @@ use Digest::SHA qw(sha256_hex);
 use JSON;
 use URI;
 
+BEGIN {
+    eval { require LWP::UserAgent; require JSON; require URI; 1 }
+        or plan skip_all => 'libwww-perl, libjson-perl or liburi-perl is missing';
+}
+
 use PVE::Storage::Custom::DellEMC::PowerVault::API;
 use PVE::Storage::Custom::DellEMC::PowerVault::Naming;
 

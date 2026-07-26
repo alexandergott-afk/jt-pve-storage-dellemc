@@ -16,6 +16,11 @@ use HTTP::Headers;
 use JSON;
 use URI;
 
+BEGIN {
+    eval { require LWP::UserAgent; require JSON; require URI; 1 }
+        or plan skip_all => 'libwww-perl, libjson-perl or liburi-perl is missing';
+}
+
 use PVE::Storage::Custom::DellEMC::PowerFlex::API;
 use PVE::Storage::Custom::DellEMC::PowerFlex::Naming;
 use PVE::Storage::Custom::DellEMC::PowerFlex::Host;

@@ -7,6 +7,17 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.19~beta1] - 2026-07-27
+
+### Fixed
+- **The release workflow could not have run the tests it claims to run.** It
+  installed `build-essential`, `debhelper` and `fakeroot` and nothing else, so
+  every test that loads an API client would have died at compile time on a
+  runner without `libwww-perl`. The plugin's own runtime dependencies are
+  installed there now, and those tests skip with a stated reason rather than
+  failing if the modules are absent — a green run that tested nothing is worse
+  than a red one.
+
 ## [0.7.18~beta1] - 2026-07-27
 
 ### Added

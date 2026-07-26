@@ -21,6 +21,11 @@ use IO::Socket::INET;
 use POSIX ();
 use Time::HiRes qw(time);
 
+BEGIN {
+    eval { require LWP::UserAgent; require JSON; require URI; 1 }
+        or plan skip_all => 'libwww-perl, libjson-perl or liburi-perl is missing';
+}
+
 use PVE::Storage::Custom::DellEMC::PowerStore::API;
 use PVE::Storage::Custom::DellEMC::PowerVault::API;
 

@@ -33,8 +33,13 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
+          # The Perl modules are the plugin's own runtime dependencies. They
+          # are installed here so the unit tests actually run: without them
+          # every test that loads an API client dies at compile time instead
+          # of testing anything, and a green run would mean nothing.
           sudo apt-get install -y --no-install-recommends \
-            build-essential debhelper fakeroot
+            build-essential debhelper fakeroot \
+            libwww-perl libjson-perl liburi-perl
 
       - name: Run checks
         run: |
