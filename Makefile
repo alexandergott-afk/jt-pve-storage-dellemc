@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.7~beta1
+VERSION = 0.7.8~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -129,13 +129,30 @@ release-check: check-multipath-flush syntax unit
 			echo "  ERROR: $$f has no entry for $(VERSION)"; fail=1; \
 		fi; \
 	done; \
+	for f in README.md README_zh-TW.md docs/index.html; do \
+		if ! grep -q "$(VERSION)" $$f; then \
+			echo "  ERROR: $$f still names an older version"; fail=1; \
+		fi; \
+	done; \
+	stale=$$(grep -ohE '0\.[0-9]+\.[0-9]+~beta[0-9]+' README.md README_zh-TW.md \
+		| sort -u | grep -v '^$(VERSION)$$' || true); \
+	if [ -n "$$stale" ]; then \
+		echo "  ERROR: the READMEs also mention $$stale"; fail=1; \
+	fi; \
+	badge=$$(sed -n 's/.*hero__badge">v\([^ <]*\).*/\1/p' docs/index.html | head -1); \
+	if [ "$$badge" != "$(VERSION)" ]; then \
+		echo "  ERROR: the docs site badge says $$badge"; fail=1; \
+	fi; \
+	if ! grep -q 'changelog-version">v$(VERSION)<' docs/index.html; then \
+		echo "  ERROR: the docs site has no changelog entry for $(VERSION)"; fail=1; \
+	fi; \
 	if [ "$$fail" = "1" ]; then \
 		echo ""; \
 		echo "A release whose files disagree about its own version is worse"; \
 		echo "than no release. Fix the above, then run this again."; \
 		exit 1; \
 	fi; \
-	echo "  OK: every file agrees on $(VERSION)"
+	echo "  OK: every file agrees on $(VERSION), including the docs site"
 	@echo ""
 	@echo "Stage 1 passed. Stages 2 to 5 are in docs/RELEASE_TESTING.md."
 

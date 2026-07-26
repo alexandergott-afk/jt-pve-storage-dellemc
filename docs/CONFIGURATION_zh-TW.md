@@ -51,6 +51,26 @@ PowerVault 的 volume 與 snapshot 名稱**上限為 32 bytes**，而且 volume 
 
 若 storeid 長到放不下，外掛會在建立時直接報錯，而不是產生一個被截斷、可能與其他 VM 的 volume 撞名的名稱。在這個系列請使用簡短的 storage id。
 
+## PowerFlex 專屬選項
+
+由 `dellpowerflex` 型別使用。PowerFlex 的 volume 不是以 SCSI LUN 的形式送到主機，因此這裡完全用不到 multipath 相關選項；`dell-protocol` 在這個系列接受的是 `nvme`（預設）或 `sdc`，而不是 `iscsi` 或 `fc`。
+
+| 選項 | 型別 | 必填 | 預設 | 說明 |
+|---|---|---|---|---|
+| `pflex-storage-pool` | 字串 | **是** | — | 建立新 volume 的儲存池。PowerFlex 沒有預設儲存池 |
+| `pflex-protection-domain` | 字串 | 否 | — | 該儲存池所屬的保護網域。只有在多個網域中存在同名儲存池時才需要 |
+| `pflex-nvme-ctrl-loss-tmo` | 0–600 | 否 | `60` | 失去 NVMe 控制器之後，kernel 持續重試多久才讓 I/O 失敗。這是 NVMe 版的 `no_path_retry`；kernel 自己的預設值 600 秒長到跟當機難以分辨 |
+| `pflex-nvme-io-queues` | 1–128 | 否 | — | 每個控制器的 NVMe/TCP I/O 佇列數。不設定就交給 kernel 決定，通常是每個 CPU 一條 |
+| `pflex-thick` | 布林 | 否 | `0` | 建立厚配置的 volume。預設為精簡配置，而精簡配置正是讓快照與複製足夠便宜的原因 |
+
+### 這個系列的容量與名稱限制
+
+PowerFlex 以 **8 GiB** 為配置單位，比這更小的請求會被進位到一個單位。Volume 與快照名稱上限為 **31 個字元** —— 比 PowerVault 還少一個 —— 因此 storage id 的可用長度是 **9 個字元**。
+
+### 該選哪一條資料路徑
+
+`dell-protocol nvme` 使用 kernel 內建的 NVMe/TCP initiator 連到陣列的 SDT 元件，主機端不需要安裝任何專有軟體。`dell-protocol sdc` 則使用 Dell 的 SDC kernel module，它必須與執行中的 kernel 相符；而 Proxmox VE 的 kernel 並不在 Dell 的支援矩陣上，因此一次 kernel 升級就可能讓某個節點失去儲存。詳見 [POWERFLEX_SDC_zh-TW.md](POWERFLEX_SDC_zh-TW.md)。
+
 ## PVE 標準選項
 
 `nodes`、`disable`、`content`、`shared` 全部為選填。要放 VM 磁碟與容器根檔案系統請設 `content images,rootdir`；叢集環境請設 `shared 1`。

@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.8~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The five PowerFlex options were not documented at all, including
+    pflex-storage-pool, which is required. Both languages now describe them,
+    along with the family's 8 GiB allocation unit, its 31-character name
+    limit and the choice between the two data paths.
+  * New test t/15-pve-contract.t reads the installed PVE::Storage::Plugin and
+    fails if this plugin would inherit a base method that reaches for
+    filesystem_path or that dies, if the API version claim falls outside what
+    the running PVE accepts, or if two of the three plugins declare the same
+    property name.
+  * New test t/16-docs.t fails when an option exists but is not documented,
+    when the documentation names one that does not exist, or when a document
+    has no counterpart in the other language.
+  * make release-check now also checks the READMEs and the documentation site,
+    including the version badge and the changelog entry there.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.7~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

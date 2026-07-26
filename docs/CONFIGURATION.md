@@ -59,6 +59,34 @@ A storage id that does not leave room raises an error at creation time rather
 than producing a truncated name that could collide with another VM's volume.
 Keep the storage id short on this family.
 
+## PowerFlex options
+
+Used by the `dellpowerflex` type. PowerFlex does not reach the host as a SCSI
+LUN, so none of the multipath options apply here; `dell-protocol` takes
+`nvme` (the default) or `sdc` instead of `iscsi` or `fc`.
+
+| Option | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `pflex-storage-pool` | string | **yes** | — | Storage pool new volumes are created in. PowerFlex has no default pool |
+| `pflex-protection-domain` | string | no | — | Protection domain of that pool. Only needed when the same pool name exists in more than one domain |
+| `pflex-nvme-ctrl-loss-tmo` | 0–600 | no | `60` | Seconds the kernel keeps retrying a lost NVMe controller before it fails the I/O. This is the NVMe equivalent of `no_path_retry`; the kernel's own default of 600 is long enough to be indistinguishable from a hang |
+| `pflex-nvme-io-queues` | 1–128 | no | — | NVMe/TCP I/O queues per controller. Unset lets the kernel decide, which is normally one per CPU |
+| `pflex-thick` | boolean | no | `0` | Create thick-provisioned volumes. Thin is the default and is what makes snapshots and clones cheap |
+
+### Sizes and names on this family
+
+PowerFlex allocates in **8 GiB** units, so a smaller request is rounded up to
+one. Volume and snapshot names are limited to **31 characters** — one fewer
+than PowerVault — which gives the storage id a **9-character budget**.
+
+### Which data path
+
+`dell-protocol nvme` uses the in-kernel NVMe/TCP initiator against the array's
+SDT components and needs nothing proprietary on the host. `dell-protocol sdc`
+uses Dell's SDC kernel module, which has to match the running kernel; Proxmox
+VE kernels are not on Dell's support matrix, so a kernel upgrade can leave a
+node without storage. See [POWERFLEX_SDC.md](POWERFLEX_SDC.md).
+
 ## Standard PVE options
 
 `nodes`, `disable`, `content`, `shared` — all optional. Use `content

@@ -7,6 +7,32 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.8~beta1] - 2026-07-27
+
+### Fixed
+- **The PowerFlex options were undocumented.** All five, including
+  `pflex-storage-pool`, which is required and which PowerFlex has no default
+  for. `docs/CONFIGURATION.md` and its Traditional Chinese counterpart now
+  describe them, together with the family's 8 GiB allocation unit, its
+  31-character name limit, and what choosing between NVMe/TCP and the SDC
+  actually commits you to.
+
+### Added
+- `t/15-pve-contract.t`: reads the installed `PVE::Storage::Plugin` and fails
+  if this plugin would inherit a base method that reaches for
+  `filesystem_path` or that dies by default, if its API version claim falls
+  outside what the running PVE accepts, or if two of the three plugins declare
+  the same property name — which makes PVE die while building the storage
+  schema and takes every storage on the node with it. A PVE upgrade that
+  changes any of this now fails here rather than in production.
+- `t/16-docs.t`: fails when an option exists but is not documented, when the
+  documentation names an option that does not exist — an operator who copies
+  that into `storage.cfg` has the whole storage refused — or when a document
+  has no counterpart in the other language.
+- `make release-check` also checks the READMEs and the documentation site now,
+  including the version badge and whether the site has a changelog entry for
+  the release being made.
+
 ## [0.7.7~beta1] - 2026-07-27
 
 ### Fixed
