@@ -182,4 +182,44 @@ is_deeply(get_multipath_slaves('/dev/does-not-exist-12345'), [],
 is_deeply(get_scsi_paths_for_wwid('not-a-wwid'), [],
     'implausible WWID yields no paths');
 
+# ---------------------------------------------------------------------------
+# A file test on a device path is a kernel call
+#
+# -b stats the target, and on a multipath device whose paths have all failed
+# while queueing is still on, that stat lands in the same uninterruptible
+# sleep that hangs vgs. Every device path here is that kind of path.
+# ---------------------------------------------------------------------------
+
+{
+    my $is_block = \&{"${P}::is_block_device"};
+
+    is($is_block->(undef), 0, 'undef is not a block device');
+    is($is_block->(''), 0, 'the empty string is not a block device');
+    is($is_block->('/dev/definitely/not/here'), 0, 'nor is a path that does not exist');
+    is($is_block->('/etc/hostname'), 0, 'nor is a regular file');
+
+    my ($real) = grep { -b $_ }
+        map { "/dev/$_" }
+        do { opendir(my $dh, '/sys/block') or last; sort grep { !/^\./ } readdir($dh) };
+
+    SKIP: {
+        skip 'no block device on this host', 1 unless defined $real;
+        is($is_block->($real), 1, "a real block device is recognised ($real)");
+    }
+
+    # The caller's own timeout must survive: nesting alarm() without putting
+    # back what was left cancels it, which is worse than the hang it guards.
+    my $left;
+    eval {
+        local $SIG{ALRM} = sub { die "outer\n" };
+        alarm(5);
+        $is_block->('/etc/hostname');
+        $left = alarm(0);
+    };
+    alarm(0);
+
+    ok(defined $left && $left > 0,
+        'an alarm the caller had running is still running afterwards');
+}
+
 done_testing();

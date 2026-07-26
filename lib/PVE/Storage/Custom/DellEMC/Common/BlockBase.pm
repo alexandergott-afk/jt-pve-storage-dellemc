@@ -50,6 +50,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     wait_for_multipath_device
     get_multipath_slaves
     cleanup_lun_devices
+    is_block_device
     is_device_in_use
     get_device_usage_details
     list_vendor_multipath_devices
@@ -104,6 +105,10 @@ use constant MIN_APIVERSION => APIVERSION_MIN;
 # loses the race again; ten is far past what concurrent allocation for a
 # single VM produces in practice.
 use constant ALLOC_MAX_ATTEMPTS => 10;
+
+# How long to wait for an array to report a resize it has accepted, before
+# refreshing the host side regardless.
+use constant RESIZE_SETTLE_TIMEOUT => 30;
 
 use constant MULTIPATH_CONF_DIR    => '/etc/multipath/conf.d';
 use constant MULTIPATH_CONF_MARKER => 'dellemc-multipath-config-version: ';
@@ -765,7 +770,7 @@ sub deactivate_storage {
 
         # Never tear down a device a running VM is still using.
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device && is_device_in_use($device)) {
+        if ($device && is_block_device($device) && is_device_in_use($device)) {
             push @in_use, $vol->{name};
             next;
         }
@@ -940,7 +945,7 @@ sub _cleanup_orphaned_devices {
         next unless $WWID_STATE->is_reapable($entry);
 
         my $mpath = eval { get_multipath_device($wwid) };
-        if ($mpath && -b $mpath) {
+        if ($mpath && is_block_device($mpath)) {
             if (eval { is_device_in_use($mpath) }) {
                 warn "orphan cleanup: $mpath (WWID $wwid) is still in use,"
                    . " leaving it for manual review\n";
@@ -1306,7 +1311,7 @@ sub free_image {
     # Refuse while anything is using the device.
     if ($wwid) {
         my $device = get_device_by_wwid($wwid);
-        if ($device && -b $device && is_device_in_use($device)) {
+        if ($device && is_block_device($device) && is_device_in_use($device)) {
             my $details = eval { get_device_usage_details($device) } // '';
             my $msg = "Cannot delete volume '$volname': device $device is still"
                     . " in use (mounted, has holders, or open by a process).\n";
@@ -1355,7 +1360,7 @@ sub free_image {
         # when it had to fall back to dmsetup, the slave list it walks is
         # already gone. Use the list captured above.
         for my $slave (@slaves) {
-            eval { remove_scsi_device($slave) } if -b $slave;
+            eval { remove_scsi_device($slave) } if is_block_device($slave);
         }
     }
 
@@ -1558,6 +1563,14 @@ sub volume_resize {
 
     $class->_array_resize_volume($scfg, $storeid, $array_name, $size);
 
+    # Wait for the array to actually report the new size before touching the
+    # host side. A resize that is still running when the SCSI rescan happens
+    # leaves the kernel with the old capacity, and QEMU's block_resize then
+    # fails with "Cannot grow device files" on a volume that did in fact grow.
+    # Best effort: if the array never reports it, the rescan below is still
+    # worth doing.
+    $class->_await_volume_size($scfg, $array_name, $size);
+
     # Two different SCSI operations, and they are not interchangeable:
     #   host scan  (/sys/class/scsi_host/hostN/scan) finds NEW devices
     #   dev rescan (/sys/block/sdX/device/rescan)    re-reads an existing
@@ -1568,7 +1581,7 @@ sub volume_resize {
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = get_device_by_wwid($wwid);
-        if ($device && -b $device) {
+        if ($device && is_block_device($device)) {
             my $slaves = eval { get_multipath_slaves($device) } // [];
             eval { rescan_scsi_device($_) } for @$slaves;
             eval { multipath_resize_map($device) };
@@ -1577,6 +1590,36 @@ sub volume_resize {
     }
 
     return 1;
+}
+
+# Poll until the array reports at least $wanted bytes for $array_name.
+# Returns 1 if it did, 0 if the wait ran out. Never dies: the caller has
+# already asked for the resize and the host-side refresh is worth attempting
+# either way.
+sub _await_volume_size {
+    my ($class, $scfg, $array_name, $wanted, %opts) = @_;
+
+    my $timeout  = $opts{timeout} // RESIZE_SETTLE_TIMEOUT;
+    my $deadline = time() + $timeout;
+
+    while (1) {
+        my $vol = eval { $class->_array_get_volume($scfg, $array_name) };
+        my $size = ($vol && $vol->{size}) ? $vol->{size} : 0;
+
+        # Arrays round up to their own granularity, so the reported size can
+        # legitimately be larger than what was asked for; smaller means the
+        # resize has not landed.
+        return 1 if $size >= $wanted;
+
+        last if time() >= $deadline;
+        sleep(1);
+    }
+
+    warn "The array has not yet reported the new size for '$array_name' after"
+       . " ${timeout}s. Refreshing the host side anyway; if the guest still"
+       . " sees the old capacity, rescan once the array has caught up.\n";
+
+    return 0;
 }
 
 sub rename_volume {
@@ -1605,7 +1648,7 @@ sub activate_volume {
     if ($snapname) {
         my ($device) = $class->path($scfg, $volname, $storeid, $snapname);
         die "Could not activate snapshot '$snapname' of volume '$volname'\n"
-            unless $device && -b $device;
+            unless $device && is_block_device($device);
         return 1;
     }
 
@@ -1631,7 +1674,7 @@ sub activate_volume {
     # host-wide reconfigure churns maps other operations are trying to use.
     {
         my $existing = eval { get_device_by_wwid($wwid) };
-        if ($existing && -b $existing) {
+        if ($existing && is_block_device($existing)) {
             eval { $WWID_STATE->track_wwid($storeid, $wwid) };
             return 1;
         }
@@ -1722,7 +1765,7 @@ sub deactivate_volume {
 
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device) {
+        if ($device && is_block_device($device)) {
             eval { PVE::Tools::run_command(['/bin/sync'], timeout => 10) };
             eval { PVE::Tools::run_command(['/sbin/blockdev', '--flushbufs', $device],
                 timeout => 10) };
@@ -1762,7 +1805,7 @@ sub path {
 
     my $device = get_device_by_wwid($wwid);
 
-    if ((!$device || !-b $device) && $fresh) {
+    if ((!$device || !is_block_device($device)) && $fresh) {
         $class->_rescan_transport($scfg);
         my %wait = $class->_wait_opts($scfg);
         $device = wait_for_multipath_device($wwid, %wait);
@@ -1903,7 +1946,7 @@ sub _remove_temp_clone {
         warn "Device cleanup for the temporary clone '$name' failed: $@" if $@;
 
         for my $slave (@slaves) {
-            eval { remove_scsi_device($slave) } if -b $slave;
+            eval { remove_scsi_device($slave) } if is_block_device($slave);
         }
     }
 
@@ -2005,7 +2048,7 @@ sub volume_snapshot {
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device && !is_device_in_use($device)) {
+        if ($device && is_block_device($device) && !is_device_in_use($device)) {
             eval { PVE::Tools::run_command(['/bin/sync'], timeout => 10) };
             eval { PVE::Tools::run_command(['/sbin/blockdev', '--flushbufs', $device],
                 timeout => 10) };
@@ -2140,7 +2183,7 @@ sub volume_snapshot_rollback {
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device && is_device_in_use($device)) {
+        if ($device && is_block_device($device) && is_device_in_use($device)) {
             die "Cannot roll back volume '$volname': device $device is still in"
               . " use. Stop the VM first.\n";
         }
@@ -2151,7 +2194,7 @@ sub volume_snapshot_rollback {
 
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device) {
+        if ($device && is_block_device($device)) {
             # The snapshot may have a different size than the current volume,
             # and the kernel does not pick that up from a host scan.
             my $slaves = eval { get_multipath_slaves($device) } // [];
@@ -2246,7 +2289,7 @@ sub create_base {
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && -b $device && is_device_in_use($device)) {
+        if ($device && is_block_device($device) && is_device_in_use($device)) {
             die "Cannot convert volume '$volname' to a template: device $device"
               . " is still in use. Stop the VM first.\n";
         }

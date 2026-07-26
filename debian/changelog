@@ -1,3 +1,23 @@
+jt-pve-storage-dellemc (0.7.6~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Every -b test on a device path now goes through a bounded helper. A Perl
+    file test is a stat, and stat on a multipath device whose paths have all
+    failed while queueing is still on enters the same uninterruptible sleep
+    that hangs vgs. The helper also puts back any alarm the caller had
+    running, because nesting alarm() otherwise cancels the caller's own
+    timeout.
+  * volume_resize waits for the array to report the new size before
+    refreshing the host side. A rescan issued while the resize is still
+    running leaves the kernel with the old capacity, and QEMU then refuses to
+    grow a volume that did in fact grow.
+  * The removal script now names the storages that will stop working, read
+    straight from storage.cfg rather than by asking pvesm, which has to reach
+    every array to answer.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 06:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.5~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

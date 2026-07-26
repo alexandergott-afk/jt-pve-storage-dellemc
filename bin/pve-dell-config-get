@@ -21,6 +21,7 @@ use PVE::Storage::Custom::DellEMC::Common::FC qw(
 );
 use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     wait_for_multipath_device get_device_by_wwid cleanup_lun_devices
+    is_block_device
 );
 
 # Every snapshot taken by this plugin also writes the VM's configuration to a
@@ -32,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.5~beta1';
+my $VERSION = '0.7.6~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -437,11 +438,11 @@ my $ok = eval {
     info("Waiting for the device (WWID $wwid)");
     my $device = get_device_by_wwid($wwid);
     $device = wait_for_multipath_device($wwid, timeout => $opt{timeout})
-        unless $device && -b $device;
+        unless $device && is_block_device($device);
 
     die "The device for WWID $wwid did not appear within $opt{timeout}s.\n"
       . "  Check that this node can reach the array over $protocol, and that\n"
-      . "  multipathd is running.\n" unless $device && -b $device;
+      . "  multipathd is running.\n" unless $device && is_block_device($device);
 
     $mounted = File::Temp::tempdir('/tmp/pve-dell-config-XXXXXX');
 

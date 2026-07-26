@@ -1141,4 +1141,38 @@ SKIP: {
     is_deeply($blockers, ['b'], 'and is reported as the blocker');
 }
 
+# ---------------------------------------------------------------------------
+# A resize is not finished when the array says it accepted it
+#
+# Refreshing the host side before the array reports the new capacity leaves
+# the kernel with the old size, and QEMU then refuses to grow a volume that
+# did in fact grow.
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+
+    ok(Test::Plugin->_await_volume_size($scfg, $vol, 1024),
+        'a volume already at the requested size needs no waiting');
+    ok(Test::Plugin->_await_volume_size($scfg, $vol, 512),
+        'nor does one the array rounded up beyond the request');
+
+    # An array that never reports the new size must not hang the caller.
+    my $started = time();
+    my $result = Test::Plugin->_await_volume_size($scfg, $vol, 4096, timeout => 2);
+    my $elapsed = time() - $started;
+
+    is($result, 0, 'a resize that never lands is reported as not landed');
+    cmp_ok($elapsed, '<', 8, 'and the wait is bounded');
+
+    # A volume that vanished mid-resize must not spin either.
+    delete $Test::Plugin::VOLUMES{$vol};
+    is(Test::Plugin->_await_volume_size($scfg, $vol, 4096, timeout => 1), 0,
+        'a volume that is no longer there ends the wait');
+}
+
 done_testing();

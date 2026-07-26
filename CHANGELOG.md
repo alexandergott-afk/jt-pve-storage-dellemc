@@ -7,6 +7,27 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.6~beta1] - 2026-07-27
+
+### Fixed
+- **A file test on a device path can block.** `-b` is a stat, and on a
+  multipath device whose paths have all failed while queueing is still on,
+  that stat lands in the same uninterruptible sleep that hangs `vgs`. Every
+  such test now goes through `Multipath::is_block_device`, which bounds it —
+  and restores any alarm the caller had running, since nesting `alarm()`
+  without that silently cancels the caller's own timeout, which is worse than
+  the hang it guards against.
+- **`volume_resize` waits for the array to report the new size** before
+  touching the host side. A per-device rescan issued while the resize is
+  still running leaves the kernel with the old capacity, and QEMU's
+  `block_resize` then fails with "Cannot grow device files" on a volume that
+  grew. The wait is bounded and the host-side refresh happens either way.
+
+### Changed
+- The package removal script names the storages that will stop working, read
+  directly from `storage.cfg`. Asking `pvesm` would mean reaching every array
+  to answer, and a removal that hangs leaves dpkg half-configured.
+
 ## [0.7.5~beta1] - 2026-07-27
 
 Testing under conditions an array is actually found in.

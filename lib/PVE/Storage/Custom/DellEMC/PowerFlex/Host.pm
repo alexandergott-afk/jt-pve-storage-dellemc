@@ -462,7 +462,9 @@ sub nvme_device_for_volume {
     my $needle = lc($volume_id);
     $needle =~ s/^0x//;
 
-    # glob and stat together under one alarm; see sdc_device_for_volume.
+    # glob and stat together under one alarm; see sdc_device_for_volume. The
+    # -b below is a stat that can block on a dead device, which is why it is
+    # inside the alarm rather than after it.
     my $found;
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };

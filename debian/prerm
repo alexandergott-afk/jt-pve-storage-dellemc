@@ -2,10 +2,43 @@
 set -e
 
 case "$1" in
-    remove|upgrade|deconfigure)
+    remove|deconfigure)
         echo "Removing Dell EMC Storage Plugins..."
-        echo "NOTE: storage definitions stay in /etc/pve/storage.cfg and volumes"
-        echo "      stay on the array. Remove them manually if no longer needed."
+
+        # Read storage.cfg directly rather than asking pvesm. pvesm has to
+        # reach every storage to answer, and a package removal that hangs
+        # because an unrelated array is slow leaves dpkg half-configured.
+        # This is a file read; it cannot block.
+        configured=""
+        if [ -r /etc/pve/storage.cfg ]; then
+            configured=$(sed -n 's/^dell\(powerstore\|powervault\|powerflex\): *\([^ ]*\)/  \2 (dell\1)/p' \
+                /etc/pve/storage.cfg 2>/dev/null || true)
+        fi
+
+        if [ -n "$configured" ]; then
+            echo ""
+            echo "=============================================================================="
+            echo " STORAGES STILL CONFIGURED"
+            echo "=============================================================================="
+            echo " Removing this package leaves these storages without a plugin. PVE will"
+            echo " report 'Parameter verification failed' or 'No such storage' for them, and"
+            echo " guests with disks on them will not start:"
+            echo ""
+            echo "$configured"
+            echo ""
+            echo " Volumes on the array and the entries in /etc/pve/storage.cfg are both left"
+            echo " alone. To remove a storage first:"
+            echo "     pvesm set <storage> --disable 1"
+            echo "     pvesm remove <storage>"
+            echo "=============================================================================="
+            echo ""
+        else
+            echo "NOTE: storage definitions stay in /etc/pve/storage.cfg and volumes"
+            echo "      stay on the array. Remove them manually if no longer needed."
+        fi
+        ;;
+    upgrade)
+        # Nothing to say on an upgrade: postinst prints what matters.
         ;;
     failed-upgrade)
         ;;

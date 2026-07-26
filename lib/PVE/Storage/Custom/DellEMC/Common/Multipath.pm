@@ -36,6 +36,7 @@ our @EXPORT_OK = qw(
     list_vendor_multipath_devices
     list_vendor_scsi_paths
     cleanup_lun_devices
+    is_block_device
     is_device_in_use
     get_device_usage_details
     describe_wwid_state
@@ -152,6 +153,49 @@ sub _resolve_block_device_name {
     }
 
     return _untaint_device_name(basename($device));
+}
+
+# ---------------------------------------------------------------------------
+# Bounded file tests
+# ---------------------------------------------------------------------------
+
+# -b, bounded.
+#
+# A Perl file test is a stat(2), and stat on a path under /dev is not free:
+# for a symlink it resolves the target first, and on a multipath device whose
+# paths have all failed while queueing is still on, that lands in the same
+# uninterruptible sleep that hangs vgs. Every device path this plugin touches
+# is exactly that kind of path, so none of them may be tested unguarded.
+#
+# An outer alarm is preserved: alarm(0) returns what was left of it, and that
+# is put back afterwards. Nesting alarms without doing this silently cancels
+# the caller's own timeout, which is worse than the problem being solved.
+sub is_block_device {
+    my ($path, %opts) = @_;
+
+    return 0 unless defined $path && length $path;
+
+    my $timeout   = $opts{timeout} // 3;
+    my $remaining = alarm(0);
+
+    my $result = 0;
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm($timeout);
+        $result = (-b $path) ? 1 : 0;
+        alarm(0);
+    };
+    alarm(0);
+
+    if ($@) {
+        warn "stat of $path did not return within ${timeout}s; treating it as"
+           . " unusable\n";
+        $result = 0;
+    }
+
+    alarm($remaining) if $remaining;
+
+    return $result;
 }
 
 # ---------------------------------------------------------------------------
@@ -405,7 +449,7 @@ sub remove_scsi_device {
     croak "Cannot find delete file for device $device" unless -w $delete_file;
 
     eval { _run_cmd([SYNC], timeout => 10, allow_nonzero => 1, ignore_errors => 1) };
-    if ($safe_device && -b $safe_device) {
+    if ($safe_device && is_block_device($safe_device)) {
         eval { _run_cmd([BLOCKDEV, '--flushbufs', $safe_device],
             timeout => 10, allow_nonzero => 1, ignore_errors => 1) };
     }
@@ -606,7 +650,7 @@ sub get_device_by_wwid {
     croak "wwid is required" unless $wwid;
 
     my $mpath = get_multipath_device($wwid);
-    return $mpath if $mpath && -b $mpath;
+    return $mpath if $mpath && is_block_device($mpath);
 
     # Fall back to udev's by-id links: the map may exist without multipathd
     # answering, or the LUN may have a single path.
@@ -626,7 +670,7 @@ sub get_device_by_wwid {
         push @devices, glob("/dev/disk/by-id/scsi-*$safe_wwid*");
 
         for my $device (@devices) {
-            next unless -b $device;
+            next unless is_block_device($device);
             $found = $device;
             last;
         }
@@ -661,7 +705,7 @@ sub wait_for_multipath_device {
 
     my $probe = sub {
         my $device = get_device_by_wwid($wwid);
-        return ($device && -b $device) ? $device : undef;
+        return ($device && is_block_device($device)) ? $device : undef;
     };
 
     # It may already be here; that costs one multipathd query to find out.
@@ -941,7 +985,7 @@ sub cleanup_lun_devices {
 
     my $mpath = get_multipath_device($wwid);
 
-    if ($mpath && -b $mpath) {
+    if ($mpath && is_block_device($mpath)) {
         my $slaves     = get_multipath_slaves($mpath);
         my $safe_name  = _untaint_device_name(basename($mpath));
         my $safe_mpath = _untaint_device_path($mpath);
@@ -1039,7 +1083,7 @@ sub _dm_name_of {
 sub is_device_in_use {
     my ($device, %opts) = @_;
 
-    return 0 unless $device && -b $device;
+    return 0 unless $device && is_block_device($device);
 
     my $dev_name = _resolve_block_device_name($device);
     return 0 unless $dev_name;
@@ -1110,7 +1154,7 @@ sub get_device_usage_details {
     my ($device) = @_;
 
     return "device not specified" unless $device;
-    return "device $device does not exist" unless -b $device;
+    return "device $device does not exist" unless is_block_device($device);
 
     my $dev_name = _resolve_block_device_name($device);
     return "cannot resolve device $device to a kernel name" unless $dev_name;
@@ -1283,8 +1327,8 @@ sub describe_wwid_state {
         if ($match) {
             my $node = "/dev/mapper/$match->{name}";
             push @out, "  map for this WWID: $match->{name} -> $node"
-                . ((-b $node) ? " (block device present)"
-                              : " (NODE MISSING - udev did not create it)");
+                . (is_block_device($node) ? " (block device present)"
+                                          : " (NODE MISSING - udev did not create it)");
         } else {
             push @out, "  map for this WWID: NONE - multipathd has not built a map"
                 . " for $wwid";
