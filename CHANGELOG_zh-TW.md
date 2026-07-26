@@ -5,6 +5,11 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.20~beta1] - 2026-07-27
+
+### 修正
+- **套件沒有相依 LWP 的 HTTPS 驅動。** `libwww-perl` 只有在裝了 `liblwp-protocol-https-perl` 之後才會說 HTTPS —— 在 Debian 上那是獨立的一個套件 —— 而它之所以在每台 PVE 節點上都存在，只是因為 `pve-manager` 剛好相依它。這件事沒有任何保證。少了它，對陣列的每一個請求都會以 `501 Protocol scheme https is not supported` 失敗，而那句話完全沒說要裝什麼。現在它是明確宣告的相依套件，REST 客戶端也會檢查並指名該裝哪一個。
+
 ## [0.7.19~beta1] - 2026-07-27
 
 ### 修正

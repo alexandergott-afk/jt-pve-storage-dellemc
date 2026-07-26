@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.7.20~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The package now depends on liblwp-protocol-https-perl. LWP speaks HTTPS
+    only when that driver is installed, and on Debian it is a package of its
+    own; it was present on every PVE node only because pve-manager happens to
+    depend on it. Without it every request to an array fails with '501
+    Protocol scheme https is not supported', which says nothing about what to
+    install. The client also checks for it and says which package is missing.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 20:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.19~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

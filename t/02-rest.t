@@ -382,4 +382,44 @@ like($@, qr/password is required/, 'password is mandatory');
     is($base->_logout, undef, 'logout defaults to a no-op');
 }
 
+# ---------------------------------------------------------------------------
+# HTTPS needs a protocol driver LWP does not ship with
+#
+# On Debian it is a package of its own. Without it every request to an array
+# fails with '501 Protocol scheme https is not supported', which says nothing
+# about what to install.
+# ---------------------------------------------------------------------------
+
+{
+    ok(LWP::Protocol::implementor('https'),
+        'this machine has the https driver, so the client can be built');
+
+    my $api = eval {
+        PVE::Storage::Custom::DellEMC::Common::REST->new(portal => '10.0.0.1', username => 'u', password => 'p',
+            type => 'dellemc', storeid => 'ps1');
+    };
+    ok($api, 'an https client is constructed');
+
+    # Pretend it is missing and check the message names the package.
+    {
+        no warnings 'redefine';
+        my $real = \&LWP::Protocol::implementor;
+        local *LWP::Protocol::implementor = sub {
+            return undef if ($_[0] // '') eq 'https';
+            return $real->(@_);
+        };
+
+        my $ok = eval {
+            PVE::Storage::Custom::DellEMC::Common::REST->new(portal => '10.0.0.1', username => 'u', password => 'p',
+                type => 'dellemc', storeid => 'ps1');
+            1;
+        };
+
+        ok(!$ok, 'without the driver the client refuses to be built');
+        like($@, qr/liblwp-protocol-https-perl/,
+            '... naming the package to install');
+        like($@, qr/ps1/, '... and the storage it belongs to');
+    }
+}
+
 done_testing();

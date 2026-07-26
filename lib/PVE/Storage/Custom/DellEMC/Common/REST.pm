@@ -102,6 +102,18 @@ sub new {
 sub _init_ua {
     my ($self) = @_;
 
+    # LWP speaks HTTPS only when the protocol driver is installed, and on
+    # Debian that is a package of its own. Without it every request to an
+    # array fails with '501 Protocol scheme https is not supported', which
+    # says nothing about what to install. It is a dependency of this package
+    # and of pve-manager, so this should never fire — but a confusing failure
+    # against a storage array is expensive enough to be worth one check.
+    if ($self->{scheme} eq 'https' && !LWP::Protocol::implementor('https')) {
+        die $self->_msg("this node cannot make HTTPS requests: LWP has no"
+            . " https protocol driver. Install liblwp-protocol-https-perl.")
+            . "\n";
+    }
+
     # keep_alive reuses one TCP+TLS connection across calls. Every management
     # gateway pays a handshake per new connection, and under steady pvestatd
     # polling from every node that load is what tips a busy array into slow

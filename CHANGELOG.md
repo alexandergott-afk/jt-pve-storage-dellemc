@@ -7,6 +7,17 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.20~beta1] - 2026-07-27
+
+### Fixed
+- **The package did not depend on LWP's HTTPS driver.** `libwww-perl` speaks
+  HTTPS only when `liblwp-protocol-https-perl` is installed — on Debian it is
+  a package of its own — and it was present on every PVE node only because
+  `pve-manager` happens to depend on it. Nothing guaranteed that. Without it
+  every request to an array fails with `501 Protocol scheme https is not
+  supported`, which says nothing about what to install. It is now a declared
+  dependency, and the REST client checks for it and names the package.
+
 ## [0.7.19~beta1] - 2026-07-27
 
 ### Fixed
