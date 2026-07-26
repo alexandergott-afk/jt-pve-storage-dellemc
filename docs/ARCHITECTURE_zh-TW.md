@@ -19,7 +19,7 @@ PowerScale 與 Unity XT 未排入。PowerScale 是 NAS，而 Proxmox VE 內建�
 
 - **`plugindata()` 是 class method。** PVE 會在解析任何 `storage.cfg` 參數**之前**呼叫它，取得支援的 content type 與磁碟格式。PowerStore 是 block 儲存、只能放 `raw`；像 PowerScale 這類 NAS 則可以放 `qcow2`、`subvol`、ISO 與備份。沒有任何一組回傳值能同時描述兩者；PowerFlex 也一樣，它的 volume 是透過 kernel module 呈現，而不是經由 SAN 登入。
 - **schema 無法表達「在某條件下才必填」。** PVE 的 JSON schema 只有 `optional`，沒有別的。單一 type 會被迫宣告所有系列參數的聯集，錯誤的組合只會在執行期、在陣列上、在操作進行到一半時才失敗。
-- **type 字串是永久契約。** 日後修改會讓所有既有的 `storage.cfg` 失效。
+- **type 字串一旦公開就不能再改。** 日後修改會讓所有既有的 `storage.cfg` 失效。
 
 type 一律在 `pvesm add` 時明確指定，絕不向陣列探測。`storage.cfg` 會被 pvestatd、pvedaemon、pveproxy、`qm`、`pct` 反覆解析，其中也包含陣列不可達的時候；一旦解析結果取決於一次 REST 呼叫，整台節點的儲存清單都會跟著失效。
 
@@ -46,7 +46,7 @@ DellEMC::Common::BlockBase       所有與陣列無關的邏輯：
 
 `PowerStore::API` 繼承 `Common::REST`，補上 PowerStore 的認證方式與端點；`PowerStore::Naming` 繼承 `Common::Naming`，補上 PowerStore 的名稱限制。
 
-## BlockBase 的契約
+## BlockBase 要求實作的方法
 
 block 系列只需要實作以下方法，其餘全部繼承。每個未實作的方法都會以「哪個類別沒有實作它」的訊息中止，`t/08` 也會檢查沒有任何一個仍停留在抽象狀態。
 
