@@ -201,6 +201,9 @@ the rest:
 | Operators | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
 | `ilike` wildcard | every example in the guide spells it `*` (`?name=ilike.User*`), which is what this plugin sends |
 | Parameters | `select` (comma-separated attributes), `order`, `async` |
+| Pagination | `limit` (1–2000, default 100) and `offset` URL parameters, or a `Range` request header |
+| Partial results | a collection larger than the limit answers `206 Partial Content` with `Content-Range: 0-99/1000` — the figure after the slash is the total |
+| Offset past the end | `416 Range Not Satisfiable`, which paging can reach legitimately if the collection shrinks between pages, so it ends the paging instead of failing |
 
 A wildcard the array reads differently would match nothing and make every
 volume vanish from PVE while the array still holds them, so a name-prefix
@@ -218,6 +221,7 @@ The field names below are still **unverified**. So are the endpoints.
 | `physical_total`, `physical_used`, `total_physical`, `total_used` | capacity |
 | `host_id`, `logical_unit_number` | mappings |
 | `address`, `target_iqn`, `appliance_id` | iSCSI portals |
+| `purposes` | which addresses publish an iSCSI target — a list, but accepted as a bare string too |
 | `host_group_id`, `volume_id` | mapping rows |
 | `messages[].message_l10n`, `messages[].code` | the array's own error text |
 

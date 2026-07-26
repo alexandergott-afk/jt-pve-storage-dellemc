@@ -169,6 +169,9 @@ help create host
 | 運算子 | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
 | `ilike` 萬用字元 | 指南裡每一個範例都寫成 `*`（`?name=ilike.User*`），本外掛送出的也是這一種 |
 | 參數 | `select`（以逗號分隔的屬性）、`order`、`async` |
+| 分頁 | URL 參數 `limit`（1～2000，預設 100）與 `offset`，或用 `Range` 請求標頭 |
+| 部分結果 | 集合超過 limit 時回應 `206 Partial Content`，並帶 `Content-Range: 0-99/1000` —— 斜線之後的數字是總筆數 |
+| offset 超過結尾 | `416 Range Not Satisfiable`。分頁過程中若集合在兩頁之間變短，是有可能正常遇到的，因此它會結束分頁而不是失敗 |
 
 如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前綴列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
 
@@ -183,6 +186,7 @@ help create host
 | `physical_total`、`physical_used`、`total_physical`、`total_used` | 容量 |
 | `host_id`、`logical_unit_number` | 對應 |
 | `address`、`target_iqn`、`appliance_id` | iSCSI portal |
+| `purposes` | 哪些位址對外提供 iSCSI target —— 是一個清單，但單一字串也一併接受 |
 | `host_group_id`、`volume_id` | 對應資料列 |
 | `messages[].message_l10n`、`messages[].code` | 陣列自己的錯誤文字 |
 

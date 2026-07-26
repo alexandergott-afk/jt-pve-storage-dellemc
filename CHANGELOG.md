@@ -7,6 +7,32 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.25~beta1] - 2026-07-27
+
+### Fixed
+- **A volume deleted on another node during a listing would have failed the
+  listing.** The total number of rows comes from the first page, so paging can
+  legitimately ask for an offset past the end of a collection that shrank
+  underneath it. Dell documents that as `416 Range Not Satisfiable`, and the
+  client treated it as it treats any other 4xx: fatal. Paging now ends there
+  and keeps the pages already read.
+- **The iSCSI portal lookup no longer rests on an unverified filter
+  operator.** It asked for addresses with `purposes=cs.{Storage_Iscsi_Target}`;
+  `cs` and its brace literal have never been seen answered by a real
+  appliance. An operator the array rejects or reads differently returns
+  nothing, which here means no portals, no iSCSI login, and no devices —
+  without anything in the logs saying why. When the filtered query finds
+  nothing, every address is now fetched and the purpose matched locally, with
+  one warning naming the cause.
+
+### Added
+- `allow_status` in the REST layer: a caller that knows what a particular
+  refusal means can act on the status code itself, rather than on the wording
+  of the message the array wrote.
+- `docs/TESTING.md` records the pagination rules read from the developers
+  guide — `limit` 1 to 2000 (100 by default), `offset`, the `Range` header,
+  `206` with `Content-Range`, and `416` for an offset past the end.
+
 ## [0.7.24~beta1] - 2026-07-27
 
 ### Fixed

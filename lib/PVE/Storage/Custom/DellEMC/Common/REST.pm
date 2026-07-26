@@ -361,6 +361,13 @@ sub _retry_after {
 #   no_auth   skip session handling (used by _login itself)
 #   raw       return the HTTP::Response instead of decoded JSON
 #   headers   extra headers as a hashref
+#   allow_status  arrayref of status codes to hand back to the caller instead
+#             of dying on. Only meaningful together with raw, because the
+#             body of a rejected request is not what the caller expects to
+#             decode. This exists so a caller who knows what a particular
+#             refusal means can act on the code itself rather than reading
+#             the message the array wrote - a message that is free to change
+#             wording, and in some locales already has.
 sub _request {
     my ($self, $method, $endpoint, $data, %opts) = @_;
 
@@ -415,6 +422,13 @@ sub _request {
         }
 
         my $code = $resp->code;
+
+        if ($opts{raw} && $opts{allow_status}
+            && grep { $_ == $code } @{ $opts{allow_status} }) {
+            $restore->();
+            return $resp;
+        }
+
         my $body = $resp->decoded_content // '';
         my $parsed = eval { decode_json($body) };
 

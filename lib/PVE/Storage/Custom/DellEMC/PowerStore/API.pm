@@ -36,9 +36,10 @@ use constant {
     # PowerStore requires volume sizes to be a multiple of 8 KiB.
     SIZE_GRANULARITY => 8192,
 
-    # PowerStore caps a single collection response; anything larger has to be
-    # paged. The array answers 206 with a Content-Range header, but paging on
-    # a short page is simpler and works on both.
+    # The developers guide documents the pagination limit as 1 to 2000, 100
+    # by default, and answers 206 Partial Content with a Content-Range header
+    # when the collection is larger. 200 keeps a poll's response small while
+    # still costing one round trip for any storage of a realistic size.
     PAGE_SIZE => 200,
 
     # Guard against an endless paging loop if the array keeps returning full
@@ -199,7 +200,16 @@ sub _collection {
     for my $page (1 .. MAX_PAGES) {
         my %query = (%{ $params // {} }, limit => PAGE_SIZE, offset => $offset);
 
-        my $resp = $self->get($endpoint, \%query, %opts, raw => 1);
+        my $resp = $self->get($endpoint, \%query, %opts,
+            raw => 1, allow_status => [416]);
+
+        # 416 Range Not Satisfiable is what the array answers for an offset
+        # past the end of the collection. Reaching one is not an error here:
+        # it means the collection shrank while it was being paged, which is
+        # what a volume deleted on another node during a listing looks like.
+        # Dying on it would turn an ordinary concurrent delete into a storage
+        # that reports itself broken.
+        last if $resp->code == 416;
 
         my $body  = $resp->decoded_content // '';
         my $batch = length($body) ? eval { decode_json($body) } : [];
@@ -214,8 +224,10 @@ sub _collection {
         # An empty page always ends it, whatever the headers say.
         last unless @$batch;
 
-        # 'Content-Range: items 0-99/1234' — the figure after the slash is how
-        # many rows match in total. '*' means the array will not say.
+        # 'Content-Range: 0-99/1000' — the figure after the slash is how many
+        # rows match in total. '*' means the array will not say. Some
+        # implementations prefix the unit ('items 0-99/1000'), which is why
+        # only the tail is matched.
         if (my $range = $resp->header('Content-Range')) {
             my ($reported) = $range =~ m{/\s*(\d+)\s*$};
             $total = $reported if defined $reported;
@@ -748,11 +760,32 @@ sub volume_detach {
 sub iscsi_portals {
     my ($self, %opts) = @_;
 
+    my $select = 'id,address,appliance_id,purposes';
+
+    # 'cs' is the contains operator for a list attribute, and the braces are
+    # the array literal it takes. Neither has been seen answered by a real
+    # appliance, and an operator the array rejects or reads differently gives
+    # an empty result — which here means no portals, so no iSCSI login, so no
+    # devices at all. The filter stays, because asking for every address on
+    # the array is wasteful; but it is not what decides the answer.
     my $addresses = eval {
         $self->_collection('/ip_pool_address',
-            { purposes => 'cs.{Storage_Iscsi_Target}',
-              select   => 'id,address,appliance_id,purposes' }, %opts);
+            { purposes => 'cs.{Storage_Iscsi_Target}', select => $select },
+            %opts);
     } // [];
+
+    unless (@$addresses) {
+        my $all = eval {
+            $self->_collection('/ip_pool_address', { select => $select }, %opts);
+        } // [];
+
+        $addresses = [ grep { _has_iscsi_purpose($_) } @$all ];
+
+        $self->log_warn("the array returned no iSCSI target address for the"
+            . " 'cs' filter, but " . scalar(@$addresses) . " of its addresses"
+            . " carry the Storage_Iscsi_Target purpose. Using those. Please"
+            . " report it.") if @$addresses;
+    }
 
     return [] unless @$addresses;
 
@@ -779,6 +812,17 @@ sub iscsi_portals {
     }
 
     return \@portals;
+}
+
+# 'purposes' is a list. Whether it arrives as an arrayref or as one string
+# depends on the appliance, so accept either rather than pick one.
+sub _has_iscsi_purpose {
+    my ($row) = @_;
+
+    my $purposes = $row->{purposes} // return 0;
+    my @values = ref($purposes) eq 'ARRAY' ? @$purposes : ($purposes);
+
+    return (grep { defined && /Storage_Iscsi_Target/i } @values) ? 1 : 0;
 }
 
 # Target WWPNs, for checking that zoning reaches this array at all.

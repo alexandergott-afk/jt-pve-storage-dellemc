@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.24~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.25~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.25~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Two more PowerStore paths that rested on unverified request syntax: a volume deleted mid-listing would have failed the listing, and the iSCSI portal lookup would have found nothing at all if the array read one filter operator differently. Neither depends on the answer now.</span>
+            <span class="lang-zh">另外兩處 PowerStore 路徑原本建立在未驗證的請求語法上：列舉期間有 volume 被刪除會讓整個列舉失敗，而陣列若對某個過濾運算子解讀不同，iSCSI portal 就會完全查不到。現在兩者都不再取決於那個答案。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.24~beta1</div>

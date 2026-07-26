@@ -277,6 +277,41 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 }
 
 {
+    # Dell documents an offset past the end of a collection as 416 Range Not
+    # Satisfiable. Paging can reach one legitimately: the total comes from the
+    # first page, and a volume deleted on another node between pages makes the
+    # collection shorter than that total. Dying there would turn an ordinary
+    # concurrent delete into a storage that reports itself broken.
+    my $page = [ map { { id => "v$_", name => "pve-ps1-1$_-disk0" } } (1 .. 200) ];
+    my $calls = 0;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+        return json_response(206, $page, 'Content-Range' => '0-199/400')
+            if $calls++ == 0;
+        return HTTP::Response->new(416, undef,
+            HTTP::Headers->new('Content-Type' => 'application/json'),
+            '{"messages":[{"code":"0xE0101001","message_l10n":"bad range"}]}');
+    });
+
+    my $volumes = eval { $api->volume_list() };
+    ok($volumes, 'a 416 while paging is not fatal')
+        or diag("died with: $@");
+    is(scalar @$volumes, 200, 'and the pages already read are kept');
+}
+
+{
+    # A 416 that is not part of paging must still be an error.
+    my ($api) = make_api(handler => sub {
+        return HTTP::Response->new(416, undef,
+            HTTP::Headers->new('Content-Type' => 'application/json'), '{}');
+    });
+
+    ok(!eval { $api->volume_get('vol-1'); 1 },
+        'a 416 on an ordinary request still fails');
+}
+
+{
     # An array that reads the wildcard as an ordinary character. The filtered
     # query matches nothing, which is indistinguishable from "this storage is
     # empty" — so the client must look again without the filter rather than
@@ -674,6 +709,59 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
     # An array with no iSCSI configured must yield an empty list, not a crash.
     my ($api) = make_api(handler => sub { json_response(200, []) });
     is_deeply($api->iscsi_portals(), [], 'no addresses, no portals');
+}
+
+{
+    # 'cs' and its brace-literal argument have never been seen answered by a
+    # real appliance. An operator the array rejects or reads differently
+    # returns nothing, which here means no portals, no iSCSI login and no
+    # devices at all — so the filter must not be what decides the answer.
+    my @warned;
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+
+        if ($key eq 'GET /api/rest/ip_pool_address') {
+            my %q = URI->new($req->uri)->query_form;
+            return json_response(200, []) if defined $q{purposes};
+            return json_response(200, [
+                { id => 'a1', address => '10.10.10.11', appliance_id => 'A1',
+                  purposes => ['Storage_Iscsi_Target'] },
+                { id => 'a2', address => '10.10.10.99', appliance_id => 'A1',
+                  purposes => ['Management'] },
+                { id => 'a3', address => '10.10.10.12', appliance_id => 'A1',
+                  purposes => 'Storage_Iscsi_Target' },   # a bare string
+            ]);
+        }
+        return json_response(200, [
+            { id => 'p1', target_iqn => 'iqn.2015-10.com.dell:x', appliance_id => 'A1' },
+        ]) if $key eq 'GET /api/rest/ip_port';
+
+        return json_response(200, []);
+    });
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::DellEMC::PowerStore::API::log_warn =
+        sub { push @warned, $_[1] };
+
+    my $portals = $api->iscsi_portals();
+    is_deeply([map { $_->{portal} } @$portals],
+        ['10.10.10.11:3260', '10.10.10.12:3260'],
+        'the iSCSI target addresses are found without the filter');
+    like($warned[0] // '', qr/Storage_Iscsi_Target/,
+        'and it says the filter is what failed');
+}
+
+{
+    # The fallback must not turn a management address into a portal.
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, [
+            { id => 'a2', address => '10.10.10.99', purposes => ['Management'] },
+        ]) if $key eq 'GET /api/rest/ip_pool_address';
+        return json_response(200, []);
+    });
+
+    is_deeply($api->iscsi_portals(), [],
+        'an address with no iSCSI purpose is not a portal');
 }
 
 # ---------------------------------------------------------------------------
