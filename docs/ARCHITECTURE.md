@@ -12,7 +12,7 @@ so each family gets its own and they share the host-side layer.
 | 1 | PowerStore | `dellpowerstore` | iSCSI / FC, dm-multipath | `Common::BlockBase` |
 | 2 | PowerVault ME5 | `dellpowervault` | iSCSI / FC / SAS, dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module, `/dev/scini*` | its own |
-| 4 | PowerMax | `dellpowermax` | FC / iSCSI, dm-multipath | `Common::BlockBase` |
+| 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath), NVMe/FC and NVMe/TCP | `Common::BlockBase` plus an NVMe path |
 
 PowerScale and Unity XT are not scheduled. PowerScale is NAS, and Proxmox
 VE's built-in NFS storage already covers most of what a dedicated plugin
@@ -111,6 +111,23 @@ the node stops working.
 The shared `dell-*` options are therefore declared by whichever family class
 PVE asks first, and the others declare only their own. Adding a family
 requires no change to this mechanism, and `t/06` covers it.
+
+### A note on PowerMax, before it is built
+
+PowerMax 2500/8500 on PowerMaxOS 10 speaks **four** host protocols, not two:
+FC and iSCSI over SCSI, plus NVMe/FC and NVMe/TCP. The SCSI pair fits
+`BlockBase` and dm-multipath as PowerStore and PowerVault do; the NVMe pair
+does not — those paths are NVMe namespaces with ANA multipathing, which is
+what `PowerFlex::Host` already implements.
+
+The consequence is that when PowerMax is built, the NVMe primitives
+(connect, host NQN, path enumeration, the ctrl-loss-tmo policy) should move
+out of `PowerFlex::Host` into a shared module, and `BlockBase` should be able
+to take its device layer as a parameter rather than assuming dm-multipath.
+That refactor is deliberately not being done in advance: PowerFlex is the
+only NVMe consumer today, and a second one is what will show where the seam
+actually belongs.
+
 
 ## Adding a family
 

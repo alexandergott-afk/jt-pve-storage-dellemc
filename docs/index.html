@@ -265,7 +265,7 @@
                 <tr>
                     <td>PowerMax</td>
                     <td><code>dellpowermax</code></td>
-                    <td>FC / iSCSI (dm-multipath)</td>
+                    <td>FC / iSCSI, NVMe/FC, NVMe/TCP</td>
                     <td><span class="lang-en">Planned</span><span class="lang-zh">規劃中</span></td>
                 </tr>
                 <tr>
@@ -460,9 +460,17 @@
         <div class="step__number">1</div>
         <div class="step__content">
             <div class="step__title">
-                <span class="lang-en">Build the package</span>
-                <span class="lang-zh">建置套件</span>
+                <span class="lang-en">Get the package</span>
+                <span class="lang-zh">取得套件</span>
             </div>
+            <p>
+                <span class="lang-en">A prebuilt <code>.deb</code> is attached to every
+                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>,
+                    with a <code>SHA256SUMS</code> file beside it. Or build one from source:</span>
+                <span class="lang-zh">每個
+                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
+                    都附有預先建置的 <code>.deb</code> 與 <code>SHA256SUMS</code>。也可以自行從原始碼建置：</span>
+            </p>
             <pre><span class="cmd">git</span> clone https://github.com/jasoncheng7115/jt-pve-storage-dellemc.git
 <span class="cmd">cd</span> jt-pve-storage-dellemc
 <span class="cmd">make</span> test    <span class="comment"># syntax checks, unit tests, safety guard</span>

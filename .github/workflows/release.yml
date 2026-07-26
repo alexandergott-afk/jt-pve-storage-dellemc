@@ -1,0 +1,125 @@
+name: Release
+
+# Publishes a downloadable .deb whenever a version tag is pushed, so an
+# operator does not have to clone the repository and build one.
+#
+#   git tag -a v0.7.0-beta1 -m 'Release 0.7.0~beta1'
+#   git push origin v0.7.0-beta1
+#
+# The tag drives the release; debian/changelog drives the package version.
+# The two are checked against each other below, because a release whose file
+# name disagrees with its contents is worse than no release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish .deb
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential debhelper fakeroot
+
+      - name: Run checks
+        run: |
+          make check-multipath-flush
+          make syntax
+          make unit
+
+      - name: Read the package version
+        id: version
+        run: |
+          version=$(dpkg-parsechangelog --show-field Version)
+          echo "deb=$version" >> "$GITHUB_OUTPUT"
+          echo "Package version: $version"
+
+      - name: Check the tag against debian/changelog
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          deb="${{ steps.version.outputs.deb }}"
+          # The tag uses '-beta1' where a Debian version uses '~beta1'.
+          normalised="${deb//\~/-}"
+          normalised="${normalised%-1}"
+          if [ "$tag" != "$normalised" ]; then
+            echo "Tag '$tag' does not match debian/changelog version '$deb'."
+            echo "Update debian/changelog or retag before releasing."
+            exit 1
+          fi
+
+      - name: Build the Debian package
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect artefacts
+        run: |
+          mkdir -p artifacts
+          cp ../jt-pve-storage-dellemc_*_all.deb artifacts/
+          cd artifacts
+          sha256sum *.deb > SHA256SUMS
+          ls -la
+
+      - name: Upload build artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jt-pve-storage-dellemc-deb
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.deb
+            artifacts/SHA256SUMS
+          # Every 0.x release is a beta: nothing has been verified against
+          # physical hardware yet.
+          prerelease: ${{ contains(steps.version.outputs.deb, 'beta') }}
+          generate_release_notes: true
+          body: |
+            ## ⚠️ Beta software — read before installing
+
+            This release has **never been run against a physical Dell EMC
+            array**. Every array-facing behaviour is unverified: REST
+            endpoints and field names, the SCSI vendor and product strings
+            that decide which devices the plugin touches, the WWN to WWID
+            conversion, and the Fibre Channel path.
+
+            A storage plugin runs as root, creates and deletes volumes on the
+            array, and manipulates block devices on every node. A defect can
+            destroy virtual machine data, take a storage offline, or leave a
+            node in a state that only a reboot clears. Use a non-production
+            cluster and a non-production array, and keep independent backups.
+
+            See the [disclaimer](https://github.com/jasoncheng7115/jt-pve-storage-dellemc#disclaimer-and-risk)
+            and [what has and has not been verified](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md).
+
+            ## Install
+
+            On **every** node of the cluster:
+
+            ```bash
+            apt install ./jt-pve-storage-dellemc_*_all.deb
+            ```
+
+            Use `apt install ./file.deb` rather than `dpkg -i`: dpkg does not
+            install dependencies, and the missing binaries only surface much
+            later as failures inside the plugin.
+
+            After an upgrade, run `systemctl restart pvestatd` on every node.
+
+            Verify the download against `SHA256SUMS`.

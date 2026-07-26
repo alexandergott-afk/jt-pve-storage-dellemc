@@ -11,7 +11,7 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 | 1 | PowerStore | `dellpowerstore` | iSCSI／FC、dm-multipath | `Common::BlockBase` |
 | 2 | PowerVault ME5 | `dellpowervault` | iSCSI／FC／SAS、dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module、`/dev/scini*` | 自有 |
-| 4 | PowerMax | `dellpowermax` | FC／iSCSI、dm-multipath | `Common::BlockBase` |
+| 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath）、NVMe/FC 與 NVMe/TCP | `Common::BlockBase` 加上 NVMe 路徑 |
 
 PowerScale 與 Unity XT 未排入。PowerScale 是 NAS，而 Proxmox VE 內建的 NFS 儲存已經涵蓋專用外掛能提供的大部分功能。
 
@@ -81,6 +81,13 @@ _array_get_portals      iSCSI portal，格式為 [{ portal, iqn }]
 PVE 會把所有已註冊外掛的 `properties()` 合併成同一份 schema，若兩個外掛宣告了相同名稱就會以 `duplicate property` **中止** —— 見 `PVE::SectionConfig::init`。這個失敗的影響範圍不限於出問題的外掛：它發生在 PVE 建立 storage schema 的過程中，因此該節點上的每一個儲存都會停止運作。
 
 因此共用的 `dell-*` 選項由「PVE 最先詢問到的那個系列類別」宣告，其他系列只宣告自己的。新增系列不需要更動這個機制，`t/06` 也涵蓋了它。
+
+### 關於 PowerMax，在動工之前先記下
+
+PowerMaxOS 10 的 PowerMax 2500／8500 支援的主機協定是**四種**而非兩種：SCSI 上的 FC 與 iSCSI，加上 NVMe/FC 與 NVMe/TCP。SCSI 那一對可以像 PowerStore 與 PowerVault 一樣套用 `BlockBase` 與 dm-multipath；NVMe 那一對不行 —— 那些路徑是 NVMe namespace，走 ANA 多路徑，也就是 `PowerFlex::Host` 已經實作的東西。
+
+因此在動工 PowerMax 時，NVMe 的基礎功能（連線、host NQN、路徑列舉、ctrl-loss-tmo 策略）應該從 `PowerFlex::Host` 移到共用模組，而 `BlockBase` 的裝置層應該可以由參數指定，而不是預設 dm-multipath。這個重構刻意先不做：目前 NVMe 只有 PowerFlex 一個使用者，第二個使用者才會顯示出接縫真正該切在哪裡。
+
 
 ## 新增一個系列
 

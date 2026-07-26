@@ -66,7 +66,7 @@ an API client, not a restructuring.
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
 | 2 | **PowerVault ME4/ME5** | `dellpowervault` | iSCSI / FC / SAS (dm-multipath) | **in development** |
 | 3 | **PowerFlex** | `dellpowerflex` | NVMe/TCP or SDC | **in development** |
-| 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
+| 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath), NVMe/FC and NVMe/TCP (NVMe-oF) | planned |
 | — | PowerScale | `dellpowerscale` | NFS (directory semantics) | not scheduled |
 | — | Unity XT | `dellunity` | iSCSI / FC | not scheduled |
 | — | ObjectScale, PowerProtect | — | — | out of scope |
@@ -195,7 +195,17 @@ trademarks of Proxmox Server Solutions GmbH.
 
 ## Installation
 
-Build from source:
+### Download a package
+
+Prebuilt `.deb` packages are attached to each
+[release](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases).
+Verify the download against the `SHA256SUMS` file published beside it.
+
+```bash
+apt install ./jt-pve-storage-dellemc_<version>_all.deb
+```
+
+### Or build from source
 
 ```bash
 make test            # perl -c on every module + multipath safety guard

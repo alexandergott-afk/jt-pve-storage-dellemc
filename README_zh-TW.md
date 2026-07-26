@@ -42,7 +42,7 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
 | 2 | **PowerVault ME4／ME5** | `dellpowervault` | iSCSI／FC／SAS（dm-multipath） | **開發中** |
 | 3 | **PowerFlex** | `dellpowerflex` | NVMe/TCP 或 SDC | **開發中** |
-| 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
+| 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath）、NVMe/FC 與 NVMe/TCP（NVMe-oF） | 規劃中 |
 | — | PowerScale | `dellpowerscale` | NFS（目錄語意） | 未排入 |
 | — | Unity XT | `dellunity` | iSCSI／FC | 未排入 |
 | — | ObjectScale、PowerProtect | — | — | 不列入範圍 |
@@ -120,7 +120,15 @@ Proxmox VE 的儲存外掛在每一台節點上都是以 root 權限執行。本
 
 ## 安裝
 
-從原始碼建置：
+### 下載安裝包
+
+每個 [release](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases) 都附有預先建置的 `.deb`，請以旁邊的 `SHA256SUMS` 檔案驗證下載內容。
+
+```bash
+apt install ./jt-pve-storage-dellemc_<version>_all.deb
+```
+
+### 或從原始碼建置
 
 ```bash
 make test            # 對每個模組跑 perl -c，並執行 multipath 安全檢查
