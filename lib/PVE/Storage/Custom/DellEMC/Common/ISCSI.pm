@@ -11,6 +11,7 @@ use Carp qw(croak);
 use IO::Select;
 use IO::Socket::INET;
 use IPC::Open3;
+use Errno ();
 use POSIX ();
 use Symbol qw(gensym);
 
@@ -158,20 +159,32 @@ sub _read_sysfs_attr {
     return $value;
 }
 
+# Returns ($sessions, $error, $absent).
+#
+# $absent is the answer to "is iSCSI configured on this node at all", and it
+# comes from the errno rather than from the text of $!. strerror is rendered
+# in the node's locale: on a node running with a non-English LC_MESSAGES,
+# matching /No such file or directory/ finds nothing, and a node with no iSCSI
+# then warns on every rescan that it cannot enumerate its sessions.
 sub _session_dirs {
     my @sessions;
+    my $absent = 0;
 
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
         alarm(5);
-        opendir(my $dh, ISCSI_SESSION_PATH) or die "opendir: $!\n";
-        @sessions = sort grep { /^session\d+$/ } readdir($dh);
-        closedir($dh);
+        unless (opendir(my $dh, ISCSI_SESSION_PATH)) {
+            $absent = $!{ENOENT} ? 1 : 0;
+            die "opendir: $!\n";
+        } else {
+            @sessions = sort grep { /^session\d+$/ } readdir($dh);
+            closedir($dh);
+        }
         alarm(0);
     };
     alarm(0);
 
-    return (\@sessions, $@);
+    return (\@sessions, $@, $absent);
 }
 
 sub _portal_addr {
@@ -463,10 +476,10 @@ sub rescan_sessions {
 
     my $per_session_timeout = $opts{per_session_timeout} // $opts{timeout} // RESCAN_TIMEOUT;
 
-    my ($sessions, $err) = _session_dirs();
+    my ($sessions, $err, $absent) = _session_dirs();
     if ($err) {
         # No iSCSI configured at all is not an error worth reporting.
-        return 0 if $err =~ /No such file or directory/;
+        return 0 if $absent;
         warn "rescan_sessions: cannot enumerate iSCSI sessions: $err";
         return 0;
     }

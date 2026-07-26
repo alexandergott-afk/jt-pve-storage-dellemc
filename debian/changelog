@@ -1,3 +1,17 @@
+jt-pve-storage-dellemc (0.7.34~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * iSCSI session enumeration no longer decides "iSCSI is not configured on
+    this node" by matching $! against the English 'No such file or
+    directory'. strerror is rendered in the node's locale, so on a node
+    running with a non-English LC_MESSAGES the match found nothing and a node
+    with no iSCSI at all warned that it could not enumerate its sessions - on
+    every rescan. The errno decides now.
+  * A test asserts that nothing in the iSCSI code matches strerror text.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:53:42 +0800
+
 jt-pve-storage-dellemc (0.7.33~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

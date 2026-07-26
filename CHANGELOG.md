@@ -7,6 +7,20 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.34~beta1] - 2026-07-27
+
+### Fixed
+- **A node with no iSCSI configured would have warned on every rescan, in any
+  locale but English.** Whether `/sys/class/iscsi_session` was simply absent
+  was decided by matching `$!` against `No such file or directory`. `strerror`
+  is rendered in the node's locale, so with a non-English `LC_MESSAGES` the
+  match finds nothing and "there is no iSCSI here" is reported as "cannot
+  enumerate iSCSI sessions". The errno decides now, through `%!`.
+
+### Added
+- A test asserts that nothing in the iSCSI code matches `strerror` text.
+  Comments may name the string; code may not.
+
 ## [0.7.33~beta1] - 2026-07-27
 
 ### Fixed

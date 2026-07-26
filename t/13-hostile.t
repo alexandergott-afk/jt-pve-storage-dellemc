@@ -479,4 +479,41 @@ my $TMP = tempdir(CLEANUP => 1);
     }
 }
 
+# ---------------------------------------------------------------------------
+# Locale
+# ---------------------------------------------------------------------------
+
+# strerror is rendered in the node's locale. Code that asks "does this path
+# exist" by matching $! against English text finds nothing on a node running
+# with a non-English LC_MESSAGES, and then reports a missing directory as a
+# failure to read it — on every poll.
+{
+    require PVE::Storage::Custom::DellEMC::Common::ISCSI;
+
+    my ($sessions, $err, $absent) =
+        PVE::Storage::Custom::DellEMC::Common::ISCSI::_session_dirs();
+
+    ok(ref($sessions) eq 'ARRAY', 'session enumeration returns a list');
+    ok(defined($absent), 'and says whether iSCSI is configured at all')
+        or diag('the absent flag is what the caller uses instead of reading $!');
+
+    # Whatever this node has, the two answers must agree with each other.
+    ok(!($absent && !$err), 'absent is only ever set alongside the error');
+
+    # And the errno, not its text: this is what makes it locale-independent.
+    my $source = '';
+    for my $path ('lib/PVE/Storage/Custom/DellEMC/Common/ISCSI.pm',
+                  '../lib/PVE/Storage/Custom/DellEMC/Common/ISCSI.pm') {
+        next unless open(my $fh, '<', $path);
+        local $/;
+        $source = <$fh>;
+        close($fh);
+        last;
+    }
+    # Comments are allowed to name the string; code is not.
+    (my $code = $source) =~ s/^\s*#.*$//mg;
+    unlike($code, qr/No such file or directory/,
+        'nothing decides anything by matching strerror text');
+}
+
 done_testing();

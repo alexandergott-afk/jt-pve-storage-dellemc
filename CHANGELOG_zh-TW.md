@@ -5,6 +5,14 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.34~beta1] - 2026-07-27
+
+### 修正
+- **沒有設定 iSCSI 的節點，在非英文語系下每次 rescan 都會發出警告。** 判斷 `/sys/class/iscsi_session` 是不是根本不存在，靠的是拿 `$!` 去比對 `No such file or directory`。`strerror` 會依節點的語系呈現，因此在 `LC_MESSAGES` 不是英文時比對不到任何東西，「這裡沒有 iSCSI」就被回報成「無法列舉 iSCSI session」。現在改由 errno（透過 `%!`）決定。
+
+### 新增
+- 有測試確認 iSCSI 相關程式碼不會去比對 `strerror` 的文字。註解裡可以提到那個字串，程式碼裡不行。
+
 ## [0.7.33~beta1] - 2026-07-27
 
 ### 修正
