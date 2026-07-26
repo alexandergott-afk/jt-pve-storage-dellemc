@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.16~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault could not tell whether a volume was already mapped to this
+    node. 'show maps' reports one row per initiator, with the columns Serial
+    Number, Name, Ports, LUN, Access, Identifier, Nickname and Profile — there
+    is no host-name column at all, so comparing against a host name always
+    answered no. Every activation would have remapped the volume and taken
+    another LUN. The check now matches a row by the host name OR by any of
+    this node's own initiator ids.
+  * Four more PowerVault commands were read from the ME5 CLI Reference and
+    found correct as written: create snapshots, delete snapshot, expand volume
+    (the size really is the amount to ADD), and show maps.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 16:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.15~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

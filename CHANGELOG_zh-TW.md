@@ -5,6 +5,14 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.16~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 無法判斷某個 volume 是否已經對應到本節點。** `show maps` 每個 initiator 回一列，欄位是 Serial Number、Name、Ports、LUN、Access、Identifier、Nickname 與 Profile —— 完全沒有 host 名稱這一欄，因此拿 host 名稱去比對永遠得到「否」。於是每一次啟用都會再對應一次，並且再吃掉一個 LUN；而在這個系列上，那正是會讓新磁碟不再出現的耗損。現在會以 host 名稱**或**本節點自己的任一 initiator id 來比對；解除對應時也使用同一組識別，因為 `unmap volume initiator` 接受 initiator、host 或 host group 皆可。
+
+### 變更
+- 另外四個指令也依 ME5 CLI Reference Guide 確認過，寫法正確：`create snapshots volumes <volumes> <snap-names>`、`delete snapshot <snapshots>`、`expand volume size <size> <volume>`（指南明確寫著這個 size 是「要加到該 volume 的空間量」，而不是新的總容量），以及 `show maps`。
+
 ## [0.7.15~beta1] - 2026-07-27
 
 ### 修正

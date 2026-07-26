@@ -522,7 +522,8 @@ sub _array_map_to_host {
 
     my $api = $class->_api($scfg, %opts);
 
-    return 1 if $api->is_mapped($name, $host, %opts);
+    return 1 if $api->is_mapped_to_any($name,
+        $class->_mapping_identities($scfg, $host), %opts);
 
     return $api->volume_map($name, $host,
         lun_base => $scfg->{'pvault-lun-id-base'} // 1, %opts);
@@ -534,15 +535,37 @@ sub _array_unmap_from_host {
     my $api = $class->_api($scfg, %opts);
 
     return 1 unless $api->volume_get_by_name($name, %opts);
-    return 1 unless $api->is_mapped($name, $host, %opts);
+
+    # $host here may be a host name or an initiator id: _array_mapped_hosts
+    # returns whatever the mapping row named, and 'unmap volume initiator'
+    # accepts an initiator, a host or a host group alike.
+    return 1 unless $api->is_mapped_to_any($name, [$host], %opts)
+                 || $api->is_mapped_to_any($name,
+                        $class->_mapping_identities($scfg, $host), %opts);
 
     return $api->volume_unmap($name, $host, %opts);
+}
+
+# A mapping row on this family names an initiator, not a host: 'show maps'
+# has no host-name column. So the question "is this volume mapped to this
+# node" is answered by looking for the host name OR any of this node's own
+# initiator ids among the rows.
+sub _mapping_identities {
+    my ($class, $scfg, $host) = @_;
+
+    my @identities = ($host);
+
+    my $initiators = eval { $class->_initiator_ids($scfg) } // [];
+    push @identities, @$initiators;
+
+    return \@identities;
 }
 
 sub _array_is_mapped {
     my ($class, $scfg, $name, $host, %opts) = @_;
 
-    return $class->_api($scfg, %opts)->is_mapped($name, $host, %opts);
+    return $class->_api($scfg, %opts)->is_mapped_to_any(
+        $name, $class->_mapping_identities($scfg, $host), %opts);
 }
 
 sub _array_mapped_hosts {

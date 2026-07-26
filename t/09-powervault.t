@@ -687,4 +687,56 @@ SKIP: {
     like($@, qr/ME5 form.*ME4 form/s, '... reported with both refusals');
 }
 
+# ---------------------------------------------------------------------------
+# A mapping row names an initiator, not a host
+#
+# 'show maps' reports Serial Number, Name, Ports, LUN, Access, Identifier,
+# Nickname and Profile — there is no host-name column. Asking "is this volume
+# mapped to host X" by comparing against a host name alone therefore always
+# answers no, and the plugin would remap on every activation, taking a new LUN
+# each time.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({
+            status => [{ 'response-type' => 'Success', 'return-code' => 0 }],
+            'volume-view-mappings' => [
+                { identifier => 'iqn.1993-08.org.debian:01:node1',
+                  nickname   => 'pve-pve-node1',
+                  lun => '3', access => 'read-write' },
+            ],
+        }) if $path =~ m{/show/maps};
+        return reply(ok_status());
+    });
+
+    ok($api->is_mapped_to_any('pve-me5-100-d0', ['pve-pve-node1']),
+        'a row is matched by the nickname, which is the host name here');
+
+    ok($api->is_mapped_to_any('pve-me5-100-d0',
+            ['iqn.1993-08.org.debian:01:node1']),
+        'and by the initiator id, which is what Identifier holds');
+
+    ok($api->is_mapped_to_any('pve-me5-100-d0',
+            ['pve-other-node', 'iqn.1993-08.org.debian:01:node1']),
+        'any one of the identities is enough');
+
+    ok(!$api->is_mapped_to_any('pve-me5-100-d0', ['pve-some-other-node']),
+        'and a node that is not there is not matched');
+
+    ok(!$api->is_mapped_to_any('pve-me5-100-d0', []),
+        'an empty identity list matches nothing');
+
+    # Case: initiator ids are compared without regard to it.
+    ok($api->is_mapped_to_any('pve-me5-100-d0',
+            ['IQN.1993-08.ORG.DEBIAN:01:NODE1']),
+        'initiator ids match regardless of case');
+
+    my $mappings = $api->volume_mappings('pve-me5-100-d0');
+    is($mappings->[0]{host}, 'pve-pve-node1',
+        'the friendliest name is what is reported back for unmapping');
+    is($mappings->[0]{lun}, '3', 'and the LUN comes with it');
+}
+
 done_testing();

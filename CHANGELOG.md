@@ -7,6 +7,27 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.16~beta1] - 2026-07-27
+
+### Fixed
+- **PowerVault could not tell whether a volume was already mapped to this
+  node.** `show maps` reports one row per initiator, with the columns Serial
+  Number, Name, Ports, LUN, Access, Identifier, Nickname and Profile — there
+  is no host-name column, so comparing a row against a host name always
+  answered no. Every activation would have mapped the volume again and taken
+  another LUN, which on this family is exactly the churn that makes new disks
+  stop appearing. A row is now matched by the host name *or* by any of this
+  node's own initiator ids, and the same identities are used when unmapping,
+  since `unmap volume initiator` accepts an initiator, a host or a host group
+  alike.
+
+### Changed
+- Four more commands were read from the ME5 CLI Reference Guide and found
+  correct as written: `create snapshots volumes <volumes> <snap-names>`,
+  `delete snapshot <snapshots>`, `expand volume size <size> <volume>` — where
+  the guide confirms the size is "the amount of space to add to the volume",
+  not the new total — and `show maps`.
+
 ## [0.7.15~beta1] - 2026-07-27
 
 ### Fixed

@@ -178,6 +178,19 @@ sub children_of { my ($n) = @_; return [ sort grep { ($OBJ{$_}{parent} // '') eq
         return $OBJ{$name}{mapped}{$host} ? 1 : 0;
     }
 
+    # 'show maps' names an initiator, not a host, so the plugin asks about
+    # several identities at once: the host name and this node's own initiator
+    # ids. The fake maps by whichever one it was given.
+    sub is_mapped_to_any {
+        my ($self, $name, $identities, %opts) = @_;
+        return 0 unless ref($identities) eq 'ARRAY';
+        for my $id (@$identities) {
+            next unless defined $id;
+            return 1 if $OBJ{$name}{mapped}{$id};
+        }
+        return 0;
+    }
+
     sub volume_mappings {
         my ($self, $name, %opts) = @_;
         return [ map { { host => $_ } } sort keys %{ $OBJ{$name}{mapped} // {} } ];

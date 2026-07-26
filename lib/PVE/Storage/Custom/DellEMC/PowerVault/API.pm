@@ -702,7 +702,18 @@ sub mapping_list {
     return $rows;
 }
 
-# Mappings of one volume, normalised to { host, lun, access }.
+# Mappings of one volume.
+#
+# 'show maps' without the initiator parameter reports one row per INITIATOR,
+# with the columns Serial Number, Name, Ports, LUN, Access, Identifier,
+# Nickname and Profile — there is no host-name column. So a row identifies
+# who it is mapped to by initiator id (Identifier) or by nickname, and asking
+# "is this volume mapped to host X" cannot be answered by comparing against a
+# host name alone.
+#
+# Every candidate is therefore returned, and the caller decides: a host name,
+# an initiator nickname and an initiator id are all things 'unmap volume
+# initiator ...' accepts, which is what these are used for.
 sub volume_mappings {
     my ($self, $volume, %opts) = @_;
 
@@ -710,26 +721,48 @@ sub volume_mappings {
 
     my @out;
     for my $row (@$rows) {
-        my $host = $row->{'identifier'} // $row->{'host-id'} // $row->{'nickname'}
-                // $row->{'host'} // next;
+        my @names = grep { defined && length }
+            $row->{'nickname'}, $row->{'identifier'},
+            $row->{'host-id'},  $row->{'host'}, $row->{'name'};
+
+        next unless @names;
+
         push @out, {
-            host   => $host,
-            lun    => $row->{lun},
-            access => $row->{access},
+            host    => $names[0],   # the friendliest name available
+            names   => \@names,     # everything this row could be matched by
+            lun     => $row->{lun},
+            access  => $row->{access},
         };
     }
 
     return \@out;
 }
 
-sub is_mapped {
-    my ($self, $volume, $host, %opts) = @_;
+# Is $volume mapped to anything in @$identities?
+#
+# The caller passes the host name AND this node's initiator ids, because a
+# mapping row may name any of them and only the caller knows which initiators
+# belong to this node.
+sub is_mapped_to_any {
+    my ($self, $volume, $identities, %opts) = @_;
+
+    return 0 unless ref($identities) eq 'ARRAY' && @$identities;
+
+    my %want = map { lc($_) => 1 } grep { defined && length } @$identities;
 
     for my $mapping (@{ $self->volume_mappings($volume, %opts) }) {
-        return 1 if ($mapping->{host} // '') eq $host;
+        for my $name (@{ $mapping->{names} }) {
+            return 1 if $want{ lc($name) };
+        }
     }
 
     return 0;
+}
+
+sub is_mapped {
+    my ($self, $volume, $host, %opts) = @_;
+
+    return $self->is_mapped_to_any($volume, [$host], %opts);
 }
 
 # The lowest LUN this host does not already use.
