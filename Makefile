@@ -1,20 +1,18 @@
 PACKAGE = jt-pve-storage-dellemc
-VERSION = 0.6.0~beta1
+VERSION = 0.7.0~beta1
 
 DESTDIR =
 PREFIX   = /usr
 PERL5DIR = $(DESTDIR)$(PREFIX)/share/perl5
 BINDIR   = $(DESTDIR)$(PREFIX)/bin
 
-# Discovered rather than hard-coded: modules are added phase by phase
-# (see jt-pve-storage-dellemc.md ch.13) and a hand-maintained list would
+# Discovered rather than hard-coded: a hand-maintained module list would
 # drift out of sync with debian/ and the syntax-check target.
 PERL_MODULES = $(shell find lib -type f -name '*.pm' 2>/dev/null | sort)
 BIN_SCRIPTS  = $(shell find bin -type f ! -name '.gitkeep' 2>/dev/null | sort)
 UNIT_TESTS   = $(wildcard t/*.t)
 
-# Paths scanned by the capital-F flush guard. Deliberately excludes the design
-# document at the repo root, which quotes the forbidden command at length.
+# Paths scanned by the capital-F flush guard.
 GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 

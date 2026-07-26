@@ -218,7 +218,18 @@ ok($pd->{content}[0]{rootdir}, 'holds container root filesystems');
 my $props = $P->properties();
 ok($props->{'dell-portal'}, 'common properties are declared');
 is($props->{'dell-protocol'}{default}, 'iscsi', 'iSCSI is the default protocol');
-is_deeply([sort @{ $props->{'dell-protocol'}{enum} }], ['fc', 'iscsi'], 'protocol enum');
+# The protocol option is shared with PowerFlex, whose values mean nothing
+# here, so the enum is broad and each family rejects what it cannot serve.
+is_deeply([sort @{ $props->{'dell-protocol'}{enum} }], ['fc', 'iscsi', 'nvme', 'sdc'],
+    'the shared protocol enum covers every family');
+
+{
+    my $err;
+    eval { $P->activate_storage('ps1', { %$scfg, 'dell-protocol' => 'sdc' }) };
+    $err = $@;
+    like($err, qr/PowerFlex family/, 'a SAN family rejects a PowerFlex protocol');
+    like($err, qr/use 'iscsi' or 'fc'/, 'and says what to use instead');
+}
 
 my $opts = $P->options();
 ok($opts->{'dell-portal'}{fixed}, 'the portal is fixed once set');

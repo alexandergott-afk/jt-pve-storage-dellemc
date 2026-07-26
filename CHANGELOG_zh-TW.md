@@ -3,6 +3,27 @@
 本專案所有值得記錄的變更都寫在這裡。
 English version: [CHANGELOG.md](CHANGELOG.md)
 
+## [0.7.0~beta1] - 2026-07-26
+
+新增 PowerFlex 3.x 與 4.x 的 `dellpowerflex` storage type。
+
+### 新增
+- `PowerFlex/API.pm`、`PowerFlex/Naming.pm`、`PowerFlex/Host.pm` 與 `DellPowerFlexPlugin.pm`。
+- `Common/Schema.pm`：把共用的 `dell-*` 選項抽出來，讓非 block 系列也能使用而不必繼承 `BlockBase`。
+- `docs/POWERFLEX_SDC_zh-TW.md`：SDC 與 NVMe/TCP 的比較、Dell 支援矩陣的所在位置，以及如何確認某個 kernel 是否受支援 —— 以連結官方來源的方式呈現，而不是複製一份會過時的內容。
+- README 加上三個系列各自的設定步驟，並在標題下方加上文件網站連結。
+- 單元測試總計 991 個。
+
+### PowerFlex 的特殊之處
+- **它不繼承 block 基底類別。** volume 是透過 Dell 的 SDC kernel module 或 kernel 內建的 NVMe/TCP initiator 出現的；沒有 SCSI LUN、也沒有 dm-multipath，因此 `BlockBase` 對裝置所做的一切在這裡都是錯的。
+- **預設是 NVMe/TCP。** Dell 針對 Proxmox VE 的說明列出 PVE 8.x 有 SDC 支援，PVE 9.x 則僅為*規劃中*；而且 `scini` 必須針對每個 kernel 編譯 —— 一次 kernel 升級就可能讓節點在模組重建之前沒有儲存。NVMe/TCP 用的是 Proxmox 已經提供的 kernel。
+- **NVMe 的路徑走 ANA，逾時值很關鍵。** 連線時帶入 `ctrl-loss-tmo` 60 秒而非 kernel 預設的 600 秒：它是 NVMe 版的 `no_path_retry`，設成無上限會讓全路徑中斷看起來像當機。啟用時若偵測到 `nvme_core.multipath` 被停用、或只連上部分 target，都會提出警告。
+- **兩種認證世代是自動偵測而非設定**：4.x 從 `/rest/auth/login` 取得 bearer token（五分鐘到期），3.x 從 `/api/login` 取得 token 再當成密碼使用。密碼被拒絕時絕不改用另一個端點重試，否則會讓帳號鎖定政策的失敗次數加倍。
+- 容量向上對齊 8 GB 配置單位；名稱上限 31 個字元。
+
+### 移除
+- 內部開發規格書已不再放在 repository 中。
+
 ## [0.6.0~beta1] - 2026-07-26
 
 新增 PowerVault ME4／ME5 系列的 `dellpowervault` storage type。

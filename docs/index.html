@@ -1,280 +1,1127 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>jt-pve-storage-dellemc — Dell EMC storage plugins for Proxmox VE</title>
-<meta name="description" content="Dell EMC storage plugins for Proxmox VE. PowerStore over iSCSI or Fibre Channel, with direct volume provisioning, array snapshots and thin clones.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jt-pve-storage-dellemc -- Dell EMC Storage Plugins for Proxmox VE</title>
+<meta name="description" content="Open-source Dell EMC storage plugins for Proxmox VE. PowerStore, PowerVault ME4/ME5 and PowerFlex. Direct volume provisioning, array snapshots, thin clones, multipath, live migration. MIT License.">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="jt-pve-storage-dellemc">
+<meta property="og:description" content="Dell EMC Storage Plugins for Proxmox VE. PowerStore, PowerVault ME, PowerFlex. Snapshots, thin clones, multipath, live migration. Open source, MIT License.">
+<meta property="og:url" content="https://jasoncheng7115.github.io/jt-pve-storage-dellemc/">
+<meta property="og:site_name" content="jt-pve-storage-dellemc">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="jt-pve-storage-dellemc">
+<meta name="twitter:description" content="Dell EMC Storage Plugins for Proxmox VE. Open source, MIT License.">
+
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
 
-<header>
-    <h1>jt-pve-storage-dellemc</h1>
-    <p class="tagline">Dell EMC storage plugins for Proxmox VE</p>
-    <p class="lang">
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc">GitHub</a>
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README.md">README</a>
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README_zh-TW.md">繁體中文</a>
-    </p>
+<!-- ======== Top Nav ======== -->
+<header class="top-nav">
+    <div class="top-nav__brand">
+        <div class="top-nav__brand-icon">DE</div>
+        <span>
+            <span>jt-pve-storage-dellemc</span>
+        </span>
+    </div>
+    <div class="top-nav__actions">
+        <button class="lang-toggle" onclick="toggleLang()" title="Switch Language">
+            <span class="lang-en">繁體中文</span>
+            <span class="lang-zh">English</span>
+        </button>
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc" class="github-link" target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <span>GitHub</span>
+        </a>
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        </button>
+    </div>
 </header>
 
-<div class="notice danger">
-    <strong>&#9888; BETA SOFTWARE (0.5.0~beta1) — read before installing</strong>
+<!-- ======== Sidebar ======== -->
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar__search">
+        <input type="text" class="sidebar__search-input" id="sidebarSearch" placeholder="Search..." oninput="filterSidebar(this.value)">
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Getting Started</span>
+            <span class="lang-zh">快速開始</span>
+        </div>
+        <a href="#hero" class="sidebar__link">
+            <span class="lang-en">Overview</span>
+            <span class="lang-zh">概覽</span>
+        </a>
+        <a href="#disclaimer" class="sidebar__link">
+            <span class="lang-en">Disclaimer &amp; Risk</span>
+            <span class="lang-zh">免責聲明與風險</span>
+        </a>
+        <a href="#families" class="sidebar__link">
+            <span class="lang-en">Product Families</span>
+            <span class="lang-zh">產品系列</span>
+        </a>
+        <a href="#features" class="sidebar__link">
+            <span class="lang-en">Features</span>
+            <span class="lang-zh">功能特性</span>
+        </a>
+        <a href="#requirements" class="sidebar__link">
+            <span class="lang-en">Requirements</span>
+            <span class="lang-zh">系統需求</span>
+        </a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Setup</span>
+            <span class="lang-zh">安裝設定</span>
+        </div>
+        <a href="#installation" class="sidebar__link">
+            <span class="lang-en">Installation</span>
+            <span class="lang-zh">安裝</span>
+        </a>
+        <a href="#quickstart" class="sidebar__link">
+            <span class="lang-en">Quick Start</span>
+            <span class="lang-zh">快速入門</span>
+        </a>
+        <a href="#configuration" class="sidebar__link">
+            <span class="lang-en">Configuration</span>
+            <span class="lang-zh">設定選項</span>
+        </a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Architecture</span>
+            <span class="lang-zh">架構</span>
+        </div>
+        <a href="#architecture" class="sidebar__link">
+            <span class="lang-en">System Architecture</span>
+            <span class="lang-zh">系統架構</span>
+        </a>
+        <a href="#powerflex-access" class="sidebar__link">
+            <span class="lang-en">PowerFlex: SDC vs NVMe/TCP</span>
+            <span class="lang-zh">PowerFlex：SDC 與 NVMe/TCP</span>
+        </a>
+        <a href="#multipath-safety" class="sidebar__link">
+            <span class="lang-en">Multipath Safety</span>
+            <span class="lang-zh">Multipath 安全規則</span>
+        </a>
+        <a href="#supported-features" class="sidebar__link">
+            <span class="lang-en">Supported Features</span>
+            <span class="lang-zh">功能支援表</span>
+        </a>
+    </div>
+    <div class="sidebar__section">
+        <div class="sidebar__heading">
+            <span class="lang-en">Reference</span>
+            <span class="lang-zh">參考資料</span>
+        </div>
+        <a href="#verification" class="sidebar__link">
+            <span class="lang-en">Verification Status</span>
+            <span class="lang-zh">驗證狀態</span>
+        </a>
+        <a href="#troubleshooting" class="sidebar__link">
+            <span class="lang-en">Troubleshooting</span>
+            <span class="lang-zh">疑難排解</span>
+        </a>
+        <a href="#changelog" class="sidebar__link">
+            <span class="lang-en">Changelog</span>
+            <span class="lang-zh">變更紀錄</span>
+        </a>
+        <a href="#acknowledgments" class="sidebar__link">
+            <span class="lang-en">Acknowledgments</span>
+            <span class="lang-zh">致謝</span>
+        </a>
+    </div>
+</nav>
+
+<!-- ======== Main Content ======== -->
+<main class="main-content">
+
+<!-- ---- Hero ---- -->
+<section class="hero" id="hero">
+    <div class="hero__grid-bg"></div>
+    <div class="hero__glow"></div>
+    <div class="hero__glow-left"></div>
+    <div class="hero__content">
+        <div class="hero__badge">v0.7.0~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <h1 class="hero__title">jt-pve-storage-dellemc</h1>
+        <p class="hero__project-desc">
+            <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
+            <span class="lang-zh">Dell EMC 儲存陣列的 Proxmox VE 儲存外掛</span>
+        </p>
+        <p class="hero__subtitle">
+            <span class="lang-en">One package, one shared host-side layer, and one PVE storage type per Dell EMC product family: PowerStore over iSCSI or Fibre Channel, PowerVault ME4/ME5, and PowerFlex over NVMe/TCP or SDC. Direct volume provisioning — one VM disk is one array volume — so array snapshots, thin clones, compression and replication all act on a single VM disk as their natural unit.</span>
+            <span class="lang-zh">一個套件、一組共用的主機端底層，Dell EMC 每個產品系列各自對應一個 PVE storage type：PowerStore（iSCSI 或 Fibre Channel）、PowerVault ME4／ME5，以及 PowerFlex（NVMe/TCP 或 SDC）。採用直接配置 volume 的模型 —— 一顆 VM 磁碟就是一個陣列 volume —— 讓陣列端的快照、精簡複製、壓縮與複寫都以「一顆 VM 磁碟」為自然單位運作。</span>
+        </p>
+        <div class="hero__actions">
+            <a href="#installation" class="btn btn--primary">
+                <span class="lang-en">Install Guide</span>
+                <span class="lang-zh">安裝指南</span>
+            </a>
+            <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc" class="btn btn--outline" target="_blank" rel="noopener">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </div>
+</section>
+
+<div class="content-wrap">
+
+<!-- ---- Disclaimer ---- -->
+<section class="doc-section" id="disclaimer">
+    <h2 class="section-title">
+        <span class="lang-en">Disclaimer &amp; Risk</span>
+        <span class="lang-zh">免責聲明與風險</span>
+    </h2>
+    <div class="alert alert--danger">
+        <strong>
+            <span class="lang-en">BETA SOFTWARE. This has never been run against a physical Dell EMC array. Use at your own risk.</span>
+            <span class="lang-zh">BETA 版軟體。從未在任何實體 Dell EMC 陣列上執行過。使用風險自負。</span>
+        </strong>
+        <ul>
+            <li>
+                <span class="lang-en">Every array-facing behaviour is unverified: REST endpoints and field names, the SCSI vendor and product strings that decide which devices the plugin touches, the WWN to WWID conversion, and the Fibre Channel path.</span>
+                <span class="lang-zh">所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定外掛會碰哪些裝置的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及 Fibre Channel 路徑。</span>
+            </li>
+            <li>
+                <span class="lang-en">A storage plugin runs as root, creates and deletes volumes on the array, and manipulates block devices on every node. A defect can destroy virtual machine data, take a storage offline, or leave a node in a state that only a reboot clears.</span>
+                <span class="lang-zh">儲存外掛以 root 權限執行，會在陣列上建立與刪除 volume，並在每台節點上操作區塊裝置。缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態。</span>
+            </li>
+            <li>
+                <span class="lang-en">Multipath and SCSI state is shared across the whole node, so the damage is not necessarily limited to this plugin's own storage.</span>
+                <span class="lang-zh">multipath 與 SCSI 狀態是全節點共用的，因此受害範圍不一定只限於本外掛自己的儲存。</span>
+            </li>
+            <li>
+                <span class="lang-en">Provided under the MIT license, AS IS and without warranty of any kind. In no event shall the author be liable for any claim or damages, including data loss or business interruption.</span>
+                <span class="lang-zh">以 MIT 授權提供，依現狀（AS IS）提供且不附帶任何形式的保固。在任何情況下，作者均不對任何主張或損害負責，包括資料遺失與營運中斷。</span>
+            </li>
+            <li>
+                <span class="lang-en">Use a non-production cluster and a non-production array, and keep independent backups. A storage snapshot is not a backup.</span>
+                <span class="lang-zh">請使用非正式環境的叢集與陣列，並保留獨立備份。儲存快照不是備份。</span>
+            </li>
+            <li>
+                <span class="lang-en">An independent community project. Not affiliated with, endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC", "PowerStore", "PowerVault", "PowerFlex", "PowerMax" and "PowerScale" are trademarks of their respective owners.</span>
+                <span class="lang-zh">本專案為獨立的社群專案，與 Dell Technologies 無隸屬關係，亦未經其背書或提供支援。「Dell」、「Dell EMC」、「PowerStore」、「PowerVault」、「PowerFlex」、「PowerMax」、「PowerScale」為各自所有權人之商標。</span>
+            </li>
+        </ul>
+    </div>
     <p>
-        This release <strong>has never been run against a physical Dell EMC
-        array</strong>. Every array-facing behaviour is unverified: the REST
-        endpoints and field names, the SCSI vendor and product strings that
-        decide which devices the plugin will touch, the WWN to WWID
-        conversion, and the entire Fibre Channel path.
+        <span class="lang-en">1.0.0 is the on-hardware test pass, not more code. What has and has not been verified is tracked in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>.</span>
+        <span class="lang-zh">1.0.0 的門檻是實機測試通過，而不是再寫更多程式。哪些已驗證、哪些還沒，記錄在 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING_zh-TW.md">docs/TESTING_zh-TW.md</a>。</span>
     </p>
+</section>
+
+<!-- ---- Product families ---- -->
+<section class="doc-section" id="families">
+    <h2 class="section-title">
+        <span class="lang-en">Product Families</span>
+        <span class="lang-zh">產品系列</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Dell EMC's product lines differ too much to share one PVE storage type, so each family gets its own. They share the host-side layer, so adding a family is a plugin file and an API client rather than a restructuring.</span>
+        <span class="lang-zh">Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，因此每個系列各自對應一個。它們共用主機端底層，所以新增一個系列只需要一個 plugin 檔加一個 API 客戶端，不必重構。</span>
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
+                <th><span class="lang-en">Storage type</span><span class="lang-zh">Storage type</span></th>
+                <th><span class="lang-en">Data path</span><span class="lang-zh">資料路徑</span></th>
+                <th><span class="lang-en">Status</span><span class="lang-zh">狀態</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>PowerStore</strong></td>
+                    <td><code>dellpowerstore</code></td>
+                    <td>iSCSI / FC (dm-multipath)</td>
+                    <td><span class="status-badge status-badge--supported">
+                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td><strong>PowerVault ME4 / ME5</strong></td>
+                    <td><code>dellpowervault</code></td>
+                    <td>iSCSI / FC / SAS (dm-multipath)</td>
+                    <td><span class="status-badge status-badge--supported">
+                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td><strong>PowerFlex</strong></td>
+                    <td><code>dellpowerflex</code></td>
+                    <td>NVMe/TCP or SDC</td>
+                    <td><span class="status-badge status-badge--supported">
+                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
+                    </span></td>
+                </tr>
+                <tr>
+                    <td>PowerMax</td>
+                    <td><code>dellpowermax</code></td>
+                    <td>FC / iSCSI (dm-multipath)</td>
+                    <td><span class="lang-en">Planned</span><span class="lang-zh">規劃中</span></td>
+                </tr>
+                <tr>
+                    <td>PowerScale</td>
+                    <td><code>dellpowerscale</code></td>
+                    <td>NFS</td>
+                    <td><span class="lang-en">Not scheduled</span><span class="lang-zh">未排入</span></td>
+                </tr>
+                <tr>
+                    <td>Unity XT</td>
+                    <td><code>dellunity</code></td>
+                    <td>iSCSI / FC</td>
+                    <td><span class="lang-en">Not scheduled</span><span class="lang-zh">未排入</span></td>
+                </tr>
+                <tr>
+                    <td>ObjectScale, PowerProtect</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><span class="lang-en">Out of scope</span><span class="lang-zh">不列入範圍</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
     <p>
-        <strong>Do not install this on a production cluster, and do not point
-        it at an array holding data you care about.</strong> A storage plugin
-        runs as root, creates and deletes volumes on the array, and
-        manipulates block devices on every node. A defect can destroy virtual
-        machine data, take a storage offline, or leave a node in a state that
-        only a reboot clears — and because multipath and SCSI state is shared,
-        the damage is not necessarily limited to this plugin's own storage.
+        <span class="lang-en">Why not one plugin with a type option: PVE asks a plugin for its content types and disk formats <em>before</em> any configuration is parsed, so one type cannot describe families that differ in what they can hold. The type string is also a permanent contract — changing it later invalidates every existing storage.cfg.</span>
+        <span class="lang-zh">為什麼不做成單一 plugin 加型號參數：PVE 會在解析任何設定<em>之前</em>就向 plugin 詢問支援的 content type 與磁碟格式，因此單一 type 無法描述「能放的東西不同」的系列。而且 type 字串是永久契約 —— 日後修改會讓所有既有的 storage.cfg 失效。</span>
     </p>
+</section>
+
+<!-- ---- Features ---- -->
+<section class="doc-section" id="features">
+    <h2 class="section-title">
+        <span class="lang-en">Features</span>
+        <span class="lang-zh">功能特性</span>
+    </h2>
+    <div class="card-grid">
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z"/><path d="M4 12h16"/><path d="M12 4v16"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">1 VM disk = 1 array volume</span>
+                <span class="lang-zh">1 顆 VM 磁碟 = 1 個陣列 volume</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">No LVM layer and no shared large LUN carved up locally. The array's snapshots, thin clones, compression and replication act on a single VM disk as their natural unit.</span>
+                <span class="lang-zh">沒有 LVM 層，也不會切一顆大 LUN 再在本地分割。陣列的快照、精簡複製、壓縮與複寫都以一顆 VM 磁碟為自然單位運作。</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-6.219-8.56"/><path d="M12 7v5l3 3"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">Snapshots keep the VM configuration</span>
+                <span class="lang-zh">快照連同 VM 設定一起保存</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">A storage snapshot restores the disk; the configuration lives in /etc/pve. Every snapshot also writes the VM config to a 1 MB volume, readable back by pve-dell-config-get even when /etc/pve is gone.</span>
+                <span class="lang-zh">儲存快照只還原磁碟，設定放在 /etc/pve。因此每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，即使 /etc/pve 已不存在，也能用 pve-dell-config-get 讀回來。</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">Instant linked clones</span>
+                <span class="lang-zh">即時連結複製</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">Templates and linked clones use the array's thin clone or writable snapshot, so nothing is copied. Full Clone remains a PVE-side block copy — a PVE architectural decision, not a plugin limitation.</span>
+                <span class="lang-zh">範本與連結複製使用陣列的精簡複製或可寫快照，完全不複製資料。完整複製仍是 PVE 端的逐區塊複製 —— 那是 PVE 的架構決策，不是外掛的限制。</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">Ownership boundary</span>
+                <span class="lang-zh">歸屬邊界</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">Every list, delete and cleanup path filters on the pve-&lt;storeid&gt;- name prefix first. Objects on the array that do not carry it are never read, renamed or deleted.</span>
+                <span class="lang-zh">所有列舉、刪除與清理路徑都會先以 pve-&lt;storeid&gt;- 名稱前綴過濾。陣列上沒有這個前綴的物件，一律不讀取、不改名、不刪除。</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">Cluster-aware mapping</span>
+                <span class="lang-zh">叢集感知的對應</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">Volumes are mapped to every node at creation, so live migration does not have to remap first. Unmapping always precedes deletion, so an in-flight rescan cannot rebuild the device behind the delete.</span>
+                <span class="lang-zh">volume 在建立時就對應到所有節點，讓線上遷移不必先重新對應。解除對應一律在刪除之前，避免進行中的重新掃描在刪除的背後又把裝置建回來。</span>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <div class="card__title">
+                <span class="lang-en">Orphan device reaping</span>
+                <span class="lang-zh">殘留裝置自動清理</span>
+            </div>
+            <div class="card__desc">
+                <span class="lang-en">A volume deleted from another node leaves this one with a device pointing at storage that no longer answers. It is removed only after a grace period, three consecutive absences and an idle check — reaping a device in use destroys a running VM's disk.</span>
+                <span class="lang-zh">從其他節點刪除的 volume，會在本節點留下一個指向已不存在儲存的裝置。它只會在通過寬限期、連續三次未出現、且裝置閒置之後才被移除 —— 清掉使用中的裝置等於毀掉執行中 VM 的磁碟。</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ---- Requirements ---- -->
+<section class="doc-section" id="requirements">
+    <h2 class="section-title">
+        <span class="lang-en">Requirements</span>
+        <span class="lang-zh">系統需求</span>
+    </h2>
+
+    <h3 class="subsection-title">Proxmox VE</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">PVE Version</span><span class="lang-zh">PVE 版本</span></th>
+                <th>Storage API</th>
+                <th><span class="lang-en">Compatibility</span><span class="lang-zh">相容性</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td>PVE 9.1+</td><td>13</td><td><span class="status-badge status-badge--supported">
+                    <span class="lang-en">Supported</span><span class="lang-zh">支援</span>
+                </span></td></tr>
+                <tr><td>PVE 9.0</td><td>12</td><td>
+                    <span class="lang-en">Untested</span><span class="lang-zh">未測試</span>
+                </td></tr>
+                <tr><td>PVE 8.x</td><td>10–11</td><td>
+                    <span class="lang-en">Not supported</span><span class="lang-zh">不支援</span>
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Arrays</span>
+        <span class="lang-zh">陣列</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
+                <th><span class="lang-en">Version</span><span class="lang-zh">版本</span></th>
+                <th><span class="lang-en">Management interface</span><span class="lang-zh">管理介面</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td>PowerStore</td><td>PowerStore OS 3.0+ (4.x targeted)</td><td>REST API v3</td></tr>
+                <tr><td>PowerVault ME</td><td>ME4 / ME5</td><td><span class="lang-en">CLI over HTTPS</span><span class="lang-zh">HTTPS 上的 CLI</span></td></tr>
+                <tr><td>PowerFlex</td><td>3.x / 4.x <span class="lang-en">(NVMe/TCP needs 4.0+)</span><span class="lang-zh">（NVMe/TCP 需 4.0 以上）</span></td><td>REST API</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Node packages</span>
+        <span class="lang-zh">節點套件</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Package</span><span class="lang-zh">套件</span></th>
+                <th><span class="lang-en">Purpose</span><span class="lang-zh">用途</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td><code>libwww-perl</code>, <code>libjson-perl</code>, <code>liburi-perl</code></td>
+                    <td><span class="lang-en">REST client</span><span class="lang-zh">REST 客戶端</span></td></tr>
+                <tr><td><code>open-iscsi</code></td>
+                    <td><span class="lang-en">iSCSI initiator (SAN families)</span><span class="lang-zh">iSCSI initiator（SAN 系列）</span></td></tr>
+                <tr><td><code>multipath-tools</code></td>
+                    <td><span class="lang-en">dm-multipath (SAN families)</span><span class="lang-zh">dm-multipath（SAN 系列）</span></td></tr>
+                <tr><td><code>sg3-utils</code>, <code>psmisc</code></td>
+                    <td><span class="lang-en">SCSI inquiry, in-use detection</span><span class="lang-zh">SCSI 查詢、使用中偵測</span></td></tr>
+                <tr><td><code>nvme-cli</code></td>
+                    <td><span class="lang-en">PowerFlex over NVMe/TCP</span><span class="lang-zh">PowerFlex 走 NVMe/TCP 時需要</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ---- Installation ---- -->
+<section class="doc-section" id="installation">
+    <h2 class="section-title">
+        <span class="lang-en">Installation</span>
+        <span class="lang-zh">安裝</span>
+    </h2>
+    <div class="alert alert--warning">
+        <span class="lang-en">Install on <strong>every node</strong> of the cluster. A node without the package answers "Parameter verification failed (400)" or "No such storage", and cannot be a live migration target.</span>
+        <span class="lang-zh">叢集內<strong>每一台節點</strong>都必須安裝。沒有安裝的節點會回應「Parameter verification failed (400)」或「No such storage」，也無法成為線上遷移的目的地。</span>
+    </div>
+
+    <div class="step">
+        <div class="step__number">1</div>
+        <div class="step__content">
+            <div class="step__title">
+                <span class="lang-en">Build the package</span>
+                <span class="lang-zh">建置套件</span>
+            </div>
+            <pre><span class="cmd">git</span> clone https://github.com/jasoncheng7115/jt-pve-storage-dellemc.git
+<span class="cmd">cd</span> jt-pve-storage-dellemc
+<span class="cmd">make</span> test    <span class="comment"># syntax checks, unit tests, safety guard</span>
+<span class="cmd">make</span> deb</pre>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step__number">2</div>
+        <div class="step__content">
+            <div class="step__title">
+                <span class="lang-en">Install on every node</span>
+                <span class="lang-zh">在每台節點上安裝</span>
+            </div>
+            <pre><span class="cmd">apt</span> install ./jt-pve-storage-dellemc_*_all.deb</pre>
+            <p>
+                <span class="lang-en">Use <code>apt install ./file.deb</code> rather than <code>dpkg -i</code>: dpkg does not install dependencies, and the missing binaries only surface much later as failures inside the plugin.</span>
+                <span class="lang-zh">請用 <code>apt install ./file.deb</code> 而不是 <code>dpkg -i</code>：dpkg 不會安裝相依套件，缺少的執行檔要到很後面才會以外掛內部的錯誤浮現。</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step__number">3</div>
+        <div class="step__content">
+            <div class="step__title">
+                <span class="lang-en">After an upgrade</span>
+                <span class="lang-zh">升級之後</span>
+            </div>
+            <pre><span class="cmd">systemctl</span> restart pvestatd</pre>
+            <p>
+                <span class="lang-en">A reload does not reliably replace Perl modules that are already loaded. Run this on every node.</span>
+                <span class="lang-zh">reload 無法可靠地替換已載入記憶體的 Perl 模組。請在每台節點上執行。</span>
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ---- Quick start ---- -->
+<section class="doc-section" id="quickstart">
+    <h2 class="section-title">
+        <span class="lang-en">Quick Start</span>
+        <span class="lang-zh">快速入門</span>
+    </h2>
+
+    <h3 class="subsection-title">PowerStore</h3>
+    <pre><span class="cmd">pvesm</span> add dellpowerstore ps1 \
+    <span class="flag">--dell-portal</span> 192.168.1.50 \
+    <span class="flag">--dell-username</span> pveadmin \
+    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
+    <span class="flag">--dell-protocol</span> iscsi \
+    <span class="flag">--content</span> images,rootdir \
+    <span class="flag">--shared</span> 1</pre>
+
+    <h3 class="subsection-title">PowerVault ME4 / ME5</h3>
+    <pre><span class="cmd">pvesm</span> add dellpowervault me5 \
+    <span class="flag">--dell-portal</span> 192.168.1.60 \
+    <span class="flag">--dell-username</span> manage \
+    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
+    <span class="flag">--pvault-pool</span> A \
+    <span class="flag">--content</span> images,rootdir \
+    <span class="flag">--shared</span> 1</pre>
+    <div class="alert alert--info">
+        <span class="lang-en">PowerVault names are limited to 32 bytes, so keep the storage id short. A name that would not fit raises an error rather than being truncated into a collision.</span>
+        <span class="lang-zh">PowerVault 的名稱上限是 32 bytes，所以 storage id 請取短一點。放不下的名稱會直接報錯，而不是被截斷成可能撞名的名稱。</span>
+    </div>
+
+    <h3 class="subsection-title">PowerFlex</h3>
+    <pre><span class="cmd">pvesm</span> add dellpowerflex pflex1 \
+    <span class="flag">--dell-portal</span> 192.168.1.70 \
+    <span class="flag">--dell-username</span> admin \
+    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
+    <span class="flag">--dell-protocol</span> nvme \
+    <span class="flag">--pflex-storage-pool</span> pool1 \
+    <span class="flag">--content</span> images,rootdir \
+    <span class="flag">--shared</span> 1</pre>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Verify</span>
+        <span class="lang-zh">驗證</span>
+    </h3>
+    <pre><span class="cmd">pvesm</span> status
+<span class="cmd">journalctl</span> <span class="flag">-t</span> pvestatd | <span class="cmd">grep</span> dellpowerstore</pre>
+</section>
+
+<!-- ---- Configuration ---- -->
+<section class="doc-section" id="configuration">
+    <h2 class="section-title">
+        <span class="lang-en">Configuration</span>
+        <span class="lang-zh">設定選項</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Options shared by every family use the dell- prefix and are declared once; family options use their own prefix. PVE registers storage properties in one shared schema, so a name may only have one definition across all plugins.</span>
+        <span class="lang-zh">所有系列共用的選項使用 dell- 前綴且只宣告一次；各系列專屬選項使用自己的前綴。PVE 的 storage property 註冊在同一份共用 schema，同一個名稱在所有外掛之間只能有一種定義。</span>
+    </p>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Common options</span>
+        <span class="lang-zh">共通選項</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Option</span><span class="lang-zh">選項</span></th>
+                <th><span class="lang-en">Default</span><span class="lang-zh">預設</span></th>
+                <th><span class="lang-en">Description</span><span class="lang-zh">說明</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td><code>dell-portal</code></td><td>—</td>
+                    <td><span class="lang-en">Management address. Required, cannot be changed later</span>
+                        <span class="lang-zh">管理位址。必填，且建立後不可變更</span></td></tr>
+                <tr><td><code>dell-username</code></td><td>—</td>
+                    <td><span class="lang-en">API user. Required</span><span class="lang-zh">API 帳號。必填</span></td></tr>
+                <tr><td><code>dell-password</code></td><td>—</td>
+                    <td><span class="lang-en">API password. Required</span><span class="lang-zh">API 密碼。必填</span></td></tr>
+                <tr><td><code>dell-protocol</code></td><td><code>iscsi</code></td>
+                    <td><span class="lang-en">iscsi or fc on the SAN families; sdc or nvme on PowerFlex</span>
+                        <span class="lang-zh">SAN 系列為 iscsi 或 fc；PowerFlex 為 sdc 或 nvme</span></td></tr>
+                <tr><td><code>dell-host-mode</code></td><td><code>per-node</code></td>
+                    <td><span class="lang-en">One host object per node, or one for the cluster</span>
+                        <span class="lang-zh">每節點一個 host 物件，或整個叢集共用一個</span></td></tr>
+                <tr><td><code>dell-status-timeout</code></td><td><code>5</code></td>
+                    <td><span class="lang-en">Health-path timeout. PVE polls storages sequentially, so a slow array delays every storage after it</span>
+                        <span class="lang-zh">健康路徑逾時。PVE 依序輪詢儲存，因此慢的陣列會拖累排在後面的每一個儲存</span></td></tr>
+                <tr><td><code>dell-device-timeout</code></td><td><code>60</code></td>
+                    <td><span class="lang-en">Seconds to wait for a volume's device</span>
+                        <span class="lang-zh">等待 volume 裝置出現的秒數</span></td></tr>
+                <tr><td><code>dell-rescan-interval</code></td><td><code>300</code></td>
+                    <td><span class="lang-en">Rate limit for the periodic SAN rescan. A new portal login always rescans immediately</span>
+                        <span class="lang-zh">週期性 SAN 掃描的頻率限制。登入新 portal 時一律立即掃描</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Family options</span>
+        <span class="lang-zh">系列專屬選項</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
+                <th><span class="lang-en">Options</span><span class="lang-zh">選項</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td>PowerStore</td><td><code>pstore-appliance</code>, <code>pstore-volume-group</code>, <code>pstore-performance-policy</code>, <code>pstore-protection-policy</code>, <code>pstore-lun-id-base</code></td></tr>
+                <tr><td>PowerVault ME</td><td><code>pvault-pool</code>, <code>pvault-volume-group</code>, <code>pvault-tier-affinity</code>, <code>pvault-lun-id-base</code></td></tr>
+                <tr><td>PowerFlex</td><td><code>pflex-storage-pool</code> <span class="lang-en">(required)</span><span class="lang-zh">（必填）</span>, <code>pflex-protection-domain</code>, <code>pflex-thick</code></td></tr>
+            </tbody>
+        </table>
+    </div>
     <p>
-        Use a test cluster, a test array, and independent backups. See
-        <a href="#disclaimer">Disclaimer and risk</a> below.
+        <span class="lang-en">Full reference: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION.md">docs/CONFIGURATION.md</a>.</span>
+        <span class="lang-zh">完整說明：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION_zh-TW.md">docs/CONFIGURATION_zh-TW.md</a>。</span>
     </p>
-</div>
+</section>
 
-<p>
-    One package, one shared host-side layer, and one PVE storage type per Dell
-    EMC product family. The first family implemented is <strong>PowerStore</strong>
-    over iSCSI or Fibre Channel, using direct volume provisioning — one VM disk
-    is one array volume — so that array snapshots, thin clones, compression and
-    replication all act on a single VM disk as their natural unit.
-</p>
+<!-- ---- Architecture ---- -->
+<section class="doc-section" id="architecture">
+    <h2 class="section-title">
+        <span class="lang-en">System Architecture</span>
+        <span class="lang-zh">系統架構</span>
+    </h2>
+    <pre>DellPowerStorePlugin / DellPowerVaultPlugin      <span class="comment"># SAN families</span>
+        |
+        v
+DellEMC::Common::BlockBase           <span class="comment"># activation, allocation, device</span>
+        |                            <span class="comment"># discovery, snapshots, clones,</span>
+        |                            <span class="comment"># multipath drop-in, orphan reaper</span>
+        +-- Common::REST             <span class="comment"># retries, timeouts, sessions</span>
+        +-- Common::ISCSI            <span class="comment"># initiator, portals, rescan</span>
+        +-- Common::FC               <span class="comment"># HBA discovery, WWN handling</span>
+        +-- Common::Multipath        <span class="comment"># SCSI lifecycle, dm-multipath</span>
+        +-- Common::Naming           <span class="comment"># PVE names &lt;-&gt; array objects</span>
+        +-- Common::WwidState        <span class="comment"># WWID tracking, reap guards</span>
+        +-- Common::Health           <span class="comment"># outage and capacity reporting</span>
+        +-- Common::Schema           <span class="comment"># the shared dell-* options</span>
 
-<h2>Product families</h2>
+DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no multipath</span>
+        +-- PowerFlex::Host          <span class="comment"># SDC or NVMe/TCP device access</span></pre>
 
-<div class="table-wrap">
-<table>
-<thead>
-<tr><th>Order</th><th>Family</th><th>PVE storage type</th><th>Data path</th><th>Status</th></tr>
-</thead>
-<tbody>
-<tr><td>1</td><td><strong>PowerStore</strong></td><td><code>dellpowerstore</code></td><td>iSCSI / FC (dm-multipath)</td><td><strong>in development</strong></td></tr>
-<tr><td>2</td><td><strong>PowerVault ME4/ME5</strong></td><td><code>dellpowervault</code></td><td>iSCSI / FC / SAS (dm-multipath)</td><td><strong>in development</strong></td></tr>
-<tr><td>3</td><td>PowerFlex</td><td><code>dellpowerflex</code></td><td>SDC kernel module</td><td>planned</td></tr>
-<tr><td>4</td><td>PowerMax</td><td><code>dellpowermax</code></td><td>FC / iSCSI (dm-multipath)</td><td>planned</td></tr>
-<tr><td>—</td><td>PowerScale</td><td><code>dellpowerscale</code></td><td>NFS (directory semantics)</td><td>not scheduled</td></tr>
-<tr><td>—</td><td>Unity XT</td><td><code>dellunity</code></td><td>iSCSI / FC</td><td>not scheduled</td></tr>
-<tr><td>—</td><td>ObjectScale, PowerProtect</td><td>—</td><td>—</td><td>out of scope</td></tr>
-</tbody>
-</table>
-</div>
+    <h3 class="subsection-title">
+        <span class="lang-en">Why the plugin is careful about the host</span>
+        <span class="lang-zh">為什麼外掛在主機端如此謹慎</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Failure mode</span><span class="lang-zh">故障模式</span></th>
+                <th><span class="lang-en">What the plugin does about it</span><span class="lang-zh">外掛的因應</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><span class="lang-en">Uninterruptible sleep (D state)</span><span class="lang-zh">不可中斷睡眠（D state）</span></td>
+                    <td><span class="lang-en">Reading an unresponsive device puts a process into a state no signal clears. Every sysfs access runs in a forked, timeout-bounded child; every command under an alarm.</span>
+                        <span class="lang-zh">讀取沒有回應的裝置會讓行程進入任何訊號都無法清除的狀態。所有 sysfs 存取都在有逾時限制的子行程中進行，所有外部指令都有 alarm 保護。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Blast radius</span><span class="lang-zh">影響範圍</span></td>
+                    <td><span class="lang-en">The system-wide multipath flush is never issued, and neither is an FC LIP. Destructive operations are vendor-gated and act on one object at a time.</span>
+                        <span class="lang-zh">絕不執行全系統的 multipath flush，也不發 FC LIP。具破壞性的操作都有 vendor 過濾，且一次只處理一個物件。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">The sequential poll</span><span class="lang-zh">依序輪詢</span></td>
+                    <td><span class="lang-en">PVE polls storages one after another, so a slow array starves its neighbours. The health path uses a short timeout and a single attempt; expensive periodic work is rate-limited and detached.</span>
+                        <span class="lang-zh">PVE 一個接一個輪詢儲存，慢的陣列會餓死鄰居。健康路徑採短逾時且只嘗試一次；昂貴的週期性工作有頻率限制並丟到背景執行。</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
 
-<p>
-    Each family gets its own storage type: PVE asks a plugin for its content
-    types and disk formats before any configuration is parsed, so one type
-    cannot describe families that differ in what they can hold. The host-side
-    layer is shared, so adding a block family is a plugin file and an API
-    client rather than a restructuring — see
-    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.
-</p>
+<!-- ---- PowerFlex access ---- -->
+<section class="doc-section" id="powerflex-access">
+    <h2 class="section-title">
+        <span class="lang-en">PowerFlex: SDC vs NVMe/TCP</span>
+        <span class="lang-zh">PowerFlex：SDC 與 NVMe/TCP</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">PowerFlex volumes do not arrive as SCSI LUNs. There are two ways a node can see them, and the choice outlives this plugin.</span>
+        <span class="lang-zh">PowerFlex 的 volume 不是以 SCSI LUN 出現。節點有兩種方式看到它們，而這個選擇的影響會比這個外掛活得更久。</span>
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th></th>
+                <th>SDC</th>
+                <th>NVMe/TCP</th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><span class="lang-en">Host component</span><span class="lang-zh">主機端元件</span></td>
+                    <td><span class="lang-en">Dell's <code>scini</code> kernel module</span><span class="lang-zh">Dell 的 <code>scini</code> kernel module</span></td>
+                    <td><span class="lang-en">in-kernel <code>nvme_tcp</code></span><span class="lang-zh">kernel 內建的 <code>nvme_tcp</code></span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">PowerFlex version</span><span class="lang-zh">PowerFlex 版本</span></td>
+                    <td>3.x / 4.x</td>
+                    <td><span class="lang-en">4.0+ (needs SDT)</span><span class="lang-zh">4.0 以上（需要 SDT）</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Devices</span><span class="lang-zh">裝置</span></td>
+                    <td><code>/dev/disk/by-id/emc-vol-*</code></td>
+                    <td><code>/dev/nvme*n*</code></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Survives a kernel upgrade</span><span class="lang-zh">kernel 升級後仍可用</span></td>
+                    <td><span class="lang-en">only if the module rebuilds</span><span class="lang-zh">只有模組成功重建時</span></td>
+                    <td><span class="status-badge status-badge--supported"><span class="lang-en">yes</span><span class="lang-zh">是</span></span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Installed by this plugin</span><span class="lang-zh">由本外掛安裝</span></td>
+                    <td><strong><span class="lang-en">no</span><span class="lang-zh">否</span></strong></td>
+                    <td><span class="lang-en">nothing to install</span><span class="lang-zh">無需安裝</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="alert alert--warning">
+        <strong>
+            <span class="lang-en">Dell's own support statement for Proxmox VE</span>
+            <span class="lang-zh">Dell 對 Proxmox VE 的官方支援狀態</span>
+        </strong>
+        <ul>
+            <li><span class="lang-en"><strong>Proxmox VE 8.x</strong> (Debian 12): PowerFlex 4.5.3 or 3.6.5 and later</span>
+                <span class="lang-zh"><strong>Proxmox VE 8.x</strong>（Debian 12）：PowerFlex 4.5.3 或 3.6.5 以上</span></li>
+            <li><span class="lang-en"><strong>Proxmox VE 9.x</strong> (Debian 13): <em>planned</em> for PowerFlex 5.1.x</span>
+                <span class="lang-zh"><strong>Proxmox VE 9.x</strong>（Debian 13）：<em>規劃中</em>，預計 PowerFlex 5.1.x</span></li>
+            <li><span class="lang-en">This plugin requires PVE 9.1, which is the second row. Dell does not ship a prebuilt scini for the Proxmox kernel, so it is compiled on the node, and a kernel upgrade can leave that node with no storage until it rebuilds. That is why <code>dell-protocol nvme</code> is the default.</span>
+                <span class="lang-zh">本外掛要求 PVE 9.1，正好落在第二列。Dell 未為 Proxmox kernel 提供預編譯的 scini，必須在節點上編譯，因此一次 kernel 升級就可能讓該節點在模組重建之前沒有儲存。這就是 <code>dell-protocol nvme</code> 是預設值的原因。</span></li>
+        </ul>
+    </div>
 
-<h2>Features</h2>
-
-<ul>
-    <li>Direct volume provisioning: one VM disk is one PowerStore volume</li>
-    <li>Snapshots, with the VM configuration captured alongside each one</li>
-    <li>Templates and linked clones through PowerStore thin clones</li>
-    <li>Multipath I/O, with automatic cleanup of devices whose volume is gone</li>
-    <li>Cluster-aware mapping, so live migration does not have to remap first</li>
-    <li>Disaster recovery tool that reads a VM configuration back from the
-        array even when <code>/etc/pve</code> is gone</li>
-</ul>
-
-<h2>Requirements</h2>
-
-<div class="table-wrap">
-<table>
-<tbody>
-<tr><th>Proxmox VE</th><td>9.1 or later (Storage API 13)</td></tr>
-<tr><th>PowerStore OS</th><td>3.0 or later; 4.x is the primary target</td></tr>
-<tr><th>Perl</th><td><code>libwww-perl</code>, <code>libjson-perl</code>, <code>liburi-perl</code></td></tr>
-<tr><th>Tools</th><td><code>open-iscsi</code>, <code>multipath-tools</code>, <code>sg3-utils</code>, <code>psmisc</code></td></tr>
-</tbody>
-</table>
-</div>
-
-<h2>Install</h2>
-
-<pre><code>make test                 # syntax checks, unit tests, safety guard
-make deb                  # builds ../jt-pve-storage-dellemc_&lt;version&gt;_all.deb
-
-# on EVERY node of the cluster
-apt install ./jt-pve-storage-dellemc_&lt;version&gt;_all.deb</code></pre>
-
-<p>
-    Use <code>apt install ./file.deb</code> rather than <code>dpkg -i</code>:
-    <code>dpkg -i</code> does not install dependencies, and the missing
-    binaries only surface much later as failures inside the plugin. A node
-    without the package cannot be a live migration target.
-</p>
-
-<pre><code>pvesm add dellpowerstore ps1 \
-    --dell-portal 192.168.1.50 \
-    --dell-username pveadmin \
-    --dell-password 'SecurePassword' \
-    --dell-protocol iscsi \
-    --content images,rootdir \
-    --shared 1</code></pre>
-
-<h2>Multipath safety</h2>
-
-<p>
-    These rules are not stylistic. Breaking any of them can take a whole node
-    out of service, including storage that has nothing to do with this plugin.
-</p>
-
-<ul>
-    <li><strong>Never run <code>multipath -F</code></strong> (capital F). It
-        flushes every unused map on the node, including other vendors' storage
-        that happens to be idle. Flush one map:
-        <code>multipath -f /dev/mapper/&lt;wwid&gt;</code>. The build fails if
-        the capital-F form appears anywhere in this repository.</li>
-    <li><strong>Use <code>systemctl restart multipathd</code></strong>, never
-        <code>reload</code>. Reload only re-reads the file; restart reapplies
-        device-mapper state.</li>
-    <li><strong>Avoid <code>no_path_retry queue</code> and
-        <code>dev_loss_tmo infinity</code>.</strong> With every path down,
-        queued I/O that can never complete puts processes into uninterruptible
-        sleep, and the node has to be power-cycled.</li>
-    <li>The plugin never rewrites a multipath file it did not create. Its own
-        drop-in carries a version marker; a file without one is yours.</li>
-</ul>
-
-<h2>Documentation</h2>
-
-<ul class="doc-links">
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/QUICKSTART.md">Quick start</a> — first storage, step by step</li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION.md">Configuration</a> — every option, and the three that matter under load</li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/ARCHITECTURE.md">Architecture</a> — the multi-family design and how to add a family</li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a> — symptoms, causes, recovery</li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/NAMING_CONVENTIONS.md">Naming conventions</a> — what the plugin owns on the array</li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">Testing</a> — what has and has not been verified</li>
-</ul>
-
-<p>Traditional Chinese versions of each document are alongside them, named
-<code>*_zh-TW.md</code>.</p>
-
-<h2>Known limitations</h2>
-
-<ul>
-    <li><strong>Full Clone does not use array-side cloning.</strong> PVE
-        implements it as a block-by-block <code>qemu-img</code> copy and never
-        calls the plugin. Use Linked Clone for the array's instant thin
-        clone.</li>
-    <li><strong>Volumes cannot be shrunk.</strong> A shrink is refused rather
-        than silently truncating a guest filesystem.</li>
-    <li><strong>Only objects the plugin owns are touched.</strong> Every list,
-        delete and cleanup path filters on the <code>pve-&lt;storeid&gt;-</code>
-        prefix.</li>
-</ul>
-
-<h2>Related projects</h2>
-
-<ul>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage">jt-pve-storage-purestorage</a></li>
-    <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp">jt-pve-storage-netapp</a></li>
-</ul>
-
-<h2 id="disclaimer">Disclaimer and risk</h2>
-
-<h3>Development status</h3>
-
-<p>
-    This is <strong>beta software</strong>, published so that it can be
-    tested. It has not been run against a physical Dell EMC array even once.
-    Everything marked <code>NOT VERIFIED ON HARDWARE</code> in
-    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>
-    — currently every array-facing behaviour — may simply be wrong.
-</p>
-
-<h3>What can go wrong</h3>
-
-<p>
-    A Proxmox VE storage plugin runs as root on every node. This one creates
-    and deletes volumes on the array, maps them to hosts, and manipulates SCSI
-    and device-mapper state. Realistic failure modes include:
-</p>
-
-<ul>
-    <li><strong>Data loss.</strong> A volume deleted, overwritten by a
-        rollback, or truncated by a wrong size calculation takes the virtual
-        machine's data with it.</li>
-    <li><strong>Storage outage.</strong> A defect on the activation or status
-        path can leave a storage <code>inactive</code>, and because Proxmox VE
-        polls storages sequentially, a slow or hanging one delays every other
-        storage on the node.</li>
-    <li><strong>Node hangs.</strong> I/O to a device with no working path can
-        put processes into uninterruptible sleep, which no signal clears.
-        Recovery is a reboot.</li>
-    <li><strong>Collateral damage.</strong> Multipath and SCSI state is shared
-        across the node. A mistake in device cleanup can affect storage this
-        plugin does not own, from other vendors or other plugins.</li>
-</ul>
-
-<p>
-    The design takes these seriously — the safety rules above, vendor gating,
-    timeout-bounded device access and the ownership prefix all exist for them
-    — but <em>designed to be safe</em> is not <em>demonstrated to be safe</em>.
-    That demonstration is what 1.0.0 requires.
-</p>
-
-<h3>No warranty</h3>
-
-<p>
-    Provided under the MIT license, <strong>as is and without warranty of any
-    kind</strong>, express or implied, including but not limited to
-    merchantability, fitness for a particular purpose and non-infringement. In
-    no event shall the author be liable for any claim, damages or other
-    liability, including data loss or business interruption, arising from the
-    use of this software. You are solely responsible for evaluating it against
-    your own hardware, firmware version and workload before any production
-    use.
-</p>
-
-<h3>Before you install</h3>
-
-<ul>
-    <li>Use a <strong>non-production</strong> cluster and a
-        <strong>non-production</strong> array.</li>
-    <li>Keep <strong>independent backups</strong> of anything you place on this
-        storage. A storage snapshot is not a backup.</li>
-    <li>Verify at least the four items listed in
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>
-        for your array and firmware.</li>
-    <li>Report what you find:
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/issues">issues</a>.</li>
-</ul>
-
-<h3>Trademarks and affiliation</h3>
-
-<p>
-    An <strong>independent community project</strong>. Not affiliated with,
-    endorsed by, sponsored by, or supported by Dell Technologies. "Dell",
-    "Dell EMC", "PowerStore", "PowerMax", "PowerFlex", "PowerScale", "Unity"
-    and "PowerVault" are trademarks of their respective owners, used here only
-    to identify the hardware this software talks to. Proxmox and Proxmox VE
-    are trademarks of Proxmox Server Solutions GmbH.
-</p>
-
-<footer>
-    <p>MIT licensed. Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</p>
+    <h3 class="subsection-title">
+        <span class="lang-en">Official Dell references</span>
+        <span class="lang-zh">Dell 官方資料</span>
+    </h3>
     <p>
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README_zh-TW.md">繁體中文說明與免責聲明</a>
+        <span class="lang-en">Bookmark these; they are the authority on what is supported, and they change.</span>
+        <span class="lang-zh">請加入書籤；支援範圍以它們為準，而且內容會變動。</span>
     </p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">What</span><span class="lang-zh">內容</span></th>
+                <th><span class="lang-en">Link</span><span class="lang-zh">連結</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong><span class="lang-en">SDC on Proxmox VE</span><span class="lang-zh">在 Proxmox VE 上設定 SDC</span></strong></td>
+                    <td><a href="https://www.dell.com/support/kbdoc/zh-tw/000466868/powerflex-%E5%A6%82%E4%BD%95%E5%9C%A8-proxmox-ve-%E4%B8%8A%E8%A8%AD%E5%AE%9A-powerflex-sdc" target="_blank" rel="noopener">KB 000466868</a></td>
+                </tr>
+                <tr>
+                    <td><strong><span class="lang-en">Support matrix (OS and kernels)</span><span class="lang-zh">支援矩陣（OS 與 kernel）</span></strong></td>
+                    <td><a href="https://elabnavigator.dell.com/vault/pdf/PowerFlex_OS.pdf" target="_blank" rel="noopener">E-Lab Navigator: PowerFlex_OS.pdf</a></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Is my kernel supported?</span><span class="lang-zh">我的 kernel 有支援嗎？</span></td>
+                    <td><a href="https://www.dell.com/support/kbdoc/en-us/000332118/powerflex-sdc-how-to-determine-kernel-version-is-supported" target="_blank" rel="noopener">KB 000332118</a></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">On-demand driver compilation</span><span class="lang-zh">驅動程式隨選編譯</span></td>
+                    <td><a href="https://www.dell.com/support/kbdoc/en-us/000224134/how-to-on-demand-compilation-of-the-powerflex-sdc-driver" target="_blank" rel="noopener">KB 000224134</a></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Prebuilt .ko files by OS and version</span><span class="lang-zh">依 OS 與版本分類的預編譯 .ko</span></td>
+                    <td><a href="https://mft.dell.com/" target="_blank" rel="noopener">mft.dell.com</a></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">NVMe/TCP overview</span><span class="lang-zh">NVMe/TCP 概觀</span></td>
+                    <td><a href="https://www.dell.com/support/manuals/en-us/scaleio/flex-software-to-45x/nvme-over-tcp-overview" target="_blank" rel="noopener">PowerFlex 4.5.x Technical Overview</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        <span class="lang-en">Dell notes that the E-Lab matrix does not always list every kernel a distribution has released, and gives a prefix rule: a kernel is supported if its version prefix matches a listed one — <code>4.18.0-553</code> covers <code>4.18.0-553.51.1.el8_10.x86_64</code>. Details and the commands to check a node are in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC.md">docs/POWERFLEX_SDC.md</a>.</span>
+        <span class="lang-zh">Dell 也說明 E-Lab 矩陣不一定涵蓋各發行版釋出的每一個 kernel，並給了一條前綴規則：版本前綴相符即視為支援 —— <code>4.18.0-553</code> 涵蓋 <code>4.18.0-553.51.1.el8_10.x86_64</code>。細節與節點檢查指令請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC_zh-TW.md">docs/POWERFLEX_SDC_zh-TW.md</a>。</span>
+    </p>
+    <div class="alert alert--info">
+        <span class="lang-en">Whichever path is used, one VM disk is one PowerFlex volume created through the REST API. There is no LVM layer and no shared volume carved up locally — the SDC or the NVMe initiator only presents that volume as a block device.</span>
+        <span class="lang-zh">無論使用哪一條路徑，一顆 VM 磁碟就是一個透過 REST API 建立的 PowerFlex volume。中間沒有 LVM 層，也不會切一顆大 volume 再在本地分割 —— SDC 或 NVMe initiator 只負責把那個 volume 呈現成區塊裝置。</span>
+    </div>
+</section>
+
+<!-- ---- Multipath safety ---- -->
+<section class="doc-section" id="multipath-safety">
+    <h2 class="section-title">
+        <span class="lang-en">Multipath Safety</span>
+        <span class="lang-zh">Multipath 安全規則</span>
+    </h2>
+    <div class="alert alert--danger">
+        <strong>
+            <span class="lang-en">These rules are not stylistic. Breaking any of them can take a whole node out of service, including storage that has nothing to do with this plugin.</span>
+            <span class="lang-zh">以下規則不是風格偏好。違反任何一條都可能讓整台節點失去服務能力，包括與本外掛完全無關的其他儲存。</span>
+        </strong>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Rule</span><span class="lang-zh">規則</span></th>
+                <th><span class="lang-en">Why</span><span class="lang-zh">原因</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><span class="lang-en">Never run the system-wide multipath flush (capital F). Flush one map: <code>multipath -f /dev/mapper/&lt;wwid&gt;</code></span>
+                        <span class="lang-zh">絕不執行全系統的 multipath flush（大寫 F）。只清單一 map：<code>multipath -f /dev/mapper/&lt;wwid&gt;</code></span></td>
+                    <td><span class="lang-en">It removes every unused map on the node, including other vendors' storage that happens to be idle. The build fails if that form appears anywhere in this repository.</span>
+                        <span class="lang-zh">它會清掉節點上所有未使用的 map，包含當下剛好閒置的其他廠商儲存。只要該指令出現在本專案任何檔案中，建置就會失敗。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Use <code>systemctl restart multipathd</code>, never <code>reload</code></span>
+                        <span class="lang-zh">用 <code>systemctl restart multipathd</code>，不要用 <code>reload</code></span></td>
+                    <td><span class="lang-en">Reload only re-reads the file; restart is what reapplies device-mapper state.</span>
+                        <span class="lang-zh">reload 只會重讀檔案，restart 才會重新套用 device-mapper 狀態。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Avoid <code>no_path_retry queue</code> and <code>dev_loss_tmo infinity</code></span>
+                        <span class="lang-zh">避免 <code>no_path_retry queue</code> 與 <code>dev_loss_tmo infinity</code></span></td>
+                    <td><span class="lang-en">With every path down, queued I/O that can never complete puts processes into uninterruptible sleep and the node has to be power-cycled. Use 30 / 5 / 60.</span>
+                        <span class="lang-zh">所有路徑失效時，永遠無法完成的排隊 I/O 會讓行程進入不可中斷睡眠，該節點只能斷電重開。請用 30 / 5 / 60。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">The plugin never rewrites a multipath file it did not create</span>
+                        <span class="lang-zh">外掛不會改寫非它建立的 multipath 設定檔</span></td>
+                    <td><span class="lang-en">Its own drop-in carries a version marker; a file without one is treated as operator-owned and left untouched.</span>
+                        <span class="lang-zh">它自己的 drop-in 帶有版本標記；沒有標記的檔案視為管理者自有，完全不動。</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ---- Supported features ---- -->
+<section class="doc-section" id="supported-features">
+    <h2 class="section-title">
+        <span class="lang-en">Supported Features</span>
+        <span class="lang-zh">功能支援表</span>
+    </h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Feature</span><span class="lang-zh">功能</span></th>
+                <th>PowerStore</th>
+                <th>PowerVault ME</th>
+                <th>PowerFlex</th>
+            </tr></thead>
+            <tbody>
+                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
+                    <td colspan="3"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
+                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td><td>✓</td><td>✓</td><td>—</td></tr>
+                <tr><td><span class="lang-en">Multipath I/O</span><span class="lang-zh">多路徑 I/O</span></td><td>dm-multipath</td><td>dm-multipath</td>
+                    <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td></tr>
+                <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td></tr>
+                <tr><td><span class="lang-en">Full clone via the array</span><span class="lang-zh">陣列端完整複製</span></td>
+                    <td colspan="3"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ---- Verification ---- -->
+<section class="doc-section" id="verification">
+    <h2 class="section-title">
+        <span class="lang-en">Verification Status</span>
+        <span class="lang-zh">驗證狀態</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">980 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears.</span>
+        <span class="lang-zh">980 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現。</span>
+    </p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Area</span><span class="lang-zh">項目</span></th>
+                <th><span class="lang-en">Source</span><span class="lang-zh">來源</span></th>
+                <th><span class="lang-en">Hardware</span><span class="lang-zh">實機</span></th>
+            </tr></thead>
+            <tbody>
+                <tr><td><span class="lang-en">PowerStore REST endpoints and fields</span><span class="lang-zh">PowerStore REST 端點與欄位</span></td>
+                    <td><span class="lang-en">PowerStore 4.x documentation</span><span class="lang-zh">PowerStore 4.x 文件</span></td>
+                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                <tr><td><span class="lang-en">PowerVault CLI grammar</span><span class="lang-zh">PowerVault CLI 語法</span></td>
+                    <td><span class="lang-en">ME5 CLI Reference Guide</span><span class="lang-zh">ME5 CLI Reference Guide</span></td>
+                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                <tr><td><span class="lang-en">PowerFlex login, volume, mapping, snapshot API</span><span class="lang-zh">PowerFlex 登入、volume、對應、快照 API</span></td>
+                    <td><span class="lang-en">PowerFlex REST documentation</span><span class="lang-zh">PowerFlex REST 文件</span></td>
+                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                <tr><td><span class="lang-en">SCSI vendor / product strings, WWN to WWID</span><span class="lang-zh">SCSI vendor／product 字串、WWN 轉 WWID</span></td>
+                    <td><span class="lang-en">inferred</span><span class="lang-zh">推斷</span></td>
+                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                <tr><td><span class="lang-en">Fibre Channel path</span><span class="lang-zh">Fibre Channel 路徑</span></td>
+                    <td>—</td>
+                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        <span class="lang-en">The full matrix, including what came from official documentation and what did not, is in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>.</span>
+        <span class="lang-zh">完整矩陣（包含哪些來自官方文件、哪些不是）請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING_zh-TW.md">docs/TESTING_zh-TW.md</a>。</span>
+    </p>
+</section>
+
+<!-- ---- Troubleshooting ---- -->
+<section class="doc-section" id="troubleshooting">
+    <h2 class="section-title">
+        <span class="lang-en">Troubleshooting</span>
+        <span class="lang-zh">疑難排解</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Every message carries a [type:storeid] prefix, so one storage can be grepped out of a busy journal.</span>
+        <span class="lang-zh">每一則訊息都帶有 [type:storeid] 前綴，可以從繁忙的 journal 中過濾出單一儲存。</span>
+    </p>
+    <pre><span class="cmd">journalctl</span> <span class="flag">-t</span> pvestatd <span class="flag">-t</span> pvedaemon | <span class="cmd">grep</span> dellpowerstore</pre>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Symptom</span><span class="lang-zh">症狀</span></th>
+                <th><span class="lang-en">Most likely cause</span><span class="lang-zh">最可能的原因</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><code>Parameter verification failed (400)</code></td>
+                    <td><span class="lang-en">The package is not installed on that node. Install it everywhere.</span>
+                        <span class="lang-zh">該節點沒有安裝套件。請在每台節點安裝。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Storage shows <code>inactive</code></span><span class="lang-zh">儲存顯示 <code>inactive</code></span></td>
+                    <td><span class="lang-en">Credentials, the management network, or a slow array. If other storages went inactive at the same time, suspect this one was slow — PVE polls sequentially.</span>
+                        <span class="lang-zh">帳密、管理網路，或陣列太慢。若其他儲存同時變 inactive，請懷疑是這個儲存慢 —— PVE 是依序輪詢的。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">New disks stop appearing</span><span class="lang-zh">新磁碟掃不到</span></td>
+                    <td><span class="lang-en">On PowerStore, the REST-side LUN id sequence climbing past what the host scans. The plugin assigns LUN ids itself to avoid it.</span>
+                        <span class="lang-zh">在 PowerStore 上，是 REST 端的 LUN ID 序列爬過主機掃描範圍。外掛改為自行配發 LUN ID 以迴避。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Cannot delete: device still in use</span><span class="lang-zh">無法刪除：裝置仍在使用中</span></td>
+                    <td><span class="lang-en">Usually host LVM having auto-activated a volume group that lives inside a guest disk. Deactivate it and add an LVM global_filter.</span>
+                        <span class="lang-zh">通常是主機端 LVM 自動啟用了客體磁碟內部的 volume group。請停用它並設定 LVM global_filter。</span></td>
+                </tr>
+                <tr>
+                    <td><span class="lang-en">Processes stuck in D state</span><span class="lang-zh">行程卡在 D state</span></td>
+                    <td><span class="lang-en">Queued I/O to a device with no working path. Check for no_path_retry queue, then restart multipathd.</span>
+                        <span class="lang-zh">對沒有可用路徑的裝置持續排隊 I/O。請檢查 no_path_retry queue，然後 restart multipathd。</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        <span class="lang-en">Full guide: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING.md">docs/TROUBLESHOOTING.md</a>.</span>
+        <span class="lang-zh">完整指南：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING_zh-TW.md">docs/TROUBLESHOOTING_zh-TW.md</a>。</span>
+    </p>
+</section>
+
+<!-- ---- Changelog ---- -->
+<section class="doc-section" id="changelog">
+    <h2 class="section-title">
+        <span class="lang-en">Changelog</span>
+        <span class="lang-zh">變更紀錄</span>
+    </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.0~beta1</div>
+        <div class="changelog-date">2026-07-26</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerFlex support: NVMe/TCP by default, SDC optional. Both PowerFlex authentication generations are detected automatically.</span>
+            <span class="lang-zh">新增 PowerFlex 支援：預設 NVMe/TCP，SDC 為選項。兩種 PowerFlex 認證世代皆自動偵測。</span>
+        </div>
+    </div>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.6.0~beta1</div>
+        <div class="changelog-date">2026-07-26</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerVault ME4/ME5 support. HTTP 200 is not success on this family, expand takes a delta, and names are limited to 32 bytes without a dot.</span>
+            <span class="lang-zh">新增 PowerVault ME4／ME5 支援。這個系列的 HTTP 200 不代表成功、expand 收的是增量、名稱上限 32 bytes 且不可含句點。</span>
+        </div>
+    </div>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.5.0~beta1</div>
+        <div class="changelog-date">2026-07-26</div>
+        <div class="changelog-summary">
+            <span class="lang-en">First beta: the dellpowerstore storage type, the abstract block base, the recovery tool and the full documentation set.</span>
+            <span class="lang-zh">第一個 beta：dellpowerstore storage type、抽象 block 基底、災難復原工具與完整文件。</span>
+        </div>
+    </div>
+
+    <p>
+        <span class="lang-en">Full changelog: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</span>
+        <span class="lang-zh">完整變更紀錄：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/CHANGELOG_zh-TW.md">CHANGELOG_zh-TW.md</a>。</span>
+    </p>
+</section>
+
+<!-- ---- Acknowledgments ---- -->
+<section class="doc-section" id="acknowledgments">
+    <h2 class="section-title">
+        <span class="lang-en">Acknowledgments</span>
+        <span class="lang-zh">致謝</span>
+    </h2>
+    <p>
+        <span class="lang-en">The host-side layer — device discovery, multipath handling, the anti-hang rules and the orphan reaper — is carried over from two sibling projects, where those lessons were paid for in production:</span>
+        <span class="lang-zh">主機端底層 —— 裝置探索、multipath 處理、防止卡死的規則與 orphan 清理 —— 承接自兩個姊妹專案，那些教訓是在正式環境付出代價換來的：</span>
+    </p>
+    <ul>
+        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">jt-pve-storage-purestorage</a></li>
+        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">jt-pve-storage-netapp</a></li>
+    </ul>
+    <p>
+        <span class="lang-en">In the absence of hardware, this plugin was written against Dell's published documentation: the PowerStore REST guide, the PowerVault ME5 CLI Reference Guide, and the PowerFlex REST and SDC material.</span>
+        <span class="lang-zh">在沒有實機的情況下，本外掛是依據 Dell 公開的文件撰寫的：PowerStore REST 指南、PowerVault ME5 CLI Reference Guide，以及 PowerFlex 的 REST 與 SDC 資料。</span>
+    </p>
+</section>
+
+</div><!-- /content-wrap -->
+
+<footer class="footer">
+    <div class="footer__content">
+        <div class="footer__text">
+            <span class="lang-en">MIT License &middot; An independent community project, not affiliated with Dell Technologies</span>
+            <span class="lang-zh">MIT 授權 &middot; 獨立社群專案，與 Dell Technologies 無隸屬關係</span>
+        </div>
+        <div class="footer__text">Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</div>
+    </div>
 </footer>
 
 </main>
+
+<script>
+(function() {
+    // Sidebar search
+    window.filterSidebar = function(query) {
+        var q = query.toLowerCase().trim();
+        document.querySelectorAll('.sidebar__link').forEach(function(link) {
+            var text = link.textContent.toLowerCase();
+            link.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+        });
+        document.querySelectorAll('.sidebar__section').forEach(function(section) {
+            var visible = section.querySelectorAll('.sidebar__link:not([style*="none"])');
+            section.style.display = visible.length ? '' : 'none';
+        });
+    };
+
+    // Language toggle
+    window.toggleLang = function() {
+        var current = document.documentElement.getAttribute('data-lang');
+        var next = current === 'en' ? 'zh' : 'en';
+        var url = new URL(window.location);
+        url.searchParams.set('lang', next);
+        window.location.href = url.toString();
+    };
+
+    // Restore language: URL param > localStorage > default (en)
+    var urlLang = new URLSearchParams(window.location.search).get('lang');
+    if (urlLang === 'en' || urlLang === 'zh') {
+        document.documentElement.setAttribute('data-lang', urlLang);
+        try { localStorage.setItem('jt-dellemc-lang', urlLang); } catch(e) {}
+    } else {
+        try {
+            var saved = localStorage.getItem('jt-dellemc-lang');
+            if (saved === 'en' || saved === 'zh') {
+                document.documentElement.setAttribute('data-lang', saved);
+            }
+        } catch(e) {}
+    }
+
+    // Sidebar toggle (mobile)
+    window.toggleSidebar = function() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.querySelector('.sidebar-overlay');
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+    };
+
+    // Close sidebar when clicking a link (mobile)
+    document.querySelectorAll('.sidebar__link').forEach(function(link) {
+        link.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) {
+                document.getElementById('sidebar').classList.remove('open');
+                document.querySelector('.sidebar-overlay').classList.remove('show');
+            }
+        });
+    });
+
+    // Active sidebar link tracking on scroll
+    var sections = document.querySelectorAll('.doc-section, .hero');
+    var navLinks = document.querySelectorAll('.sidebar__link');
+
+    function updateActiveLink() {
+        var scrollPos = window.scrollY + 100;
+        var current = '';
+        sections.forEach(function(section) {
+            if (section.offsetTop <= scrollPos) {
+                current = section.id;
+            }
+        });
+        navLinks.forEach(function(link) {
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + current) {
+                link.classList.add('active');
+            }
+        });
+    }
+
+    var scrollTimer;
+    window.addEventListener('scroll', function() {
+        if (scrollTimer) cancelAnimationFrame(scrollTimer);
+        scrollTimer = requestAnimationFrame(updateActiveLink);
+    });
+    updateActiveLink();
+})();
+</script>
+
 </body>
 </html>

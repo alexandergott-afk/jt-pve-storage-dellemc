@@ -9,3 +9,6 @@ debian/files
 debian/*.log
 .claude/
 ref/
+
+# Internal specification - must not be published
+jt-pve-storage-dellemc.md

@@ -2,11 +2,11 @@
 
 Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
-**[English](README.md)**
+**[專案文件網站](https://jasoncheng7115.github.io/jt-pve-storage-dellemc/)** &middot; **[English](README.md)**
 
 > ## ⚠️ BETA 版軟體 —— 安裝前請務必閱讀
 >
-> **這是 beta 版（0.5.0~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
+> **這是 beta 版（0.7.0~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
 >
 > **請不要安裝在正式環境的叢集，也不要指向存有重要資料的陣列。** 儲存外掛是以 root 權限執行的，它會在陣列上建立與刪除 volume，並在每一台節點上操作區塊裝置。這裡的缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態；而且因為 multipath 與 SCSI 狀態是全節點共用的，受害範圍不一定只限於本外掛自己的儲存。
 >
@@ -18,7 +18,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.5.0~beta1 — `dellpowerstore` plugin 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
+> **版本 0.7.0~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
 > 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
@@ -30,9 +30,8 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 | 4 | `dellpowerstore` plugin、災難復原工具、文件 | **程式碼已完成**，實機測試未進行 |
 | 5 | FC 驗證、PVE 9.2 驗證、發佈 1.0.0 | 需要實機 |
 | 6 | PowerVault ME4／ME5 的 `dellpowervault` plugin | **程式碼已完成**，實機測試未進行 |
-| 7+ | PowerFlex → PowerMax（各自另立子規格） | 未開始 |
-
-完整開發規格請見 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md)。
+| 7 | `dellpowerflex` plugin，NVMe/TCP 與 SDC | **程式碼已完成**，實機測試未進行 |
+| 8+ | PowerMax | 未開始 |
 
 ## 產品系列
 
@@ -42,13 +41,13 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 |---|---|---|---|---|
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI／FC（dm-multipath） | **開發中** |
 | 2 | **PowerVault ME4／ME5** | `dellpowervault` | iSCSI／FC／SAS（dm-multipath） | **開發中** |
-| 3 | PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | 規劃中 |
+| 3 | **PowerFlex** | `dellpowerflex` | NVMe/TCP 或 SDC | **開發中** |
 | 4 | PowerMax | `dellpowermax` | FC／iSCSI（dm-multipath） | 規劃中 |
 | — | PowerScale | `dellpowerscale` | NFS（目錄語意） | 未排入 |
 | — | Unity XT | `dellunity` | iSCSI／FC | 未排入 |
 | — | ObjectScale、PowerProtect | — | — | 不列入範圍 |
 
-ME5 與 PowerMax 會繼承 block 基底類別；PowerFlex 不會，它的資料路徑是 kernel module 呈現的 `/dev/scini*`，沒有 SAN 登入，也不走 dm-multipath。
+PowerStore、PowerVault ME 與 PowerMax 共用 block 基底類別；PowerFlex 不是，它的 volume 是透過 SDC kernel module 或 NVMe/TCP namespace 出現，沒有 SAN 登入，也不走 dm-multipath。
 
 PowerScale 未排入。它是 NAS，需要自己的目錄語意與 content type，而不是這裡其他系列共用的 block 層；而且 Proxmox VE 內建的 NFS 儲存已經涵蓋它大部分的功能。
 
@@ -142,7 +141,7 @@ apt install ./jt-pve-storage-dellemc_<version>_all.deb
 
 ## 設定
 
-新增 PowerStore 儲存的方式如下：
+### PowerStore
 
 ```bash
 pvesm add dellpowerstore ps1 \
@@ -150,10 +149,40 @@ pvesm add dellpowerstore ps1 \
     --dell-username pveadmin \
     --dell-password 'SecurePassword' \
     --dell-protocol iscsi \
-    --pstore-volume-group pve-vg \
     --content images,rootdir \
     --shared 1
 ```
+
+多 appliance 的叢集請加 `--pstore-appliance`；要把所有 volume 放進同一個群組請加 `--pstore-volume-group`；使用 Fibre Channel 請改 `--dell-protocol fc`。
+
+### PowerVault ME4／ME5
+
+```bash
+pvesm add dellpowervault me5 \
+    --dell-portal 192.168.1.60 \
+    --dell-username manage \
+    --dell-password 'SecurePassword' \
+    --pvault-pool A \
+    --content images,rootdir \
+    --shared 1
+```
+
+陣列有多個 pool 時 `--pvault-pool` 為必填。storage id 請取短一點：這個系列的名稱上限是 32 bytes，放不下的名稱會被拒絕而不是截斷。
+
+### PowerFlex
+
+```bash
+pvesm add dellpowerflex pflex1 \
+    --dell-portal 192.168.1.70 \
+    --dell-username admin \
+    --dell-password 'SecurePassword' \
+    --dell-protocol nvme \
+    --pflex-storage-pool pool1 \
+    --content images,rootdir \
+    --shared 1
+```
+
+`--pflex-storage-pool` 為必填。`--dell-protocol nvme`（預設）使用 kernel 內建的 NVMe/TCP initiator；`sdc` 使用 Dell 的 kernel module，必須由您自行安裝 —— 選用前請先閱讀 [docs/POWERFLEX_SDC_zh-TW.md](docs/POWERFLEX_SDC_zh-TW.md)。
 
 參數說明：[`docs/CONFIGURATION_zh-TW.md`](docs/CONFIGURATION_zh-TW.md)。
 初次設定：[`docs/QUICKSTART_zh-TW.md`](docs/QUICKSTART_zh-TW.md)。

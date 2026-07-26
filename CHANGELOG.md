@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 繁體中文版本：[CHANGELOG_zh-TW.md](CHANGELOG_zh-TW.md)
 
+## [0.7.0~beta1] - 2026-07-26
+
+Adds the `dellpowerflex` storage type for PowerFlex 3.x and 4.x.
+
+### Added
+- `PowerFlex/API.pm`, `PowerFlex/Naming.pm`, `PowerFlex/Host.pm` and
+  `DellPowerFlexPlugin.pm`.
+- `Common/Schema.pm`: the shared `dell-*` options, extracted so a family that
+  is not a block plugin can use them without inheriting `BlockBase`.
+- `docs/POWERFLEX_SDC.md`: the SDC and NVMe/TCP comparison, Dell's support
+  matrix and where it lives, and how to check whether a kernel is supported —
+  as links to the official sources rather than a copy that would go stale.
+- Setup instructions for all three families in the README, and a link to the
+  documentation site under the title.
+- 991 unit tests in total.
+
+### PowerFlex specifics
+- **It does not inherit the block base class.** Volumes arrive through Dell's
+  SDC kernel module or the in-kernel NVMe/TCP initiator; there is no SCSI LUN
+  and no dm-multipath, so everything `BlockBase` does for devices would be
+  wrong.
+- **NVMe/TCP is the default.** Dell's Proxmox VE guidance lists SDC support
+  for PVE 8.x and only *planned* support for PVE 9.x, and `scini` must be
+  compiled for each kernel — so a kernel upgrade can leave a node with no
+  storage until it rebuilds. NVMe/TCP uses the kernel Proxmox already ships.
+- **NVMe paths are ANA, and the timeouts matter.** Connections are made with
+  `ctrl-loss-tmo` 60s rather than the kernel's 600s: it is the NVMe
+  equivalent of `no_path_retry`, and an unbounded value turns a total path
+  loss into what looks like a hang. Activation warns when
+  `nvme_core.multipath` is disabled, and when only some of the array's
+  targets could be reached.
+- **Both authentication generations are detected**, not configured: the 4.x
+  bearer token from `/rest/auth/login` (which expires in five minutes) and
+  the 3.x token from `/api/login` that is then used as a password. A refused
+  password is never replayed against the other endpoint, which would double
+  the failed-login count against a lockout policy.
+- Sizes round up to the 8 GB allocation unit; names are limited to 31
+  characters.
+
+### Removed
+- The internal development specification is no longer in the repository.
+
 ## [0.6.0~beta1] - 2026-07-26
 
 Adds the `dellpowervault` storage type for the PowerVault ME4 and ME5 series.

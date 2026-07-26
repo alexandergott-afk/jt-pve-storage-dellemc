@@ -2,11 +2,11 @@
 
 Dell EMC storage plugins for Proxmox VE.
 
-**[繁體中文說明](README_zh-TW.md)**
+**[Documentation site](https://jasoncheng7115.github.io/jt-pve-storage-dellemc/)** &middot; **[繁體中文說明](README_zh-TW.md)**
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.5.0~beta1). It has never been run against a
+> **This is a beta release (0.7.0~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.5.0~beta1 — the `dellpowerstore` plugin is code complete, and
+> **Version 0.7.0~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
@@ -51,10 +51,8 @@ all operate on a single VM disk as their natural unit.
 | 4 | `dellpowerstore` plugin, recovery tool, docs | **code done**, on-hardware pass outstanding |
 | 5 | FC verification, PVE 9.2 verification, 1.0.0 release | needs hardware |
 | 6 | `dellpowervault` plugin for PowerVault ME4/ME5 | **code done**, on-hardware pass outstanding |
-| 7+ | PowerFlex, then PowerMax (separate specs) | not started |
-
-The full development specification lives in
-[`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md).
+| 7 | `dellpowerflex` plugin, NVMe/TCP and SDC | **code done**, on-hardware pass outstanding |
+| 8+ | PowerMax | not started |
 
 ## Product families
 
@@ -67,15 +65,15 @@ an API client, not a restructuring.
 |---|---|---|---|---|
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
 | 2 | **PowerVault ME4/ME5** | `dellpowervault` | iSCSI / FC / SAS (dm-multipath) | **in development** |
-| 3 | PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned |
+| 3 | **PowerFlex** | `dellpowerflex` | NVMe/TCP or SDC | **in development** |
 | 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
 | — | PowerScale | `dellpowerscale` | NFS (directory semantics) | not scheduled |
 | — | Unity XT | `dellunity` | iSCSI / FC | not scheduled |
 | — | ObjectScale, PowerProtect | — | — | out of scope |
 
-ME5 and PowerMax will inherit the block base class. PowerFlex will not: its
-data path is a kernel module presenting `/dev/scini*`, with no SAN login and
-no dm-multipath.
+PowerStore, PowerVault ME and PowerMax share the block base class. PowerFlex
+does not: its volumes arrive through the SDC kernel module or an NVMe/TCP
+namespace, with no SAN login and no dm-multipath.
 
 PowerScale is not scheduled. It is NAS, so it would need its own directory
 semantics and content types rather than the block layer everything else here
@@ -221,7 +219,7 @@ does not reliably replace already-loaded Perl modules.
 
 ## Configuration
 
-Add a PowerStore storage:
+### PowerStore
 
 ```bash
 pvesm add dellpowerstore ps1 \
@@ -229,10 +227,46 @@ pvesm add dellpowerstore ps1 \
     --dell-username pveadmin \
     --dell-password 'SecurePassword' \
     --dell-protocol iscsi \
-    --pstore-volume-group pve-vg \
     --content images,rootdir \
     --shared 1
 ```
+
+Add `--pstore-appliance` on a multi-appliance cluster, `--pstore-volume-group`
+to keep every volume in one group, and `--dell-protocol fc` for Fibre Channel.
+
+### PowerVault ME4 / ME5
+
+```bash
+pvesm add dellpowervault me5 \
+    --dell-portal 192.168.1.60 \
+    --dell-username manage \
+    --dell-password 'SecurePassword' \
+    --pvault-pool A \
+    --content images,rootdir \
+    --shared 1
+```
+
+`--pvault-pool` is required on an array with more than one pool. Keep the
+storage id short: this family limits names to 32 bytes, and a name that would
+not fit is refused rather than truncated.
+
+### PowerFlex
+
+```bash
+pvesm add dellpowerflex pflex1 \
+    --dell-portal 192.168.1.70 \
+    --dell-username admin \
+    --dell-password 'SecurePassword' \
+    --dell-protocol nvme \
+    --pflex-storage-pool pool1 \
+    --content images,rootdir \
+    --shared 1
+```
+
+`--pflex-storage-pool` is required. `--dell-protocol nvme` (the default) uses
+NVMe/TCP with the in-kernel initiator; `sdc` uses Dell's kernel module, which
+you must install yourself — read
+[docs/POWERFLEX_SDC.md](docs/POWERFLEX_SDC.md) before choosing it.
 
 Parameter reference: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 First-time setup: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).

@@ -1,3 +1,33 @@
+jt-pve-storage-dellemc (0.7.0~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Adds the dellpowerflex storage type for PowerFlex 3.x and 4.x.
+  * PowerFlex does not inherit the block base class: volumes arrive through
+    Dell's SDC kernel module or, on 4.0 and later, the in-kernel NVMe/TCP
+    initiator. There is no SCSI LUN and no dm-multipath.
+  * NVMe/TCP is the default data path. Dell's own Proxmox VE guidance lists
+    SDC support for PVE 8.x and only *planned* support for PVE 9.x, and the
+    scini module has to be compiled per kernel, so a kernel upgrade can leave
+    a node without storage. NVMe/TCP uses the kernel Proxmox already ships.
+  * NVMe connections are made with a finite ctrl-loss-tmo (60s rather than
+    the kernel's 600s), which is the NVMe equivalent of no_path_retry, and
+    activation warns when nvme_core.multipath is disabled or when only some
+    of the array's targets could be reached.
+  * Both PowerFlex authentication generations are detected automatically:
+    the 4.x bearer token and the 3.x token-as-password.
+  * Volume sizes are rounded up to PowerFlex's 8 GB allocation unit; names
+    are limited to 31 characters.
+  * Common::Schema now owns the shared dell-* options so a non-block family
+    can use them without inheriting the block base.
+  * docs/POWERFLEX_SDC.md documents the SDC support matrix, where Dell
+    publishes it, and how to check a given kernel — with links to the
+    official sources rather than a copy that would go stale.
+  * The internal development specification is no longer part of the package
+    or the repository.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Mon, 27 Jul 2026 00:30:00 +0800
+
 jt-pve-storage-dellemc (0.6.0~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. Neither storage type has been run

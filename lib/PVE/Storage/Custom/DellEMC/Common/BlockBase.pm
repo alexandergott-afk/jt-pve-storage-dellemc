@@ -16,6 +16,7 @@ use PVE::Tools;
 use PVE::INotify;
 
 use PVE::Storage::Custom::DellEMC::Common::Naming;
+use PVE::Storage::Custom::DellEMC::Common::Schema;
 use PVE::Storage::Custom::DellEMC::Common::WwidState;
 use PVE::Storage::Custom::DellEMC::Common::Health;
 use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(
@@ -79,177 +80,25 @@ my $HEALTH     = 'PVE::Storage::Custom::DellEMC::Common::Health';
 
 sub api { return APIVERSION }
 
-# PVE merges every registered plugin's properties() into ONE schema and dies
-# with "duplicate property" if two plugins declare the same name — see
-# PVE::SectionConfig::init. The dell-* options are shared by every Dell block
-# family, so exactly one registered class may declare them. The first family
-# asked takes the job; the others declare only their own.
-my $COMMON_PROPERTIES_OWNER;
+# The shared dell-* options live in Common::Schema, which also owns the rule
+# that exactly one registered class may declare them: PVE dies with
+# "duplicate property" otherwise, and that takes down every storage on the
+# node. PowerFlex needs the same options without being a block plugin, which
+# is why the registry is not in this class.
+my $SCHEMA = 'PVE::Storage::Custom::DellEMC::Common::Schema';
 
 sub properties {
     my ($class) = @_;
-
-    my $props = { %{ $class->family_properties() } };
-
-    $COMMON_PROPERTIES_OWNER = $class unless defined $COMMON_PROPERTIES_OWNER;
-    if ($COMMON_PROPERTIES_OWNER eq $class) {
-        my $common = $class->common_properties();
-        $props->{$_} //= $common->{$_} for keys %$common;
-    }
-
-    return $props;
+    return $SCHEMA->properties($class, $class->family_properties());
 }
 
 sub options {
     my ($class) = @_;
-
-    return {
-        %{ $class->common_options() },
-        %{ $class->family_options() },
-    };
+    return $SCHEMA->options($class->family_options());
 }
 
-sub common_properties {
-    return {
-        'dell-portal' => {
-            description => "Management IP address or hostname of the array.",
-            type => 'string',
-        },
-        'dell-username' => {
-            description => "Username for the array's REST API.",
-            type => 'string',
-        },
-        'dell-password' => {
-            description => "Password for the array's REST API.",
-            type => 'string',
-        },
-        'dell-ssl-verify' => {
-            description => "Verify the array's SSL certificate.",
-            type => 'boolean',
-            default => 0,
-        },
-        'dell-protocol' => {
-            description => "SAN protocol: 'iscsi' or 'fc' (Fibre Channel).",
-            type => 'string',
-            enum => ['iscsi', 'fc'],
-            default => 'iscsi',
-        },
-        'dell-host-mode' => {
-            description => "How host objects are created on the array."
-                . " 'per-node' registers one host per PVE node, which is what"
-                . " lets the array report per-node connectivity. 'shared'"
-                . " registers a single host group for the whole cluster.",
-            type => 'string',
-            enum => ['per-node', 'shared'],
-            default => 'per-node',
-        },
-        'dell-cluster-name' => {
-            description => "Cluster name used when naming host objects on the"
-                . " array. Distinguishes several PVE clusters sharing one array.",
-            type => 'string',
-            default => 'pve',
-            optional => 1,
-        },
-        'dell-device-timeout' => {
-            description => "Seconds to wait for a volume's multipath device to"
-                . " appear after it has been mapped.",
-            type => 'integer',
-            minimum => 10,
-            maximum => 300,
-            default => 60,
-        },
-        'dell-portal-probe-timeout' => {
-            description => "Seconds for the TCP pre-check that skips iSCSI"
-                . " portals this node cannot reach, before iscsiadm discovery"
-                . " and login are attempted. Arrays routinely publish more"
-                . " portal addresses than a given node is cabled for, and each"
-                . " unreachable one otherwise costs 30s discovery plus 60s"
-                . " login. Set to 0 to disable the pre-check.",
-            type => 'integer',
-            minimum => 0,
-            maximum => 30,
-            default => 2,
-        },
-        'dell-status-timeout' => {
-            description => "REST timeout in seconds on the pvestatd health path"
-                . " (activate_storage and the foreground of status). That path"
-                . " is polled roughly every 10 seconds and PVE processes"
-                . " storages sequentially, so a slow array would otherwise back"
-                . " up the whole cycle and starve sibling storages on the node"
-                . " into 'inactive'. The health client makes a single attempt:"
-                . " the next poll is the retry. Raise on slow management"
-                . " networks.",
-            type => 'integer',
-            minimum => 2,
-            maximum => 60,
-            default => 5,
-        },
-        'dell-activate-deadline' => {
-            description => "Cumulative wall-clock budget in seconds for the"
-                . " iSCSI portal discovery and login loop in activate_storage."
-                . " Per-portal timeouts bound each portal but not the loop"
-                . " total, so several reachable-but-hanging portals can still"
-                . " stall pvestatd. Once the budget is spent AND at least one"
-                . " portal is logged in, the rest are deferred to a later"
-                . " activation. The budget is never enforced while zero paths"
-                . " are up. Set to 0 to disable it.",
-            type => 'integer',
-            minimum => 0,
-            maximum => 300,
-            default => 30,
-        },
-        'dell-config-backup-timeout' => {
-            description => "Seconds to wait for the auxiliary 1 MB config"
-                . " backup volume's device during a snapshot. That volume is"
-                . " only read by pve-dell-config-get for disaster recovery, so"
-                . " a shorter separate timeout keeps a slow fabric from"
-                . " stalling every snapshot.",
-            type => 'integer',
-            minimum => 5,
-            maximum => 60,
-            default => 15,
-        },
-        'dell-rescan-interval' => {
-            description => "Minimum seconds between the periodic SAN rescans"
-                . " activate_storage performs. PVE calls activate_storage on"
-                . " every pvestatd poll, so running a host-wide multipath"
-                . " reconfigure and udev trigger unconditionally means doing it"
-                . " six times a minute on every node, which keeps device-mapper"
-                . " in flux while other operations are trying to discover"
-                . " devices. A rescan always happens immediately when this node"
-                . " logs in to a new portal; this interval only bounds the"
-                . " periodic safety net. Set to 0 to rescan on every"
-                . " activation.",
-            type => 'integer',
-            minimum => 0,
-            maximum => 3600,
-            default => 300,
-            optional => 1,
-        },
-    };
-}
-
-sub common_options {
-    return {
-        'dell-portal'                => { fixed => 1 },
-        'dell-username'              => {},
-        'dell-password'              => {},
-        'dell-ssl-verify'            => { optional => 1 },
-        'dell-protocol'              => { optional => 1 },
-        'dell-host-mode'             => { optional => 1 },
-        'dell-cluster-name'          => { optional => 1 },
-        'dell-device-timeout'        => { optional => 1 },
-        'dell-portal-probe-timeout'  => { optional => 1 },
-        'dell-status-timeout'        => { optional => 1 },
-        'dell-activate-deadline'     => { optional => 1 },
-        'dell-config-backup-timeout' => { optional => 1 },
-        'dell-rescan-interval'       => { optional => 1 },
-        nodes   => { optional => 1 },
-        disable => { optional => 1 },
-        content => { optional => 1 },
-        shared  => { optional => 1 },
-    };
-}
+sub common_properties { return $SCHEMA->common_properties() }
+sub common_options    { return $SCHEMA->common_options() }
 
 # Block families are raw-only and hold VM disks and container root
 # filesystems. A family that is not block-based must not inherit this class.
@@ -628,6 +477,15 @@ sub _wait_opts {
 
 sub activate_storage {
     my ($class, $storeid, $scfg, $cache) = @_;
+
+    # dell-protocol is shared with PowerFlex, whose values mean nothing to a
+    # SAN family. Rejecting it here beats letting it fall through to the
+    # iSCSI path and failing with something unrelated.
+    my $protocol = $class->_protocol($scfg);
+    die "Storage '$storeid' is a " . $class->type() . " storage, which speaks"
+      . " iSCSI or Fibre Channel. 'dell-protocol $protocol' belongs to the"
+      . " PowerFlex family; use 'iscsi' or 'fc'.\n"
+        unless $protocol eq 'iscsi' || $protocol eq 'fc';
 
     # This runs on the pvestatd health path: single attempt, short timeout.
     eval { $class->_array_ping($scfg, status => 1, storeid => $storeid) };
