@@ -154,6 +154,26 @@ sub multipath_defaults  { $_[0]->_abstract('multipath_defaults') }
 # plugin-written drop-in is rewritten.
 sub multipath_config_version { return 1 }
 
+# May this family spend one extra volume per snapshot on a copy of the VM
+# configuration?
+#
+# It is a real cost, not a rounding error: every snapshot of a VM creates an
+# additional small volume, so a family whose volume or snapshot count is the
+# binding limit cannot afford it. Such a family returns 0 here and the
+# feature is never offered, whatever dell-config-backup says.
+sub supports_config_backup { return 1 }
+
+# Is the config backup actually in use for this storage?
+sub _config_backup_enabled {
+    my ($class, $scfg) = @_;
+
+    return 0 unless $class->supports_config_backup();
+
+    my $value = $scfg->{'dell-config-backup'};
+
+    return defined $value ? ($value ? 1 : 0) : 1;
+}
+
 # Cheap reachability check for the health path. Must die on failure.
 sub _array_ping         { $_[0]->_abstract('_array_ping') }
 
@@ -1132,7 +1152,7 @@ sub free_image {
         my $vmid = $1;
         my $prefix = $class->naming->volume_prefix($storeid) . "${vmid}-disk";
         my $remaining = eval { $class->_array_list_volumes($scfg, $storeid, $prefix) } // [];
-        unless (@$remaining) {
+        if (!@$remaining && $class->supports_config_backup()) {
             eval { $class->_cleanup_config_volumes($scfg, $storeid, $vmid) };
             warn "Config volume cleanup failed (not fatal): $@" if $@;
         }
@@ -1551,7 +1571,8 @@ sub volume_snapshot {
     eval { $class->_array_snapshot_create($scfg, $storeid, $array_name, $snap_name) };
     die "Failed to create snapshot '$snap' of volume '$volname': $@" if $@;
 
-    if ($volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
+    if ($class->_config_backup_enabled($scfg)
+        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
         my $vmid = $1;
         eval { $class->_backup_vm_config($scfg, $storeid, $vmid, $snap) };
         warn "VM config backup failed (not fatal): $@" if $@;
@@ -1582,7 +1603,10 @@ sub volume_snapshot_delete {
         die "Failed to delete snapshot '$snap' of volume '$volname': $err";
     }
 
-    if ($volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
+    # Clean up even when the feature is now switched off: a storage that had
+    # it enabled before still has the volumes.
+    if ($class->supports_config_backup()
+        && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+$/) {
         my $vmid = $1;
         eval { $class->_delete_config_volume($scfg, $storeid, $vmid, $snap) };
         warn "Config volume cleanup failed (not fatal): $@" if $@;

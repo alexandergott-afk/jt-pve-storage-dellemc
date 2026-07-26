@@ -23,7 +23,7 @@ boundary that lets the plugin share an array with other workloads.
 | EFI disk | Volume | `pve-{storeid}-{vmid}-efidisk{n}` |
 | TPM state | Volume | `pve-{storeid}-{vmid}-tpmstate{n}` |
 | RAM state (vmstate) | Volume | `pve-{storeid}-{vmid}-state-{snapname}` |
-| VM config backup | Volume (1 MB, ext4) | `pve-{storeid}-{vmid}-vmconf-{snapname}` |
+| VM config backup | Volume (1 MB, ext4) | `pve-{storeid}-{vmid}-vmconf-{snapname}` (PowerStore only) |
 | Snapshot | Volume snapshot | `{volume}.pve-snap-{snapname}` |
 | Template marker | Volume snapshot | `{volume}.pve-base` |
 | PVE node | Host | `pve-{cluster}-{node}` |

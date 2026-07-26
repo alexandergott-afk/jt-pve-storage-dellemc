@@ -553,6 +553,14 @@ SKIP: {
     ok('DELL EMC' =~ $P->_vendor_re, 'including the spaced spelling');
     ok('NETAPP' !~ $P->_vendor_re, 'another vendor does not');
 
+    # The VM config backup volume is not offered on this family: an ME array's
+    # volume ceiling is too low to spend one extra volume per snapshot. It must
+    # stay off even when a storage.cfg asks for it.
+    is($P->supports_config_backup(), 0, 'config backup is not offered');
+    is($P->_config_backup_enabled({}), 0, '... so it is off by default');
+    is($P->_config_backup_enabled({ 'dell-config-backup' => 1 }), 0,
+        '... and stays off when the option asks for it');
+
     my $conf = $P->_multipath_config_content();
     like($conf, qr/product\s+"ME\[45\]/, 'the product string covers ME4 and ME5');
     unlike($conf, qr/no_path_retry\s+queue/, 'never writes queueing');

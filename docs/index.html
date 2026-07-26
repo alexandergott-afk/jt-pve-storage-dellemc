@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.0~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.1~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -320,8 +320,8 @@
                 <span class="lang-zh">快照連同 VM 設定一起保存</span>
             </div>
             <div class="card__desc">
-                <span class="lang-en">A storage snapshot restores the disk; the configuration lives in /etc/pve. Every snapshot also writes the VM config to a 1 MB volume, readable back by pve-dell-config-get even when /etc/pve is gone.</span>
-                <span class="lang-zh">儲存快照只還原磁碟，設定放在 /etc/pve。因此每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，即使 /etc/pve 已不存在，也能用 pve-dell-config-get 讀回來。</span>
+                <span class="lang-en">A storage snapshot restores the disk; the configuration lives in /etc/pve. On PowerStore, every snapshot also writes the VM config to a 1 MB volume, readable back by pve-dell-config-get even when /etc/pve is gone. Not offered on PowerVault ME, whose volume ceiling is too low to spend one volume per snapshot; set <code>dell-config-backup 0</code> to turn it off on PowerStore too.</span>
+                <span class="lang-zh">儲存快照只還原磁碟，設定放在 /etc/pve。因此在 PowerStore 上，每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，即使 /etc/pve 已不存在，也能用 pve-dell-config-get 讀回來。PowerVault ME 系列不提供此功能，因為它的 volume 數量上限太少，無法為每個快照再多花一個 volume；在 PowerStore 上也可以用 <code>dell-config-backup 0</code> 關閉。</span>
             </div>
         </div>
         <div class="card">
@@ -867,7 +867,9 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                 <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
                     <td colspan="3"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
                 <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-                <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td><td>✓</td><td>✓</td><td>—</td></tr>
+                <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td>
+                    <td><span class="lang-en">✓ (optional)</span><span class="lang-zh">✓（可關閉）</span></td>
+                    <td><span class="lang-en">— (volume ceiling too low)</span><span class="lang-zh">—（volume 上限太少）</span></td><td>—</td></tr>
                 <tr><td><span class="lang-en">Multipath I/O</span><span class="lang-zh">多路徑 I/O</span></td><td>dm-multipath</td><td>dm-multipath</td>
                     <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td></tr>
                 <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td></tr>
@@ -978,6 +980,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.1~beta1</div>
+        <div class="changelog-date">2026-07-26</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The VM config backup volume is no longer offered on PowerVault ME, whose volume ceiling is too low to spend one volume per snapshot. On PowerStore it stays on by default and can be turned off with the new dell-config-backup option.</span>
+            <span class="lang-zh">PowerVault ME 系列不再提供 VM 設定備份卷，因為它的 volume 上限太少，無法為每個快照再多花一個 volume。PowerStore 上維持預設開啟，並可用新增的 dell-config-backup 選項關閉。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.0~beta1</div>

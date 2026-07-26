@@ -113,10 +113,12 @@ pve-dell-config-get -l ps1 999      # the config backup taken alongside it
 qm delsnapshot 999 before-change
 ```
 
-Every snapshot also writes the VM's configuration to a 1 MB volume, because a
-storage snapshot restores the disk and nothing else. `pve-dell-config-get`
-reads those back, including when `/etc/pve` is gone — see
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+On PowerStore, every snapshot also writes the VM's configuration to a 1 MB
+volume, because a storage snapshot restores the disk and nothing else.
+`pve-dell-config-get` reads those back, including when `/etc/pve` is gone —
+see [TROUBLESHOOTING.md](TROUBLESHOOTING.md). Set `dell-config-backup 0` to
+turn it off; on PowerVault ME it is never done, because one extra volume per
+snapshot is too much for that family's volume ceiling.
 
 ## 8. Clean up the test
 

@@ -201,4 +201,15 @@ is($P->_host_mode($scfg), 'per-node', 'per-node host mode by default');
 is($P->_protocol($scfg), 'iscsi', 'iSCSI by default');
 is($P->capacity_scope($scfg), 'array', 'capacity is reported for the array');
 
+# The VM config backup volume costs one extra volume per snapshot of a VM.
+# PowerStore's ceilings are high enough to carry that, so it stays on by
+# default — but an operator close to a limit must be able to switch it off.
+is($P->supports_config_backup(), 1, 'the family offers the config backup');
+is($P->_config_backup_enabled($scfg), 1, '... and it is on by default');
+is($P->_config_backup_enabled({ %$scfg, 'dell-config-backup' => 0 }), 0,
+    '... and can be turned off');
+is($P->_config_backup_enabled({ %$scfg, 'dell-config-backup' => 1 }), 1,
+    '... and explicitly on stays on');
+ok($P->properties()->{'dell-config-backup'}, 'the option is declared');
+
 done_testing();

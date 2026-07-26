@@ -61,6 +61,16 @@ sub multipath_defaults {
 
 sub multipath_config_version { 1 }
 
+# Not offered on this family. An ME array allows on the order of a thousand
+# volumes and snapshots in total, and every snapshot of a VM would spend a
+# second object on a copy of its configuration — on a busy cluster that is
+# the difference between running out of volumes and not. Check the Support
+# Matrix for the exact limits of your model.
+#
+# The configuration can still be recovered the ordinary way: from a PVE
+# backup, or from /etc/pve on another node of the cluster.
+sub supports_config_backup { return 0 }
+
 sub capacity_scope {
     my ($class, $scfg) = @_;
     return defined $scfg->{'pvault-pool'} ? 'pool' : 'array';

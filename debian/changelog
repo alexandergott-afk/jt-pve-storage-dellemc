@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.1~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The VM config backup volume is no longer offered on the dellpowervault
+    family. It spends one extra volume for every snapshot of a VM, and a
+    PowerVault ME array's volume and snapshot ceiling is roughly an order of
+    magnitude below PowerStore's, so the cost is material there. Snapshots
+    and rollback are unchanged; the configuration is still recoverable from a
+    PVE backup or from /etc/pve on another node.
+  * On dellpowerstore the feature stays on by default and can now be turned
+    off with the new dell-config-backup option, for an array close to its
+    volume limit.
+  * Removal of an existing config volume still runs on a storage that has the
+    feature switched off, so volumes written by an earlier version are
+    cleaned up rather than stranded.
+
+ -- Jason Cheng <jason@jason.tools>  Sun, 26 Jul 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.0~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

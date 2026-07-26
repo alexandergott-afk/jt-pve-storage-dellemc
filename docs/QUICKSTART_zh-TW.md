@@ -99,7 +99,7 @@ pve-dell-config-get -l ps1 999      # 一併建立的設定備份
 qm delsnapshot 999 before-change
 ```
 
-每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，因為儲存快照只還原磁碟，不含設定。`pve-dell-config-get` 可以把那些設定讀回來，即使 `/etc/pve` 已經不存在也可以 —— 詳見 [TROUBLESHOOTING_zh-TW.md](TROUBLESHOOTING_zh-TW.md)。
+在 PowerStore 上，每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，因為儲存快照只還原磁碟，不含設定。`pve-dell-config-get` 可以把那些設定讀回來，即使 `/etc/pve` 已經不存在也可以 —— 詳見 [TROUBLESHOOTING_zh-TW.md](TROUBLESHOOTING_zh-TW.md)。要關閉的話設 `dell-config-backup 0`；PowerVault ME 系列則完全不會做這件事，因為每個快照多一個 volume 對該系列的 volume 上限來說太奢侈。
 
 ## 8. 清掉測試用的資源
 

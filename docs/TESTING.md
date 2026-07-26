@@ -140,7 +140,7 @@ and the PowerStore OS version in the Result column.
 | 11 | Snapshot create/list/delete | — | array snapshot matches | — |
 | 12 | Snapshot rollback | VM stopped | data restored, no stale cache | — |
 | 13 | RAM snapshot (vmstate) | VM running | state volume created, VM resumes correctly | — |
-| 14 | Config backup + `pve-dell-config-get` | — | configuration is readable back | — |
+| 14 | Config backup + `pve-dell-config-get` | PowerStore | configuration is readable back; no config volume is created on PowerVault ME | — |
 | 15 | Template + linked clone | — | clone is instant | — |
 | 16 | Delete a template with clones | — | refused, dependants named | — |
 | 17 | Full clone | — | completes via qemu-img | — |

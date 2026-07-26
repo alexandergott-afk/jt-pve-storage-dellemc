@@ -18,7 +18,7 @@ English: [NAMING_CONVENTIONS.md](NAMING_CONVENTIONS.md)
 | EFI disk | Volume | `pve-{storeid}-{vmid}-efidisk{n}` |
 | TPM state | Volume | `pve-{storeid}-{vmid}-tpmstate{n}` |
 | RAM state（vmstate） | Volume | `pve-{storeid}-{vmid}-state-{snapname}` |
-| VM 設定備份 | Volume（1 MB、ext4） | `pve-{storeid}-{vmid}-vmconf-{snapname}` |
+| VM 設定備份 | Volume（1 MB、ext4） | `pve-{storeid}-{vmid}-vmconf-{snapname}`（僅 PowerStore） |
 | 快照 | Volume snapshot | `{volume}.pve-snap-{snapname}` |
 | 範本標記 | Volume snapshot | `{volume}.pve-base` |
 | PVE 節點 | Host | `pve-{cluster}-{node}` |

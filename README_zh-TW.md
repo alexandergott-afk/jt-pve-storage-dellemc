@@ -6,7 +6,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 > ## ⚠️ BETA 版軟體 —— 安裝前請務必閱讀
 >
-> **這是 beta 版（0.7.0~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
+> **這是 beta 版（0.7.1~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
 >
 > **請不要安裝在正式環境的叢集，也不要指向存有重要資料的陣列。** 儲存外掛是以 root 權限執行的，它會在陣列上建立與刪除 volume，並在每一台節點上操作區塊裝置。這裡的缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態；而且因為 multipath 與 SCSI 狀態是全節點共用的，受害範圍不一定只限於本外掛自己的儲存。
 >
@@ -18,7 +18,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.7.0~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
+> **版本 0.7.1~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
 > 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
@@ -201,6 +201,7 @@ pvesm add dellpowerflex pflex1 \
 
 - **完整複製（Full Clone）不會使用陣列端的複製功能。** PVE 對完整複製的實作是 `alloc_image` 加上 `qemu-img` 逐區塊複製，根本不會呼叫外掛的 `clone_image`。這是 PVE 的架構決策，不是外掛缺陷。想用陣列的精簡複製，請改用連結複製（Linked Clone）。
 - **不支援縮小 volume。** 只允許擴充；縮小的請求會被擋下，而不是默默截斷客體的檔案系統。
+- **PowerVault ME 系列不提供 VM 設定備份卷。** 在 PowerStore 上，每次對 VM 做快照時，也會把該 VM 的設定寫進一個 1 MB 的 volume，讓 `pve-dell-config-get` 在 `/etc/pve` 已經不存在時仍能把設定讀回來。代價是每個快照要多花一個 volume，而 ME 陣列的 volume 與快照上限比 PowerStore 少了大約一個數量級 —— 少到這個代價足以決定 volume 會不會用完。因此 `dellpowervault` 直接不提供這個功能；快照與還原完全不受影響，設定也仍然可以從 PVE 備份、或從叢集中其他節點的 `/etc/pve` 取回。在 PowerStore 上此功能預設開啟，可用 `dell-config-backup 0` 關閉。
 - **外掛只會碰自己管理的物件。** 所有列舉、刪除與清理路徑都會先過濾名稱前綴 `pve-<storeid>-`，陣列上其他物件一律不讀也不改。
 
 ---

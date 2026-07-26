@@ -109,6 +109,17 @@ sub common_properties {
             maximum => 300,
             default => 30,
         },
+        'dell-config-backup' => {
+            description => "Write the VM configuration to a small volume"
+                . " beside each snapshot, so it can be recovered when"
+                . " /etc/pve is gone. Each snapshot of a VM costs one extra"
+                . " volume on the array, so turn this off on an array whose"
+                . " volume count is the binding limit. Families whose limits"
+                . " are too low do not offer it at all.",
+            type => 'boolean',
+            default => 1,
+            optional => 1,
+        },
         'dell-config-backup-timeout' => {
             description => "Seconds to wait for the auxiliary 1 MB config"
                 . " backup volume's device during a snapshot. That volume is"
@@ -152,6 +163,7 @@ sub common_options {
         'dell-portal-probe-timeout'  => { optional => 1 },
         'dell-status-timeout'        => { optional => 1 },
         'dell-activate-deadline'     => { optional => 1 },
+        'dell-config-backup'         => { optional => 1 },
         'dell-config-backup-timeout' => { optional => 1 },
         'dell-rescan-interval'       => { optional => 1 },
         nodes   => { optional => 1 },

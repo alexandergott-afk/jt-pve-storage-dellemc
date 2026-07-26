@@ -5,6 +5,18 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.1~beta1] - 2026-07-26
+
+### 變更
+- `dellpowervault` 系列不再提供 VM 設定備份卷。每次對 VM 做快照都會為了保存一份設定而多用掉一個 volume，而 PowerVault ME 陣列的 volume 與快照上限比 PowerStore 少了大約一個數量級 —— 少到這個代價足以決定陣列的 volume 會不會用完。快照、還原與連結複製都不受影響，設定也仍然可以從 PVE 備份、或從叢集中其他節點的 `/etc/pve` 取回。
+- `Common::BlockBase` 新增 `supports_config_backup()`，由它在系列層級決定是否提供此功能，並用它把所有設定卷相關路徑都擋起來。
+
+### 新增
+- `dell-config-backup`（布林，預設開啟）：在有提供此功能的系列上把它關掉，適合 volume 數量已接近上限的 PowerStore。在不提供此功能的系列上設定它不會有任何作用。
+
+### 修正
+- 刪除快照或磁碟時，仍會清掉舊版本寫下的設定卷，即使此功能已經關閉 —— 否則那些 volume 會被遺留在陣列上。
+
 ## [0.7.0~beta1] - 2026-07-26
 
 新增 PowerFlex 3.x 與 4.x 的 `dellpowerflex` storage type。

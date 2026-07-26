@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.0~beta1). It has never been run against a
+> **This is a beta release (0.7.1~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.0~beta1 — three storage types are code complete, and
+> **Version 0.7.1~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
@@ -291,6 +291,16 @@ First-time setup: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
   defect. Use Linked Clone to get the array's thin clone.
 - **Volumes cannot be shrunk.** Only growth is supported; a shrink request is
   rejected rather than silently truncating a guest filesystem.
+- **The VM config backup volume is not offered on PowerVault ME.** On
+  PowerStore, every snapshot of a VM also writes that VM's configuration to a
+  1 MB volume, so `pve-dell-config-get` can recover it when `/etc/pve` is
+  gone. That costs one extra volume per snapshot, and an ME array's volume and
+  snapshot ceiling is roughly an order of magnitude lower than PowerStore's —
+  low enough that the cost is the difference between running out of volumes
+  and not. So the feature is simply absent on `dellpowervault`; snapshots and
+  rollback are unaffected, and the configuration is still recoverable from a
+  PVE backup or from `/etc/pve` on another node. On PowerStore it is on by
+  default and can be turned off with `dell-config-backup 0`.
 - **The plugin only touches objects it owns.** Every list, delete and cleanup
   path filters on the `pve-<storeid>-` name prefix; anything else on the array
   is never read or modified.

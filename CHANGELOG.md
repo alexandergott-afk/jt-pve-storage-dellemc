@@ -7,6 +7,29 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.1~beta1] - 2026-07-26
+
+### Changed
+- The VM config backup volume is no longer offered on the `dellpowervault`
+  family. Every snapshot of a VM would spend one additional volume on a copy
+  of its configuration, and a PowerVault ME array's volume and snapshot
+  ceiling is roughly an order of magnitude below PowerStore's — low enough
+  that the cost decides whether an array runs out of volumes. Snapshots,
+  rollback and linked clones are unaffected, and the configuration remains
+  recoverable from a PVE backup or from `/etc/pve` on another node.
+- `Common::BlockBase` gained `supports_config_backup()`, the family-level
+  switch that decides this, and it now gates every config-volume path.
+
+### Added
+- `dell-config-backup` (boolean, default on): turns the config backup off on
+  a family that does offer it, for a PowerStore close to its volume limit.
+  Setting it on a family that does not offer the feature has no effect.
+
+### Fixed
+- Deleting a snapshot or a disk still cleans up any config volumes an earlier
+  version wrote, even once the feature is switched off — otherwise they would
+  be stranded on the array.
+
 ## [0.7.0~beta1] - 2026-07-26
 
 Adds the `dellpowerflex` storage type for PowerFlex 3.x and 4.x.
