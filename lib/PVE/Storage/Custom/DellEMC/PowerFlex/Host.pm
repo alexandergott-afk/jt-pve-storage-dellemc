@@ -27,6 +27,7 @@ our @EXPORT_OK = qw(
     nvme_device_for_volume
     nvme_multipath_enabled
     nvme_paths
+    nvme_connected_addresses
     wait_for_device
 );
 
@@ -432,6 +433,31 @@ sub nvme_paths {
     }
 
     return \@paths;
+}
+
+# The transport addresses this node already has a path to, as 'ip:port'.
+#
+# 'nvme connect' to an address that is already connected is harmless, but it
+# is still a process per address, and activate_storage runs on every pvestatd
+# poll — six times a minute per node. One list-subsys instead of N connects is
+# the difference between a check and a load.
+sub nvme_connected_addresses {
+    my ($nqn) = @_;
+
+    my %connected;
+
+    for my $path (@{ nvme_paths($nqn) }) {
+        my $address = $path->{address} // next;
+
+        # 'traddr=10.0.0.1,trsvcid=4420' in any order, with or without spaces.
+        my ($ip)   = $address =~ /traddr=([^, ]+)/;
+        my ($port) = $address =~ /trsvcid=([^, ]+)/;
+        next unless defined $ip;
+
+        $connected{ $ip . ':' . ($port // NVME_DEFAULT_PORT) } = $path->{state};
+    }
+
+    return \%connected;
 }
 
 sub nvme_disconnect {

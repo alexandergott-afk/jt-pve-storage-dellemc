@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.10~beta1] - 2026-07-27
+
+### Fixed
+- **PowerFlex connected to every NVMe/TCP target on every poll.** PVE calls
+  `activate_storage` on every pvestatd cycle, and it ran `nvme connect` once
+  per target published by the array. Connecting to an address that is already
+  connected succeeds, so nothing looked wrong — but that is one process per
+  address six times a minute per node, each carrying a 30 second timeout when
+  the network is degraded. It now reads the existing paths once and connects
+  only what is missing; with everything connected it forks nothing. A target
+  that stays unreachable is retried on the rescan interval instead of every
+  poll — unless no path is up at all, when it is retried immediately, because
+  the storage is unusable until one comes up.
+- **The storage pool was validated twice per poll.** `activate_storage`
+  listed every pool on the array to check the configured one exists, and
+  `status()` listed them again on the same poll to report capacity. The check
+  in `activate_storage` is now rate-limited; a pool that disappears is still
+  caught by `status()` on the next poll.
+
 ## [0.7.9~beta1] - 2026-07-27
 
 ### Fixed

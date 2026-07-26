@@ -19,7 +19,7 @@ use PVE::Storage::Custom::DellEMC::PowerFlex::Naming;
 use PVE::Storage::Custom::DellEMC::PowerFlex::Host qw(
     sdc_available sdc_guid sdc_device_for_volume
     nvme_available nvme_host_nqn nvme_connect nvme_device_for_volume
-    nvme_multipath_enabled nvme_paths
+    nvme_multipath_enabled nvme_paths nvme_connected_addresses
     wait_for_device
 );
 
@@ -449,53 +449,121 @@ sub activate_storage {
     }
 
     # Fail early if the configured pool is not there; every later operation
-    # would fail with something less obvious.
-    $class->_storage_pool($scfg, status => 1, storeid => $storeid);
-
-    # NVMe/TCP needs a session to each SDT before any namespace can appear.
-    if ($mode eq 'nvme') {
-        # Without native multipathing each path shows up as its own block
-        # device, and two of them can be written through at once.
-        my $mp_warning = $HOST->nvme_multipath_message();
-        warn "Storage '$storeid': $mp_warning\n" if $mp_warning;
-
-        my $targets = eval { $api->nvme_targets(status => 1) } // [];
-        unless (@$targets) {
-            die "The array published no NVMe/TCP targets (SDT). PowerFlex 4.0"
-              . " or later is required for NVMe/TCP; on an older system use"
-              . " 'dell-protocol sdc'.\n";
-        }
-
-        my %connect_opts = (
-            ctrl_loss_tmo => $scfg->{'pflex-nvme-ctrl-loss-tmo'} // 60,
-        );
-        $connect_opts{io_queues} = $scfg->{'pflex-nvme-io-queues'}
-            if $scfg->{'pflex-nvme-io-queues'};
-
-        my $connected = 0;
-        my @failed;
-        for my $target (@$targets) {
-            if (nvme_connect($target, %connect_opts)) {
-                $connected++;
-            } else {
-                push @failed, "$target->{ip}:" . ($target->{port} // 4420);
-            }
-        }
-
-        die "Could not connect to any of the " . scalar(@$targets)
-          . " NVMe/TCP target(s) the array published. Check network"
-          . " reachability to the SDT addresses: " . join(', ', @failed)
-          . "\n" unless $connected;
-
-        # One path is not multipathing. Say so, because the array published
-        # more targets than this node could reach.
-        warn "Storage '$storeid' connected to $connected of "
-           . scalar(@$targets) . " NVMe/TCP targets; could not reach: "
-           . join(', ', @failed) . ". The volumes will work but with reduced"
-           . " path redundancy.\n" if @failed;
+    # would fail with something less obvious. Rate-limited: this is a
+    # configuration check, not a health check, and status() looks the pool up
+    # again on the same poll to report capacity — so doing it here on every
+    # poll as well is one duplicated listing of every pool on the array, six
+    # times a minute per node.
+    if ($class->_check_due("$storeid/pool", $scfg)) {
+        $class->_storage_pool($scfg, status => 1, storeid => $storeid);
+        $class->_mark_check("$storeid/pool");
     }
 
+    # NVMe/TCP needs a session to each SDT before any namespace can appear.
+    $class->_ensure_nvme_sessions($storeid, $scfg, $api) if $mode eq 'nvme';
+
     return 1;
+}
+
+# Connect to the SDTs this node is not already connected to.
+#
+# activate_storage runs on every pvestatd poll, so this must cost one cheap
+# check when nothing has changed. 'nvme connect' to an address that is already
+# connected succeeds, but it is a process per address six times a minute per
+# node — and on a degraded network each one carries a 30s timeout. Reading the
+# existing paths once and connecting only what is missing costs a single
+# command instead.
+sub _ensure_nvme_sessions {
+    my ($class, $storeid, $scfg, $api) = @_;
+
+    # Without native multipathing each path shows up as its own block device,
+    # and two of them can be written through at once.
+    my $mp_warning = $HOST->nvme_multipath_message();
+    warn "Storage '$storeid': $mp_warning\n" if $mp_warning;
+
+    my $targets = eval { $api->nvme_targets(status => 1) } // [];
+    unless (@$targets) {
+        die "The array published no NVMe/TCP targets (SDT). PowerFlex 4.0"
+          . " or later is required for NVMe/TCP; on an older system use"
+          . " 'dell-protocol sdc'.\n";
+    }
+
+    my $connected = eval { nvme_connected_addresses() } // {};
+
+    my @missing = grep {
+        !exists $connected->{ $_->{ip} . ':' . ($_->{port} // 4420) }
+    } @$targets;
+
+    # Everything the array published is already connected: nothing to do, and
+    # nothing forked.
+    unless (@missing) {
+        $class->_mark_check($storeid);
+        return 1;
+    }
+
+    # Some are missing. Retrying every poll would fork a connect per missing
+    # target six times a minute against a target this node may simply not be
+    # cabled to, so the retry is rate-limited once at least one path is up.
+    my $have_any = scalar(keys %$connected) > 0;
+    return 1 if $have_any && !$class->_check_due($storeid, $scfg);
+
+    $class->_mark_check($storeid);
+
+    my %connect_opts = (
+        ctrl_loss_tmo => $scfg->{'pflex-nvme-ctrl-loss-tmo'} // 60,
+    );
+    $connect_opts{io_queues} = $scfg->{'pflex-nvme-io-queues'}
+        if $scfg->{'pflex-nvme-io-queues'};
+
+    my @failed;
+    for my $target (@missing) {
+        push @failed, "$target->{ip}:" . ($target->{port} // 4420)
+            unless nvme_connect($target, %connect_opts);
+    }
+
+    my $now_up = scalar(@$targets) - scalar(@failed);
+
+    die "Could not connect to any of the " . scalar(@$targets)
+      . " NVMe/TCP target(s) the array published. Check network"
+      . " reachability to the SDT addresses: " . join(', ', @failed)
+      . "\n" if $now_up < 1;
+
+    # One path is not multipathing. Say so, because the array published more
+    # targets than this node could reach.
+    warn "Storage '$storeid' has $now_up of " . scalar(@$targets)
+       . " NVMe/TCP targets connected; could not reach: "
+       . join(', ', @failed) . ". The volumes will work but with reduced"
+       . " path redundancy.\n" if @failed;
+
+    return 1;
+}
+
+# Wall clock of the last time a periodic check ran, per storage and topic.
+#
+# activate_storage runs on every pvestatd poll, so anything in it that is not
+# strictly a health check has to be rate-limited. Process-wide on purpose:
+# pvestatd is long-lived, so this is what actually bounds the rate.
+my %LAST_CHECK;
+
+sub _check_due {
+    my ($class, $storeid, $scfg) = @_;
+
+    my $interval = $scfg->{'dell-rescan-interval'} // 300;
+    return 1 if $interval <= 0;
+
+    my $last = $LAST_CHECK{$storeid};
+    my $now  = time();
+
+    return 1 unless defined $last;
+    return 1 if $now < $last;          # the clock stepped backwards
+
+    return ($now - $last) >= $interval ? 1 : 0;
+}
+
+sub _mark_check {
+    my ($class, $storeid, $when) = @_;
+    $LAST_CHECK{$storeid} = $when // time();
+    return;
 }
 
 sub deactivate_storage {

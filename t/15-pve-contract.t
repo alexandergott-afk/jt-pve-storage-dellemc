@@ -203,6 +203,48 @@ for my $method (sort keys %ONLY_FOR_CONTENT) {
 }
 
 # ---------------------------------------------------------------------------
+# The abstract interface between BlockBase and its families
+#
+# BlockBase dies with "must implement" when a family is missing one of these,
+# and that only happens when the operation is first tried — which for several
+# of them means the first time anyone deletes a disk or reads a snapshot.
+# ---------------------------------------------------------------------------
+
+{
+    my $base = 'PVE::Storage::Custom::DellEMC::Common::BlockBase';
+
+    # Every _array_* method the base class declares abstract.
+    my $file = $INC{'PVE/Storage/Custom/DellEMC/Common/BlockBase.pm'};
+    my $source = do {
+        open(my $fh, '<', $file) or die "cannot read $file: $!";
+        local $/;
+        <$fh>;
+    };
+
+    my @abstract;
+    while ($source =~ /^sub (_array_\w+)\s*\{\s*\$_\[0\]->_abstract/gm) {
+        push @abstract, $1;
+    }
+
+    cmp_ok(scalar(@abstract), '>=', 15,
+        'the abstract interface was found in the base class');
+
+    for my $family (qw(
+        PVE::Storage::Custom::DellPowerStorePlugin
+        PVE::Storage::Custom::DellPowerVaultPlugin
+    )) {
+        my @missing = grep {
+            ($family->can($_) // 0) == ($base->can($_) // 1)
+        } @abstract;
+
+        is_deeply(\@missing, [], "$family implements every abstract method")
+            or diag("still abstract: @missing — these die with 'must implement'"
+                  . " the first time the operation is tried, which for some of"
+                  . " them is the first delete or the first snapshot read");
+    }
+}
+
+# ---------------------------------------------------------------------------
 # plugindata
 # ---------------------------------------------------------------------------
 

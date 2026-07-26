@@ -599,4 +599,93 @@ SKIP: {
         'a pool that does not exist is undef, not an error');
 }
 
+# ---------------------------------------------------------------------------
+# activate_storage must be cheap when nothing has changed
+#
+# PVE calls it on every pvestatd poll, for every storage, sequentially. A
+# 'nvme connect' per target there is a process per address six times a minute
+# per node, each carrying a 30s timeout on a degraded network.
+# ---------------------------------------------------------------------------
+
+SKIP: {
+    skip 'PVE::Storage::Plugin is not available', 7
+        unless eval { require PVE::Storage::Custom::DellPowerFlexPlugin; 1 };
+
+    my $P = 'PVE::Storage::Custom::DellPowerFlexPlugin';
+    my $H = 'PVE::Storage::Custom::DellEMC::PowerFlex::Host';
+
+    my @targets = (
+        { ip => '10.0.0.1', port => 4420, nqn => 'nqn.test' },
+        { ip => '10.0.0.2', port => 4420, nqn => 'nqn.test' },
+    );
+
+    my @connect_calls;
+    my %connected;
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_connect = sub {
+        push @connect_calls, $_[0]{ip};
+        return 1;
+    };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_connected_addresses =
+        sub { return { %connected } };
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::Host::nvme_multipath_message =
+        sub { '' };
+
+    my $api = bless {}, 'PVE::Storage::Custom::DellEMC::PowerFlex::API';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::nvme_targets =
+        sub { [@targets] };
+
+    my $scfg = { 'dell-portal' => '10.0.0.5' };
+
+    # Nothing connected yet: both are attempted.
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api);
+    is_deeply([sort @connect_calls], ['10.0.0.1', '10.0.0.2'],
+        'a node with no session connects to every target');
+
+    # Now both are up. A poll must fork nothing at all.
+    %connected = ('10.0.0.1:4420' => 'live', '10.0.0.2:4420' => 'live');
+    @connect_calls = ();
+
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api) for 1 .. 5;
+    is_deeply(\@connect_calls, [],
+        'five more polls with everything connected fork nothing');
+
+    # One path drops. The retry is rate-limited, because the target may simply
+    # be one this node is not cabled to.
+    %connected = ('10.0.0.1:4420' => 'live');
+    @connect_calls = ();
+
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api) for 1 .. 5;
+    is(scalar(@connect_calls), 0,
+        'a missing target is not retried on every poll while a path is up');
+
+    # Once the interval has passed, it is retried — once.
+    $P->_mark_check('pf1', time() - 3600);
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api);
+    is_deeply(\@connect_calls, ['10.0.0.2'],
+        'and is retried after the interval, for the missing target only');
+
+    # With no path at all, the retry is immediate: the storage is unusable
+    # until one comes up, so waiting out an interval would be wrong.
+    %connected = ();
+    @connect_calls = ();
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api);
+    is(scalar(@connect_calls), 2,
+        'with zero paths up every target is tried immediately');
+
+    # A clock that went backwards must not suppress the retry either.
+    %connected = ('10.0.0.1:4420' => 'live');
+    @connect_calls = ();
+    $P->_mark_check('pf1', time() + 3600);
+    $P->_ensure_nvme_sessions('pf1', $scfg, $api);
+    is_deeply(\@connect_calls, ['10.0.0.2'],
+        'a timestamp in the future counts as due');
+
+    # An array that publishes nothing is an error, not a quiet success.
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::nvme_targets = sub { [] };
+    ok(!eval { $P->_ensure_nvme_sessions('pf1', $scfg, $api); 1 },
+        'an array with no SDT targets is reported');
+}
+
 done_testing();
