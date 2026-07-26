@@ -1,3 +1,42 @@
+jt-pve-storage-dellemc (0.7.2~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Review pass over every plugin entry point against the Proxmox VE 9.2.5
+    storage API source. Nine defects fixed, all of which would have shown up
+    in the first hours of testing against an array.
+  * PowerFlex enforced PowerVault's 32-character name limit instead of its
+    own 31, because the inherited naming code read a constant rather than the
+    subclass. Snapshots and linked clones of a storage with a longer id were
+    generated one byte too long and refused.
+  * Deleting a volume now removes the snapshots this plugin created for it
+    first. PVE deletes a VM's disks without touching storage snapshots, so
+    'qm destroy' on a VM with a snapshot, and deleting any template, failed
+    on the array. The template marker is handled last, so a template whose
+    linked clones still depend on it keeps it.
+  * The temporary clone used to read a snapshot was named by hand and ignored
+    the family name limits, so reading a snapshot could not work on
+    PowerVault or PowerFlex at all.
+  * A generated NVMe host NQN is now written to /etc/nvme/hostnqn. It was
+    returned without being stored, so every call produced a different NQN and
+    the volume was mapped to one no connection used.
+  * Linked clones are listed under the same 'base-.../vm-...' volid PVE holds
+    in the VM configuration, so 'qm rescan' no longer sees them as volumes no
+    configuration references.
+  * list_images now matches a vollist filter exactly; a prefix match let a
+    request for vm-1-disk-1 also return vm-1-disk-10.
+  * Host registration is checked at most once every five minutes per storage
+    rather than on every pvestatd poll.
+  * The periodic SAN rescan survives a backwards clock step.
+  * PowerStore waits for a volume it created or cloned to become visible,
+    rather than failing on an operation the array is still running.
+  * PowerVault falls back to the formatted size string when the numeric field
+    is missing, instead of reporting a volume as zero bytes.
+  * pve-dell-config-get refuses a storage that is not dellpowerstore instead
+    of speaking PowerStore REST to another family's array.
+
+ -- Jason Cheng <jason@jason.tools>  Sun, 26 Jul 2026 18:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.1~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

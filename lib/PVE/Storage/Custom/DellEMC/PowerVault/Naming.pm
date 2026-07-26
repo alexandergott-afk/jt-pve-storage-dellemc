@@ -135,11 +135,16 @@ sub encode_config_volume_name {
 sub _fit_name {
     my ($class, $name) = @_;
 
-    return $name if length($name) <= MAX_NAME;
+    # The limit comes from the class, never from the constant: PowerFlex
+    # subclasses this module with a limit of 31, and reading MAX_NAME here
+    # would silently apply PowerVault's 32 to it.
+    my $max = $class->max_volume_name_length;
 
-    die "Generated name '$name' is " . length($name) . " bytes, but PowerVault"
-      . " accepts at most " . MAX_NAME . ". Use a shorter storage id: this"
-      . " family has far less room for names than PowerStore does.\n";
+    return $name if length($name) <= $max;
+
+    die "Generated name '$name' is " . length($name) . " bytes, but this array"
+      . " accepts at most $max. Use a shorter storage id: this family has far"
+      . " less room for names than PowerStore does.\n";
 }
 
 sub encode_snapshot_name {
@@ -148,12 +153,13 @@ sub encode_snapshot_name {
     die "volume is required\n"   unless defined $volume;
     die "snapname is required\n" unless defined $snapname;
 
+    my $max    = $class->max_snapshot_name_length;
     my $prefix = $volume . SNAP_SEP;
-    my $budget = MAX_NAME - length($prefix);
+    my $budget = $max - length($prefix);
 
-    die "Volume name '$volume' leaves no room for a snapshot name on"
-      . " PowerVault, which allows " . MAX_NAME . " bytes in total. Use a"
-      . " shorter storage id.\n" if $budget < 1;
+    die "Volume name '$volume' leaves no room for a snapshot name on this"
+      . " array, which allows $max bytes in total. Use a shorter storage"
+      . " id.\n" if $budget < 1;
 
     my $snap = $class->sanitize($snapname, $budget);
     $snap = substr($snap, 0, $budget);
@@ -163,6 +169,9 @@ sub encode_snapshot_name {
     return $prefix . $snap;
 }
 
+# Two characters, not nine: on a 32-byte name the infix is most of the budget.
+sub temp_clone_infix { '-t' }
+
 sub encode_base_snapshot_name {
     my ($class, $volume) = @_;
 
@@ -171,8 +180,9 @@ sub encode_base_snapshot_name {
     my $name = $volume . BASE_SUFFIX_ME;
 
     die "Volume name '$volume' leaves no room for the template marker"
-      . " snapshot on PowerVault. Use a shorter storage id.\n"
-        if length($name) > MAX_NAME;
+      . " snapshot, which would be " . length($name) . " bytes against a limit"
+      . " of " . $class->max_snapshot_name_length . ". Use a shorter storage"
+      . " id.\n" if length($name) > $class->max_snapshot_name_length;
 
     return $name;
 }
@@ -262,7 +272,7 @@ sub is_valid_volume_name {
     my ($class, $name) = @_;
 
     return 0 unless defined $name && length($name);
-    return 0 if length($name) > MAX_NAME;
+    return 0 if length($name) > $class->max_volume_name_length;
     # The array forbids " , . < \ ; this plugin never generates anything but
     # alphanumerics, '-' and '_' anyway.
     return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -272,7 +282,12 @@ sub is_valid_volume_name {
 
 sub is_valid_snapshot_name {
     my ($class, $name) = @_;
-    return $class->is_valid_volume_name($name);
+
+    return 0 unless defined $name && length($name);
+    return 0 if length($name) > $class->max_snapshot_name_length;
+    return 0 unless $name =~ /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+    return 1;
 }
 
 1;

@@ -367,14 +367,39 @@ sub _blocks_to_bytes {
     my ($self, $row, @fields) = @_;
 
     for my $field (@fields) {
-        for my $key ("${field}-numeric", $field) {
-            my $value = $row->{$key};
-            next unless defined $value && $value =~ /^\d+$/;
-            return $value * 512 if $key =~ /-numeric$/;
-        }
+        my $value = $row->{"${field}-numeric"};
+        return $value * 512 if defined $value && $value =~ /^\d+$/;
+    }
+
+    # Fall back to the formatted string ('1996.7GB'). Returning 0 here would be
+    # worse than an approximation: volume_resize compares against the current
+    # size, so a zero makes every request look like growth, and PVE would show
+    # the volume as empty.
+    for my $field (@fields) {
+        my $bytes = $self->_parse_size_string($row->{$field});
+        return $bytes if defined $bytes;
     }
 
     return 0;
+}
+
+# '1996.7GB', '4.2MB', '1.5TiB' -> bytes. The CLI prints decimal units without
+# a suffix letter for base-2, so 'GB' means 10**9 here; the '-numeric' field is
+# always preferred and this only runs when it is missing.
+sub _parse_size_string {
+    my ($self, $value) = @_;
+
+    return undef unless defined $value;
+    return $value + 0 if $value =~ /^\d+$/;
+
+    return undef unless $value =~ /^\s*([\d.]+)\s*([KMGTP]?)(i?)B\s*$/i;
+
+    my ($number, $unit, $binary) = ($1, uc($2), $3);
+
+    my $base = $binary ? 1024 : 1000;
+    my %power = ('' => 0, K => 1, M => 2, G => 3, T => 4, P => 5);
+
+    return int($number * ($base ** $power{$unit}));
 }
 
 # ---------------------------------------------------------------------------

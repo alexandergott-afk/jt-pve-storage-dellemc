@@ -589,4 +589,182 @@ SKIP: {
         'a file without the marker is never rewritten');
 }
 
+# ---------------------------------------------------------------------------
+# Deleting a volume takes this plugin's own snapshots with it
+#
+# PVE does not remove storage snapshots before deleting a disk: 'qm destroy'
+# calls vdisk_free straight away, and a template always carries its marker
+# snapshot. Without this the very first "delete a VM that has a snapshot" fails
+# on the array.
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-snap-before"} = { volume => $vol, ctime => 1 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-base"}        = { volume => $vol, ctime => 1 };
+    # Another volume's snapshot, and a foreign object: neither may be touched.
+    $Test::Plugin::SNAPSHOTS{'pve-t1-101-disk0.pve-snap-x'} =
+        { volume => 'pve-t1-101-disk0', ctime => 1 };
+    $Test::Plugin::SNAPSHOTS{'someone-elses-snap'} = { volume => $vol, ctime => 1 };
+
+    Test::Plugin->free_image('t1', $scfg, 'base-100-disk-0', 1, 'raw');
+
+    my $calls = join(' | ', @{ Test::Plugin->calls() });
+    like($calls, qr/snapshot_delete \Q$vol\E\.pve-snap-before/,
+        'the volume\'s own snapshot is removed');
+    like($calls, qr/snapshot_delete \Q$vol\E\.pve-base/,
+        'the template marker is removed too');
+    unlike($calls, qr/snapshot_delete pve-t1-101-disk0/,
+        'another volume\'s snapshot is left alone');
+    unlike($calls, qr/snapshot_delete someone-elses-snap/,
+        'an object that does not decode as ours is left alone');
+
+    ok(!$Test::Plugin::VOLUMES{$vol}, 'and the volume itself is gone');
+
+    my @order = @{ Test::Plugin->calls() };
+    my ($snap_idx) = grep { $order[$_] =~ /^snapshot_delete/ } 0 .. $#order;
+    my ($del_idx)  = grep { $order[$_] eq "delete $vol" } 0 .. $#order;
+    ok($snap_idx < $del_idx, 'snapshots are removed before the volume');
+
+    # The template marker goes last: while a linked clone still depends on it
+    # the delete fails either way, and removing the marker first would leave a
+    # template PVE no longer recognises as one.
+    my ($base_idx) = grep { $order[$_] eq "snapshot_delete $vol.pve-base" } 0 .. $#order;
+    my ($first_del) = grep { $order[$_] eq "delete $vol" } 0 .. $#order;
+    ok($base_idx > $first_del,
+        'the template marker is only removed after a delete has been tried');
+    ok(!$Test::Plugin::SNAPSHOTS{"$vol.pve-base"},
+        'and it does not outlive the volume it marked');
+}
+
+# A template whose delete keeps failing must keep its marker snapshot: the
+# volume survives, so it has to survive as a template.
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
+    $Test::Plugin::SNAPSHOTS{"$vol.pve-base"} = { volume => $vol, ctime => 1 };
+
+    # The array refuses because a linked clone still depends on the template.
+    no warnings 'redefine';
+    local *Test::Plugin::_array_delete_volume = sub {
+        my ($class, $scfg, $storeid, $name) = @_;
+        $class->log_call('delete', $name);
+        die "cannot delete: dependent clone exists\n";
+    };
+
+    my $err;
+    eval { Test::Plugin->free_image('t1', $scfg, 'base-100-disk-0', 1, 'raw') };
+    $err = $@;
+
+    like($err, qr/dependent objects/, 'the refusal is reported to the operator');
+    ok($Test::Plugin::SNAPSHOTS{"$vol.pve-base"},
+        'and the template keeps its marker snapshot');
+}
+
+# ---------------------------------------------------------------------------
+# Temporary snapshot-access clone names
+# ---------------------------------------------------------------------------
+
+{
+    my $token = PVE::Storage::Custom::DellEMC::Common::BlockBase::_short_token(
+        12345, 1785056400);
+    like($token, qr/^[0-9a-z]+$/, 'the token is base 36 and needs no escaping');
+    cmp_ok(length($token), '<=', 8, 'and is short enough for a 32-byte name');
+
+    isnt(PVE::Storage::Custom::DellEMC::Common::BlockBase::_short_token(1, 1785056400),
+        PVE::Storage::Custom::DellEMC::Common::BlockBase::_short_token(2, 1785056400),
+        'two processes at the same instant get different tokens');
+
+    # The name has to come from the naming class: built by hand it would ignore
+    # the family limit and PowerVault would reject it.
+    for my $case (
+        ['PVE::Storage::Custom::DellEMC::Common::Naming',     'pve-ps1-100-disk0', 63],
+        ['PVE::Storage::Custom::DellEMC::PowerVault::Naming', 'pve-pv1-100-d0',    32],
+        ['PVE::Storage::Custom::DellEMC::PowerFlex::Naming',  'pve-pf1-100-d0',    31],
+    ) {
+        my ($naming, $volume, $limit) = @$case;
+        eval "require $naming" or die $@;
+        my $name = $naming->encode_temp_clone_name($volume, $token);
+        cmp_ok(length($name), '<=', $limit,
+            "$naming keeps the temporary clone name within $limit bytes");
+        ok($naming->is_valid_volume_name($name),
+            "$naming produces a name the array would accept");
+        like($name, qr/^\Q$volume\E/, '... derived from the volume it clones');
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Periodic rescan gating
+# ---------------------------------------------------------------------------
+
+{
+    my $scfg = { 'dell-rescan-interval' => 300 };
+
+    ok(Test::Plugin->_should_rescan('never', $scfg, 0),
+        'a storage that has never rescanned is due');
+
+    Test::Plugin->_mark_rescan('r1');
+    ok(!Test::Plugin->_should_rescan('r1', $scfg, 0), 'and not again straight away');
+    ok(Test::Plugin->_should_rescan('r1', $scfg, 1), 'unless forced');
+
+    # An NTP correction that steps the clock backwards must not suppress
+    # rescans for as long as the skew lasts.
+    Test::Plugin->_mark_rescan('r1', time() + 3600);
+    ok(Test::Plugin->_should_rescan('r1', $scfg, 0),
+        'a timestamp in the future counts as due');
+
+    ok(Test::Plugin->_should_rescan('r1', { 'dell-rescan-interval' => 0 }, 0),
+        'an interval of 0 rescans every time');
+}
+
+# ---------------------------------------------------------------------------
+# Host registration is not repeated on every poll
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+
+    Test::Plugin->_ensure_host_throttled('h1', $scfg);
+    Test::Plugin->_ensure_host_throttled('h1', $scfg);
+    Test::Plugin->_ensure_host_throttled('h1', $scfg);
+
+    my @checks = grep { $_ eq 'ensure_host' } @{ Test::Plugin->calls() };
+    is(scalar(@checks), 1,
+        'activate_storage checks the host object once, not on every poll');
+
+    Test::Plugin->_ensure_host_throttled('h2', $scfg);
+    @checks = grep { $_ eq 'ensure_host' } @{ Test::Plugin->calls() };
+    is(scalar(@checks), 2, 'a different storage is checked on its own');
+}
+
+# ---------------------------------------------------------------------------
+# list_images
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk1'}  = { size => 1024, used => 0 };
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk10'} = { size => 2048, used => 0 };
+
+    my $all = Test::Plugin->list_images('t1', $scfg);
+    is(scalar(@$all), 2, 'both disks are listed without a filter');
+
+    # A prefix match would also return vm-100-disk-10 here.
+    my $one = Test::Plugin->list_images('t1', $scfg, undef, ['t1:vm-100-disk-1']);
+    is(scalar(@$one), 1, 'a vollist filter matches exactly one volume');
+    is($one->[0]{volid}, 't1:vm-100-disk-1', '... and it is the right one');
+}
+
 done_testing();

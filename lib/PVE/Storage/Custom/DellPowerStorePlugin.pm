@@ -137,6 +137,9 @@ sub family_options {
 my %API_CACHE;
 use constant API_CACHE_TTL => 300;
 
+# How long to wait for an object the array has accepted but not yet published.
+use constant AWAIT_OBJECT_TIMEOUT => 30;
+
 # The health path (activate_storage and the foreground of status) gets a
 # short-timeout, single-attempt client; everything else gets the resilient
 # one. They are cached separately so neither replaces the other.
@@ -242,6 +245,8 @@ sub _volume_row {
 
     return undef unless $row && $row->{name};
 
+    my $protection = $row->{protection_data};
+
     return {
         id    => $row->{id},
         name  => $row->{name},
@@ -249,6 +254,9 @@ sub _volume_row {
         used  => $row->{logical_used} // 0,
         wwid  => PVE::Storage::Custom::DellEMC::PowerStore::API->wwn_to_wwid($row->{wwn}),
         ctime => $class->_to_epoch($row->{creation_timestamp}),
+        # The object a thin clone or snapshot was created from. Used to report
+        # a linked clone under the volid PVE stored for it.
+        source_id => ref($protection) eq 'HASH' ? $protection->{source_id} : undef,
     };
 }
 
@@ -316,7 +324,34 @@ sub _array_create_volume {
 
     $args{description} = "Proxmox VE storage $storeid" if defined $storeid;
 
-    return $api->volume_create($name, $size, %args);
+    my $id = $api->volume_create($name, $size, %args);
+
+    # PowerStore answers some requests with 202 and a job id instead of the
+    # finished object. The caller looks the volume up by name immediately
+    # afterwards, so wait for it to actually be there rather than failing with
+    # "does not exist" on a volume that is merely still being created.
+    $class->_await_volume($scfg, $name, %opts);
+
+    return $id;
+}
+
+# Wait for a named volume to become visible, bounded. Returns 1 as soon as it
+# is there; dies with a message that names the volume if it never appears.
+sub _await_volume {
+    my ($class, $scfg, $name, %opts) = @_;
+
+    my $deadline = time() + ($opts{await_timeout} // AWAIT_OBJECT_TIMEOUT);
+
+    while (1) {
+        return 1 if eval { $class->_volume_id($scfg, $name, %opts) };
+        last if time() >= $deadline;
+        sleep(1);
+    }
+
+    die "The array accepted the request but volume '$name' had not appeared"
+      . " after " . AWAIT_OBJECT_TIMEOUT . "s. The operation may still be"
+      . " running as a background job; check PowerStore Manager before"
+      . " retrying.\n";
 }
 
 sub _array_delete_volume {
@@ -420,7 +455,45 @@ sub _array_clone {
         // $class->_snapshot_id($scfg, $source, %opts);
     die "Clone source '$source' does not exist on the array\n" unless $source_id;
 
-    return $api->volume_clone($source_id, $target, %opts);
+    my $id = $api->volume_clone($source_id, $target, %opts);
+
+    $class->_await_volume($scfg, $target, %opts);
+
+    return $id;
+}
+
+# A thin clone carries protection_data.source_id, which for a PVE linked clone
+# is the id of a template marker snapshot. Mapping those ids back to the volume
+# each one marks gives the clone's base without another query per volume.
+sub _array_clone_parents {
+    my ($class, $scfg, $storeid, $volumes, %opts) = @_;
+
+    return {} unless ref($volumes) eq 'ARRAY' && @$volumes;
+    return {} unless grep { $_->{source_id} } @$volumes;
+
+    my $prefix = $class->naming->volume_prefix($storeid);
+    my $snaps = eval {
+        $class->_api($scfg, %opts)->snapshot_list(prefix => $prefix, %opts);
+    } // [];
+
+    my %base_of;
+    for my $snap (@$snaps) {
+        my $name = $snap->{name} or next;
+        my $id   = $snap->{id}   or next;
+        my $decoded = $class->naming->decode_snapshot_name($name) or next;
+        $base_of{$id} = $decoded->{volume} if $decoded->{is_base};
+    }
+
+    return {} unless %base_of;
+
+    my %parents;
+    for my $volume (@$volumes) {
+        my $source = $volume->{source_id} // next;
+        my $base   = $base_of{$source}    // next;
+        $parents{ $volume->{name} } = $base;
+    }
+
+    return \%parents;
 }
 
 # ---------------------------------------------------------------------------

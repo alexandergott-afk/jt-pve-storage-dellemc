@@ -7,6 +7,62 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.2~beta1] - 2026-07-26
+
+A review pass over every plugin entry point against the Proxmox VE 9.2.5
+storage API source, and over each family's API client. Nine defects, all of
+which would have surfaced in the first hours against real hardware.
+
+### Fixed
+- **PowerFlex applied the wrong name limit.** `PowerFlex::Naming` overrides
+  the limit to 31 characters, but the inherited PowerVault methods read that
+  family's constant of 32 directly, so every generated name was allowed to be
+  one byte too long. A snapshot or linked clone on a storage with a longer id
+  was refused by the array. The shared methods now take the limit from the
+  class.
+- **Deleting a volume left its snapshots behind.** PVE removes a VM's disks
+  without touching storage snapshots — `qm destroy` calls `vdisk_free`
+  directly — and a template always carries its marker snapshot, so both
+  failed on the array. The snapshots this plugin created are now removed
+  first, as the Ceph and ZFS plugins do. The template marker is handled last
+  and only when the array's refusal was not about dependents, so a template
+  whose linked clones still exist keeps the marker it is identified by.
+- **The temporary clone used to read a snapshot ignored the family name
+  limits.** It was built by string concatenation and came out at 39 bytes,
+  which PowerVault (32) and PowerFlex (31) both refuse, so reading a snapshot
+  could not work on those families. It now goes through the naming class.
+- **A generated NVMe host NQN was never persisted.** `nvme gen-hostnqn`
+  returns a new random NQN on every call, so the array was told one NQN while
+  `nvme connect` presented another and the namespace never appeared. It is
+  now written to `/etc/nvme/hostnqn`, atomically and without overwriting an
+  existing file.
+- **Linked clones were listed under the wrong volid.** `clone_image` returns
+  `base-100-disk-0/vm-101-disk-0`, which is what PVE stores, but
+  `list_images` reported `vm-101-disk-0`. `qm rescan` would see a volume no
+  configuration references and add it again as an unused disk. The parent is
+  now derived from the array's own metadata; a family that cannot determine
+  it reports the clone under its plain name, as the LVM-thin plugin does.
+- **A `vollist` filter matched by prefix**, so a request for `vm-1-disk-1`
+  also returned `vm-1-disk-10`. It matches exactly now, as the built-in
+  plugins do.
+- **PowerStore could fail on an operation the array had accepted.** Some
+  requests answer 202 with a job id rather than the finished object, and the
+  volume was looked up by name immediately afterwards. Creation and cloning
+  now wait for the object to appear.
+- **PowerVault reported a volume as zero bytes** when `show volumes` returned
+  only the formatted size and not the `-numeric` field. Zero also made every
+  resize look like growth. The formatted string is parsed as a fallback.
+- **The periodic SAN rescan stopped after a backwards clock step**, the same
+  defect already fixed in the health cooldown.
+
+### Changed
+- Host registration is checked at most once every five minutes per storage
+  instead of on every `activate_storage`, which PVE calls on every pvestatd
+  poll. On PowerVault that check is a full `show host-groups`.
+- `pve-dell-config-get` refuses a storage that is not `dellpowerstore`
+  instead of speaking PowerStore REST to another family's array, and says why
+  the config backup does not exist on PowerVault.
+
 ## [0.7.1~beta1] - 2026-07-26
 
 ### Changed

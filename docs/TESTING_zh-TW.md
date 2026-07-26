@@ -21,6 +21,8 @@ English: [TESTING.md](TESTING.md)
 | LUN ID 配發行為 | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | multipath device 參數 | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
 | Fibre Channel 資料路徑 | 全部 | NOT VERIFIED ON HARDWARE |
+| host 物件中 WWPN 的寫法（純十六進位或冒號分隔） | `DellPowerStorePlugin.pm`、`DellPowerVaultPlugin.pm` | NOT VERIFIED ON HARDWARE |
+| 用來辨識連結複製來源的欄位（`protection_data.source_id`、`ancestorVolumeId`） | `DellPowerStorePlugin.pm`、`DellPowerFlexPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | NVMe-TCP | — | 不在 1.0 範圍 |
 
 ### 最該優先驗證的四項

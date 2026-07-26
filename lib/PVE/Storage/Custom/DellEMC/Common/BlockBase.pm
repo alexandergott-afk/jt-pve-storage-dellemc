@@ -456,12 +456,22 @@ sub _should_rescan {
     my $interval = $class->_rescan_interval($scfg);
     return 1 if $interval <= 0;
 
-    return (time() - ($LAST_RESCAN{$storeid} // 0)) >= $interval ? 1 : 0;
+    my $last = $LAST_RESCAN{$storeid};
+    my $now  = time();
+
+    # Never rescanned, or the clock stepped backwards (NTP correction): due.
+    # Otherwise a single backwards jump would suppress every rescan until the
+    # skew had been lived through.
+    return 1 unless defined $last;
+    return 1 if $now < $last;
+
+    return ($now - $last) >= $interval ? 1 : 0;
 }
 
+# $when exists so a test can place the timestamp; callers pass the default.
 sub _mark_rescan {
-    my ($class, $storeid) = @_;
-    $LAST_RESCAN{$storeid} = time();
+    my ($class, $storeid, $when) = @_;
+    $LAST_RESCAN{$storeid} = $when // time();
     return;
 }
 
@@ -522,7 +532,35 @@ sub activate_storage {
         $class->_activate_iscsi($storeid, $scfg);
     }
 
+    $class->_ensure_host_throttled($storeid, $scfg);
+
+    return 1;
+}
+
+# Host registration, at most once per HOST_CHECK_INTERVAL per storage.
+#
+# activate_storage runs on every pvestatd poll, roughly every ten seconds per
+# node. Re-checking the host object that often is one extra array round trip
+# per poll on PowerStore and a full `show host-groups` on PowerVault, and any
+# family whose "is this initiator already attached" check is imprecise would
+# reissue the attach six times a minute. A failure is not cached: the next
+# activation retries immediately.
+my %LAST_HOST_CHECK;
+use constant HOST_CHECK_INTERVAL => 300;
+
+sub _ensure_host_throttled {
+    my ($class, $storeid, $scfg) = @_;
+
+    my $now  = time();
+    my $last = $LAST_HOST_CHECK{$storeid};
+
+    my $due = !defined($last) || $now < $last
+        || ($now - $last) >= HOST_CHECK_INTERVAL;
+
+    return 1 unless $due;
+
     $class->_array_ensure_host($scfg, $storeid);
+    $LAST_HOST_CHECK{$storeid} = $now;
 
     return 1;
 }
@@ -1007,6 +1045,43 @@ sub alloc_image {
     return $pve_volname;
 }
 
+# Delete the snapshots of one volume that this plugin created, including the
+# template marker. Only names that decode back to this exact volume are
+# touched; anything else on the array is left alone.
+# opts:
+#   keep_base   leave the template marker snapshot in place
+#   base_only   remove nothing but the template marker
+sub _purge_own_snapshots {
+    my ($class, $scfg, $storeid, $array_name, %opts) = @_;
+
+    my $snaps = eval { $class->_array_snapshot_list($scfg, $storeid, $array_name) };
+    if ($@) {
+        warn "Could not list the snapshots of '$array_name' before deleting"
+           . " it: $@";
+        return 0;
+    }
+
+    my $removed = 0;
+    for my $snap (@{ $snaps // [] }) {
+        my $name = $snap->{name} or next;
+
+        my $decoded = $class->naming->decode_snapshot_name($name) or next;
+        next unless ($decoded->{volume} // '') eq $array_name;
+
+        next if $opts{keep_base} && $decoded->{is_base};
+        next if $opts{base_only} && !$decoded->{is_base};
+
+        eval { $class->_array_snapshot_delete($scfg, $storeid, $name) };
+        if ($@) {
+            warn "Could not delete snapshot '$name' of '$array_name': $@";
+            next;
+        }
+        $removed++;
+    }
+
+    return $removed;
+}
+
 # Unmap from everywhere, then delete. Used by every rollback path: deleting a
 # volume that is still mapped leaves other nodes with ghost LUNs.
 sub _release_volume {
@@ -1126,7 +1201,32 @@ sub free_image {
         }
     }
 
+    # An array refuses to delete a volume that still has snapshots, and PVE
+    # does not remove them first: 'qm destroy' calls vdisk_free straight away.
+    # The template marker is deliberately left for now — see below.
+    $class->_purge_own_snapshots($scfg, $storeid, $array_name, keep_base => 1);
+
     eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
+
+    # The template marker is handled last and separately. A template that
+    # still has linked clones cannot be deleted whatever we do, and removing
+    # its marker on the way to failing would leave a volume PVE no longer
+    # recognises as a template. So the marker only goes when the array's
+    # refusal was not about dependents, or when the delete already succeeded
+    # and the marker would otherwise outlive the volume it marks.
+    if ($isBase || $volname =~ /^base-/) {
+        if (my $err = $@) {
+            if ($err !~ /clone|dependent|child|in use/i
+                && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+                    base_only => 1)) {
+                eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
+            }
+        } else {
+            eval { $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+                base_only => 1) };
+        }
+    }
+
     if ($@) {
         my $err = $@;
         if ($err =~ /clone|dependent|child|in use/i) {
@@ -1174,6 +1274,13 @@ sub list_images {
     my $bases = eval { $class->_array_list_base_snapshots($scfg, $storeid, $prefix) } // [];
     $is_template{$_} = 1 for @$bases;
 
+    # Linked clones must be reported under the same volid PVE stored in the VM
+    # configuration, 'base-.../vm-...', or 'qm rescan' sees a volume no config
+    # references and adds it a second time as an unused disk. Families that
+    # cannot work out the parent return nothing here and the clone is listed
+    # under its own name, which is what the LVM-thin plugin does.
+    my $parents = eval { $class->_array_clone_parents($scfg, $storeid, $volumes) } // {};
+
     my @res;
     for my $vol (@$volumes) {
         my $name = $vol->{name} or next;
@@ -1188,6 +1295,12 @@ sub list_images {
         if ($decoded->{type} eq 'disk') {
             my $kind = $is_template{$name} ? 'base' : 'vm';
             $pve_volname = "$kind-$decoded->{vmid}-disk-$decoded->{diskid}";
+
+            if ($kind eq 'vm' && defined(my $base = $parents->{$name})) {
+                my $bd = $class->naming->decode_volume_name($base);
+                $pve_volname = "base-$bd->{vmid}-disk-$bd->{diskid}/$pve_volname"
+                    if $bd && $bd->{type} eq 'disk';
+            }
         } else {
             $pve_volname = $class->naming->array_to_pve_volname($name);
         }
@@ -1195,8 +1308,10 @@ sub list_images {
 
         my $volid = "$storeid:$pve_volname";
 
+        # Exact match, as the built-in plugins do: a prefix match would let a
+        # request for vm-1-disk-1 also return vm-1-disk-10.
         if ($vollist) {
-            next unless grep { $volid =~ /^\Q$_\E/ } @$vollist;
+            next unless grep { $_ eq $volid } @$vollist;
         }
 
         push @res, {
@@ -1210,6 +1325,14 @@ sub list_images {
 
     return \@res;
 }
+
+# { clone_volume_name => base_volume_name } for the linked clones on this
+# storage, from data the family has already fetched.
+#
+# The default is an empty map: a family that cannot identify the parent from
+# its array's own metadata must not guess, and reporting the clone under its
+# plain name is a supported shape rather than a wrong one.
+sub _array_clone_parents { return {} }
 
 # Volumes that carry a .pve-base marker snapshot. Families may override with
 # a cheaper query.
@@ -1489,6 +1612,22 @@ sub filesystem_path {
       . " not available here. Use PVE::Storage::path() instead.\n";
 }
 
+# A compact, mostly-unique token for a temporary object name. Base 36 keeps it
+# inside the few characters PowerVault and PowerFlex have to spare.
+sub _short_token {
+    my ($pid, $now) = @_;
+
+    my $encode = sub {
+        my ($n) = @_;
+        my @digits = (0 .. 9, 'a' .. 'z');
+        my $out = '';
+        do { $out = $digits[$n % 36] . $out; $n = int($n / 36) } while ($n > 0);
+        return $out;
+    };
+
+    return $encode->($pid % (36 ** 3)) . $encode->($now % (36 ** 4));
+}
+
 # A snapshot is made readable through a temporary thin clone. Returns
 # ($object_name, $is_new).
 sub _prepare_snapshot_access {
@@ -1506,7 +1645,8 @@ sub _prepare_snapshot_access {
         delete $SNAPSHOT_ACCESS{$key};
     }
 
-    my $temp = "${array_name}-tmpsnap-" . time() . "-$$";
+    my $temp = $class->naming->encode_temp_clone_name($array_name,
+        _short_token($$, time()));
 
     eval { $class->_array_clone($scfg, $storeid, $snap_name, $temp) };
     die "Failed to create a temporary clone for snapshot access: $@" if $@;

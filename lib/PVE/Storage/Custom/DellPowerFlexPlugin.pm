@@ -330,6 +330,9 @@ sub _list_own_volumes {
             name => $name,
             size => $class->_api($scfg, %opts)->volume_size($row),
             used => 0,
+            # The volume a snapshot was taken from. For a PVE linked clone
+            # that is the template marker snapshot.
+            ancestor => $row->{ancestorVolumeId},
             row  => $row,
         };
     }
@@ -576,7 +579,29 @@ sub free_image {
         warn "Failed to unmap '$array_name' from host $host_id: $@" if $@;
     }
 
+    # PowerFlex refuses to remove a volume that still has snapshots, and PVE
+    # does not delete them first: 'qm destroy' calls vdisk_free straight away.
+    # removeMode stays ONLY_ME so a linked clone is never taken with it, and
+    # the template marker is left until the delete has been tried, so a
+    # template whose clones still depend on it is not stripped of its identity
+    # by a delete that fails anyway.
+    $class->_purge_own_snapshots($scfg, $storeid, $array_name, keep_base => 1);
+
     eval { $api->volume_delete($id, storeid => $storeid) };
+
+    if ($isBase || $volname =~ /^base-/) {
+        if (my $err = $@) {
+            if ($err !~ /descendant|snapshot|child|depend/i
+                && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+                    base_only => 1)) {
+                eval { $api->volume_delete($id, storeid => $storeid) };
+            }
+        } else {
+            eval { $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+                base_only => 1) };
+        }
+    }
+
     if ($@) {
         my $err = $@;
         die "Cannot delete volume '$volname': the array reports dependent"
@@ -589,6 +614,39 @@ sub free_image {
     $class->_invalidate_list_cache($scfg, $storeid);
 
     return undef;
+}
+
+# Delete the snapshots this plugin created for one volume, including the
+# template marker. A linked clone is a snapshot with a volume-shaped name, so
+# it does not decode here and is never removed.
+sub _purge_own_snapshots {
+    my ($class, $scfg, $storeid, $array_name, %opts) = @_;
+
+    my $api = $class->_api($scfg, storeid => $storeid);
+    my $volumes = eval {
+        $class->_list_own_volumes($scfg, $storeid, $NAMING->volume_prefix($storeid));
+    } // [];
+
+    my $removed = 0;
+    for my $volume (@$volumes) {
+        my $decoded = $NAMING->decode_snapshot_name($volume->{name}) or next;
+        next unless ($decoded->{volume} // '') eq $array_name;
+
+        next if $opts{keep_base} && $decoded->{is_base};
+        next if $opts{base_only} && !$decoded->{is_base};
+
+        eval { $api->volume_delete($volume->{id}, storeid => $storeid) };
+        if ($@) {
+            warn "Could not delete snapshot '$volume->{name}' of"
+               . " '$array_name': $@";
+            next;
+        }
+        $removed++;
+    }
+
+    $class->_invalidate_list_cache($scfg, $storeid) if $removed;
+
+    return $removed;
 }
 
 sub list_images {
@@ -607,6 +665,18 @@ sub list_images {
         $is_template{$decoded->{volume}} = 1 if $decoded->{is_base};
     }
 
+    # Linked clones must carry the same 'base-.../vm-...' volid PVE stored in
+    # the VM configuration; otherwise 'qm rescan' sees a volume no config
+    # references and adds it again as an unused disk. A clone is a snapshot of
+    # a template marker, so the marker's id identifies its base.
+    my %base_of;
+    for my $volume (@{ $class->_list_own_volumes($scfg, $storeid,
+        $NAMING->volume_prefix($storeid)) }) {
+        my $decoded = $NAMING->decode_snapshot_name($volume->{name}) or next;
+        next unless $decoded->{is_base};
+        $base_of{ $volume->{id} } = $decoded->{volume} if defined $volume->{id};
+    }
+
     my @res;
     for my $volume (@$volumes) {
         my $decoded = $NAMING->decode_volume_name($volume->{name}) or next;
@@ -617,14 +687,24 @@ sub list_images {
         if ($decoded->{type} eq 'disk') {
             my $kind = $is_template{$volume->{name}} ? 'base' : 'vm';
             $pve_volname = "$kind-$decoded->{vmid}-disk-$decoded->{diskid}";
+
+            my $base = defined $volume->{ancestor}
+                ? $base_of{ $volume->{ancestor} } : undef;
+            if ($kind eq 'vm' && defined $base) {
+                my $bd = $NAMING->decode_volume_name($base);
+                $pve_volname = "base-$bd->{vmid}-disk-$bd->{diskid}/$pve_volname"
+                    if $bd && $bd->{type} eq 'disk';
+            }
         } else {
             $pve_volname = $NAMING->array_to_pve_volname($volume->{name});
         }
         next unless $pve_volname;
 
         my $volid = "$storeid:$pve_volname";
+        # Exact match, as the built-in plugins do: a prefix match would let a
+        # request for vm-1-disk-1 also return vm-1-disk-10.
         if ($vollist) {
-            next unless grep { $volid =~ /^\Q$_\E/ } @$vollist;
+            next unless grep { $_ eq $volid } @$vollist;
         }
 
         push @res, {

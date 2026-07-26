@@ -249,26 +249,81 @@ sub nvme_status_message {
 
 # This host's NQN, which the array must know before it will map anything.
 sub nvme_host_nqn {
-    if (open(my $fh, '<', NVME_HOSTNQN)) {
-        my $nqn = <$fh>;
-        close($fh);
-        if (defined $nqn) {
-            chomp $nqn;
-            $nqn =~ s/^\s+|\s+$//g;
-            return $nqn if length $nqn;
-        }
-    }
+    my $existing = _read_host_nqn_file();
+    return $existing if defined $existing;
 
-    # nvme-cli can generate one, but it must then be persisted or it changes
-    # on every call and the array's host object stops matching.
+    # nvme-cli can generate one, but a generated NQN is random and a new one
+    # comes back on every call. Returning it unpersisted would register a fresh
+    # host on the array each time, while 'nvme connect' — which reads this same
+    # file — would present yet another. The volume is then mapped to an NQN no
+    # connection uses and the namespace simply never appears. So write it once
+    # and use the file from then on.
     my ($out) = _run([NVME_CLI, 'gen-hostnqn'], timeout => 10);
-    if (defined $out) {
-        chomp $out;
-        $out =~ s/^\s+|\s+$//g;
-        return $out if length $out;
+    return undef unless defined $out;
+
+    chomp $out;
+    $out =~ s/^\s+|\s+$//g;
+    return undef unless length $out;
+
+    my ($nqn) = $out =~ /^(nqn\.[\x21-\x7e]+)$/
+        or return undef;
+
+    my $persisted = _persist_host_nqn($nqn);
+    return $persisted if defined $persisted;
+
+    die "This node has no " . NVME_HOSTNQN . " and one could not be written."
+      . " NVMe/TCP needs a stable host NQN: the array maps volumes to it and"
+      . " 'nvme connect' presents it. Create it by hand with\n"
+      . "  mkdir -p /etc/nvme && nvme gen-hostnqn > " . NVME_HOSTNQN . "\n";
+}
+
+# Write the host NQN atomically. Returns the NQN that is on disk afterwards —
+# ours, or the one another process wrote first — or undef if nothing could be
+# written.
+sub _persist_host_nqn {
+    my ($nqn) = @_;
+
+    my $file = NVME_HOSTNQN;
+    (my $dir = $file) =~ s|/[^/]+$||;
+
+    unless (-d $dir) {
+        mkdir($dir, 0755) or return undef;
     }
 
-    return undef;
+    my $tmp = "$file.tmp.$$";
+    open(my $fh, '>', $tmp) or return undef;
+    print $fh "$nqn\n";
+    unless (close($fh)) {
+        unlink($tmp);
+        return undef;
+    }
+
+    # link() fails if the target exists, which makes this the atomic
+    # create-if-absent that rename() is not. A file another process wrote
+    # first is as good as ours, and replacing it under a live connection
+    # would be worse than keeping it.
+    my $created = link($tmp, $file);
+    unlink($tmp);
+
+    if ($created) {
+        warn "Wrote a host NQN to $file for NVMe/TCP: $nqn\n";
+        return $nqn;
+    }
+
+    return _read_host_nqn_file();
+}
+
+# The NQN in NVME_HOSTNQN, or undef when the file is missing or empty.
+sub _read_host_nqn_file {
+    open(my $fh, '<', NVME_HOSTNQN) or return undef;
+    my $value = <$fh>;
+    close($fh);
+
+    return undef unless defined $value;
+    chomp $value;
+    $value =~ s/^\s+|\s+$//g;
+
+    return length($value) ? $value : undef;
 }
 
 # Is NVMe native multipath enabled in the kernel?

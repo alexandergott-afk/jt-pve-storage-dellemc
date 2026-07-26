@@ -212,4 +212,25 @@ is($P->_config_backup_enabled({ %$scfg, 'dell-config-backup' => 1 }), 1,
     '... and explicitly on stays on');
 ok($P->properties()->{'dell-config-backup'}, 'the option is declared');
 
+# ---------------------------------------------------------------------------
+# Linked clones are reported under the volid PVE stored for them
+# ---------------------------------------------------------------------------
+
+{
+    # A thin clone carries protection_data.source_id; for a PVE linked clone
+    # that is the id of the template's marker snapshot.
+    my $row = $P->_volume_row({
+        id => 'v-2', name => 'pve-ps1-101-disk0', size => 1024, wwn => 'naa.6000',
+        protection_data => { source_id => 'snap-1' },
+    });
+    is($row->{source_id}, 'snap-1', 'the clone source id is carried through');
+
+    my $plain = $P->_volume_row({ id => 'v-3', name => 'pve-ps1-102-disk0', size => 1 });
+    is($plain->{source_id}, undef, 'a volume without protection data has none');
+
+    # No source ids at all: no query, no map.
+    is_deeply($P->_array_clone_parents({}, 'ps1', [$plain]), {},
+        'a storage with no clones asks the array nothing');
+}
+
 done_testing();

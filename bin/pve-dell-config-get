@@ -32,7 +32,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.1~beta1';
+my $VERSION = '0.7.2~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -182,6 +182,25 @@ die "Storage '$storeid' has no dell-portal configured\n"
 die "Storage '$storeid' has no credentials configured. Pass --username and"
   . " --password.\n"
     unless $scfg->{'dell-username'} && defined $scfg->{'dell-password'};
+
+# This tool speaks PowerStore REST. Pointed at another family it would send
+# PowerStore requests to an array that does not understand them and report
+# something unhelpful, so say plainly what is going on instead. The config
+# backup volume it reads only exists on PowerStore anyway: PowerVault ME does
+# not offer the feature, because one extra volume per snapshot is too much for
+# that family's volume ceiling.
+my $type = $scfg->{type};
+if (defined $type && $type ne 'dellpowerstore') {
+    die "Storage '$storeid' is of type '$type'. This tool reads the VM config"
+      . " backup volume, which only the dellpowerstore family creates.\n"
+      . ($type eq 'dellpowervault'
+         ? "  PowerVault ME does not offer the config backup: it would cost one"
+         . " extra volume per snapshot, and that family's volume ceiling is too"
+         . " low for it.\n"
+         : '')
+      . "  Recover the VM configuration from a PVE backup, or from /etc/pve on"
+      . " another node of the cluster.\n";
+}
 
 my $protocol = $scfg->{'dell-protocol'} // 'iscsi';
 my $cluster  = $scfg->{'dell-cluster-name'} // 'pve';

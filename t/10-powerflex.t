@@ -527,4 +527,32 @@ SKIP: {
     is_deeply(\@dup, [], 'three Dell plugins, no duplicate property');
 }
 
+# ---------------------------------------------------------------------------
+# Name limits
+#
+# PowerFlex allows 31 characters, one fewer than the PowerVault module it
+# inherits the compact naming scheme from. The inherited methods must read the
+# limit from the class, not from PowerVault's own constant, or every generated
+# name is allowed to be one byte too long and the array rejects it.
+# ---------------------------------------------------------------------------
+
+{
+    my $N = 'PVE::Storage::Custom::DellEMC::PowerFlex::Naming';
+
+    is($N->max_volume_name_length, 31, 'the family limit is 31');
+
+    my $volume = $N->encode_volume_name('pflexstor', 1234567, 0);
+    my $snap   = $N->encode_snapshot_name($volume, 'abcdefghij');
+    cmp_ok(length($snap), '<=', 31, 'a snapshot name stays within the limit');
+    ok($N->is_valid_snapshot_name($snap), '... and validates');
+
+    is($N->is_valid_volume_name('a' x 32), 0, '32 characters is refused');
+    is($N->is_valid_volume_name('a' x 31), 1, '31 is accepted');
+    is($N->is_valid_snapshot_name('a' x 32), 0, 'and the same for a snapshot');
+
+    # PowerVault keeps its own 32, so the shared code really is per-class.
+    my $V = 'PVE::Storage::Custom::DellEMC::PowerVault::Naming';
+    is($V->is_valid_volume_name('a' x 32), 1, 'PowerVault still allows 32');
+}
+
 done_testing();

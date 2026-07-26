@@ -240,6 +240,36 @@ sub encode_snapshot_name {
     return "${prefix}${snap}";
 }
 
+# Short-lived clone created so a snapshot can be read through a device.
+#
+# It has to go through the naming class like everything else: built by hand it
+# would ignore the family's length limit, and PowerVault (32 bytes) and
+# PowerFlex (31) both reject what PowerStore accepts. The token only has to
+# distinguish concurrent attempts, so it is shortened from the front, keeping
+# the least significant digits.
+sub temp_clone_infix { '-tmpsnap-' }
+
+sub encode_temp_clone_name {
+    my ($class, $volume, $token) = @_;
+
+    die "volume is required\n" unless defined $volume;
+    $token = 'x' unless defined $token && length $token;
+
+    my $prefix = $volume . $class->temp_clone_infix;
+    my $budget = $class->max_volume_name_length - length($prefix);
+
+    die "Volume name '$volume' leaves no room for a temporary snapshot clone"
+      . " name, which this family needs in order to read a snapshot. Use a"
+      . " shorter storage id.\n" if $budget < 2;
+
+    my $suffix = $class->sanitize($token, length($token));
+    $suffix = substr($suffix, -$budget) if length($suffix) > $budget;
+    $suffix =~ s/^[-_]+//;
+    $suffix = 'x' unless length $suffix;
+
+    return $prefix . $suffix;
+}
+
 # Marker snapshot that turns a volume into a template base.
 sub encode_base_snapshot_name {
     my ($class, $volume) = @_;
