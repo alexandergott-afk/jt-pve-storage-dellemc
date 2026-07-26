@@ -7,6 +7,16 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.21~beta1] - 2026-07-27
+
+### Fixed
+- **The "device is still in use" message could never name the process.**
+  `fuser -v` prints its table to stderr and only the bare PID list to stdout,
+  and only stdout was being read. The rest of that message does real work —
+  it names the holders, works out which LVM volume group the host activated
+  from inside the guest disk, and gives the `vgchange -an` to undo it — but
+  the one line saying *which process* has the device open was silently empty.
+
 ## [0.7.20~beta1] - 2026-07-27
 
 ### Fixed

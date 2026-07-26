@@ -1252,13 +1252,23 @@ sub get_device_usage_details {
 
     my $safe_device = _untaint_device_path($device);
     if ($safe_device) {
-        my ($out, undef, $exit) = eval {
+        # fuser -v writes its table to STDERR, not stdout; only the bare PID
+        # list goes to stdout. Reading stdout alone means this section never
+        # appears, which is the difference between telling the operator which
+        # process holds the device and telling them nothing.
+        my ($out, $err, $exit) = eval {
             _run_cmd([FUSER, '-v', $safe_device],
                 timeout => 10, allow_nonzero => 1, ignore_errors => 1);
         };
-        if (!$@ && defined $exit && $exit == 0 && $out) {
-            chomp $out;
-            push @reasons, "[PROCESS] Device is open by process(es):\n    $out";
+
+        if (!$@ && defined $exit && $exit == 0) {
+            my $text = join("\n",
+                grep { defined && /\S/ } ($err // '', $out // ''));
+            $text =~ s/\s+\z//;
+            $text =~ s/^/    /mg;
+
+            push @reasons, "[PROCESS] Device is open by process(es):\n$text"
+                if length $text;
         }
     }
 

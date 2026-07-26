@@ -1,3 +1,14 @@
+jt-pve-storage-dellemc (0.7.21~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The message that explains why a volume cannot be deleted could never
+    name the process holding it. 'fuser -v' prints its table to stderr and
+    only the bare PID list to stdout, and only stdout was being read — so an
+    operator was told the device was open and never told by what.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 21:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.20~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

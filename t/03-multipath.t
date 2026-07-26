@@ -222,4 +222,34 @@ is_deeply(get_scsi_paths_for_wwid('not-a-wwid'), [],
         'an alarm the caller had running is still running afterwards');
 }
 
+# ---------------------------------------------------------------------------
+# The process list comes from stderr
+#
+# 'fuser -v' prints its table to stderr; only the bare PID list goes to
+# stdout. Reading stdout alone means the operator is told a device is in use
+# and never told by what.
+# ---------------------------------------------------------------------------
+
+{
+    my $details = \&{"${P}::get_device_usage_details"};
+
+    no strict 'refs';
+    no warnings 'redefine';
+    local *{"${P}::_run_cmd"} = sub {
+        my ($cmd) = @_;
+        return ('', "                     USER        PID ACCESS COMMAND\n"
+                  . "/dev/mapper/x:       root      12345 F.... qemu-system-x86_64\n", 0)
+            if $cmd->[0] =~ /fuser/;
+        return ('', '', 0);
+    };
+    local *{"${P}::is_block_device"} = sub { 1 };
+    local *{"${P}::_resolve_block_device_name"} = sub { 'dm-99' };
+
+    my $text = $details->('/dev/mapper/x');
+
+    like($text, qr/\[PROCESS\]/, 'the process section appears at all');
+    like($text, qr/qemu-system-x86_64/,
+        'and names the process holding the device, which fuser put on stderr');
+}
+
 done_testing();
