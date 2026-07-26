@@ -7,6 +7,32 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.12~beta1] - 2026-07-27
+
+### Fixed
+- **Deleting a template could never succeed on PowerStore or PowerFlex.**
+  Whether to remove the template marker was decided by reading the array's
+  refusal text, and both families use the same wording for "this volume still
+  has a snapshot" and "something was cloned from it". On PowerStore it was
+  worse: the hint this plugin appends to a 422 contains the word `clones`, so
+  the rule matched its own text and the marker was never removed — leaving the
+  volume undeletable for good. The array decides now. A linked clone is a
+  clone *of the marker*, so an array that still has one refuses to delete it;
+  trying and being refused is both safe and the only reliable test.
+- **Operator-facing messages end at a newline.** Without one Perl appends
+  ` at /usr/share/perl5/PVE/Storage/Custom/... line 1234.`, which in a PVE
+  task log is noise in front of the person trying to work out what to do.
+
+### Added
+- `t/18-powerflex-lifecycle.t`: a whole VM's life on PowerFlex, which has its
+  own allocation, cloning, snapshot and delete paths and so was untouched by
+  the lifecycle test added in 0.7.11. The fake array behaves as PowerFlex
+  does — volumes addressed by id, a snapshot is a volume with an ancestor,
+  and a volume with descendants cannot be removed — which is what exposed the
+  template deletion above.
+- `t/11-imports.t` also fails on a `die` whose message does not end at a
+  newline.
+
 ## [0.7.11~beta1] - 2026-07-27
 
 ### Fixed

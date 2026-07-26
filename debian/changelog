@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.12~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Deleting a template could never succeed on PowerStore or PowerFlex. The
+    decision whether to remove the template marker was made by reading the
+    array's refusal text, and both families use the same wording for "this
+    volume still has a snapshot" and "something was cloned from it" — on
+    PowerStore the hint this plugin appends to a 422 contains the word
+    "clones" itself, so the rule matched its own text. The array decides now:
+    a linked clone is a clone OF THE MARKER, so an array that still has one
+    refuses to delete it, and trying is both safe and reliable.
+  * Operator-facing messages end at a newline, so Perl no longer appends
+    " at /usr/share/perl5/... line 1234." to them in a PVE task log.
+  * New test t/18-powerflex-lifecycle.t walks a whole VM's life on PowerFlex,
+    which has its own alloc, clone, snapshot and delete and was therefore not
+    covered by the lifecycle test added in 0.7.11. It is what found the
+    template deletion above.
+  * t/11-imports.t also fails now on a die message that does not end at a
+    newline.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.11~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

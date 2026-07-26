@@ -644,6 +644,12 @@ SKIP: {
 
 # A template whose delete keeps failing must keep its marker snapshot: the
 # volume survives, so it has to survive as a template.
+#
+# The array is what decides. A linked clone is a clone OF THE MARKER, so an
+# array that still has one refuses to delete the marker — trying and being
+# refused is the reliable test. Reading the refusal text is not: PowerStore
+# and PowerFlex use the same wording for "this volume still has a snapshot"
+# and "something was cloned from it".
 {
     Test::Plugin->reset_state();
 
@@ -653,12 +659,21 @@ SKIP: {
     $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0 };
     $Test::Plugin::SNAPSHOTS{"$vol.pve-base"} = { volume => $vol, ctime => 1 };
 
-    # The array refuses because a linked clone still depends on the template.
     no warnings 'redefine';
+
+    # The volume cannot go: something was cloned from it.
     local *Test::Plugin::_array_delete_volume = sub {
         my ($class, $scfg, $storeid, $name) = @_;
         $class->log_call('delete', $name);
         die "cannot delete: dependent clone exists\n";
+    };
+
+    # And neither can the marker, for the same reason — which is what a real
+    # array says when the clone was taken from it.
+    local *Test::Plugin::_array_snapshot_delete = sub {
+        my ($class, $scfg, $storeid, $snap) = @_;
+        $class->log_call('snapshot_delete', $snap);
+        die "cannot delete: a clone was made from this snapshot\n";
     };
 
     my $err;
@@ -666,6 +681,8 @@ SKIP: {
     $err = $@;
 
     like($err, qr/dependent objects/, 'the refusal is reported to the operator');
+    like($err, qr/clone was made from this snapshot/,
+        '... including what the array said about the marker itself');
     ok($Test::Plugin::SNAPSHOTS{"$vol.pve-base"},
         'and the template keeps its marker snapshot');
 }

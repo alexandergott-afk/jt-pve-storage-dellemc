@@ -1,5 +1,9 @@
 #!/usr/bin/perl
-# Helpers must be imported, not merely called.
+# Source rules that nothing else enforces.
+#
+# Two of them, both about things Perl accepts happily and an operator pays for
+# later: a helper called without its `use` line, and a die whose message does
+# not end at a newline.
 #
 # `perl -c` compiles a call to an undefined subroutine without a word of
 # complaint, so a helper used without its `use` line only fails at runtime —
@@ -70,6 +74,38 @@ for my $file (sort @files) {
 
     is_deeply(\@missing, [], "$file imports every helper it calls")
         or diag(join("\n  ", @missing));
+}
+
+# ---------------------------------------------------------------------------
+# An operator-facing die must end at a newline
+#
+# Without one, Perl appends " at /usr/share/perl5/PVE/Storage/Custom/... line
+# 1234." to the message. In a PVE task log that is noise in front of the
+# person trying to work out what to do, and it leaks a path they cannot act
+# on. Messages raised inside a forked helper are exempt: the parent reports,
+# the child's text never reaches anyone.
+# ---------------------------------------------------------------------------
+
+for my $file (sort @files) {
+    open(my $fh, '<', $file) or next;
+    my $source = do { local $/; <$fh> };
+    close($fh);
+
+    $source =~ s/^__END__.*//ms;
+
+    my @bare;
+    while ($source =~ /die\s+((?:"(?:[^"\\]|\\.)*"\s*\.?\s*)+);/g) {
+        my $statement = $1;
+
+        next if $statement =~ /\\n"\s*\z/;          # ends at a newline
+        next if $statement =~ /\A"\w+: \$!"\z/;      # 'open: $!' inside a child
+
+        (my $shown = $statement) =~ s/\s+/ /g;
+        push @bare, substr($shown, 0, 60);
+    }
+
+    is_deeply(\@bare, [], "$file: every die message ends at a newline")
+        or diag(join("\n  ", '', @bare));
 }
 
 done_testing();

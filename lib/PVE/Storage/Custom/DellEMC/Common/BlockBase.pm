@@ -1157,7 +1157,7 @@ sub alloc_image {
         # stale devices.
         warn "Mapping failed, removing volume '$array_name' again\n";
         eval { $class->_release_volume($scfg, $storeid, $array_name) };
-        die "Failed to map volume '$array_name' to this node: $err";
+        die "Failed to map volume '$array_name' to this node: $err\n";
     }
 
     warn "Volume '$array_name' could not be mapped to: " . join(', ', @$failed)
@@ -1387,16 +1387,17 @@ sub free_image {
     # on the array.
     my $delete_error = $@;
 
-    # The template marker is handled last and separately. A template that
-    # still has linked clones cannot be deleted whatever we do, and removing
-    # its marker on the way to failing would leave a volume PVE no longer
-    # recognises as a template. So the marker only goes when the array's
-    # refusal was not about dependents, or when the delete already succeeded
-    # and the marker would otherwise outlive the volume it marks.
+    # The template marker is handled last and separately, and the array is
+    # what decides whether it may go: a linked clone is a clone OF THE MARKER,
+    # so an array that still has one refuses to delete it. Trying and being
+    # refused is therefore safe, and it is the only reliable test — reading the
+    # refusal text is not. Both PowerStore and PowerFlex use the same wording
+    # for "this volume still has a snapshot" and "something was cloned from
+    # it", and on PowerStore the hint this plugin appends to a 422 contains
+    # the word "clones" itself, so any message-matching rule matches both.
     if ($isBase || $volname =~ /^base-/) {
         if ($delete_error) {
-            if ($delete_error !~ /clone|dependent|child|in use/i
-                && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+            if ($class->_purge_own_snapshots($scfg, $storeid, $array_name,
                     base_only => 1, errors => \@snapshot_errors)) {
                 eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
                 $delete_error = $@;
@@ -1420,9 +1421,9 @@ sub free_image {
         if ($err =~ /clone|dependent|child|in use/i) {
             die "Cannot delete volume '$volname': the array reports dependent"
               . " objects, which usually means thin clones were made from it."
-              . " Delete those first.\n  Array error: $err";
+              . " Delete those first.\n  Array error: $err\n";
         }
-        die "Failed to delete volume '$array_name': $err";
+        die "Failed to delete volume '$array_name': $err\n";
     }
 
     # Keep the WWID tracked if a stale device survived, so the reaper retries.
@@ -1895,7 +1896,7 @@ sub _prepare_snapshot_access {
     if ($@) {
         my $err = $@;
         eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
-        die "Failed to create a temporary clone for snapshot access: $err";
+        die "Failed to create a temporary clone for snapshot access: $err\n";
     }
 
     my $host = $class->_host_name($scfg);
@@ -1905,7 +1906,7 @@ sub _prepare_snapshot_access {
         # The map may have taken effect even though the response failed.
         eval { $class->_release_volume($scfg, $storeid, $temp) };
         eval { $WWID_STATE->untrack_temp_clone($storeid, $temp) };
-        die "Failed to map the temporary snapshot clone: $err";
+        die "Failed to map the temporary snapshot clone: $err\n";
     }
 
     $SNAPSHOT_ACCESS{$key} = $temp;
@@ -2107,9 +2108,9 @@ sub volume_snapshot_delete {
         my $err = $@;
         die "Cannot delete snapshot '$snap' of volume '$volname': the array"
           . " reports it is still the source of one or more thin clones."
-          . " Delete those volumes first.\n  Array error: $err"
+          . " Delete those volumes first.\n  Array error: $err\n"
             if $err =~ /dependent|in use|clone|cannot be deleted/i;
-        die "Failed to delete snapshot '$snap' of volume '$volname': $err";
+        die "Failed to delete snapshot '$snap' of volume '$volname': $err\n";
     }
 
     # Clean up even when the feature is now switched off: a storage that had
@@ -2384,7 +2385,7 @@ sub clone_image {
             next;
         }
 
-        die "Failed to clone '$source' to '$target': $err";
+        die "Failed to clone '$source' to '$target': $err\n";
     }
 
     my ($mapped, $failed) = eval { $class->_map_to_all_hosts($scfg, $storeid, $target) };
@@ -2392,7 +2393,7 @@ sub clone_image {
         my $err = $@;
         warn "Mapping failed, removing clone '$target' again\n";
         eval { $class->_release_volume($scfg, $storeid, $target) };
-        die "Failed to map the cloned volume: $err";
+        die "Failed to map the cloned volume: $err\n";
     }
 
     warn "Clone '$target' could not be mapped to: " . join(', ', @$failed)

@@ -474,7 +474,7 @@ sub _array_ensure_host {
               . " 'dell-cluster-name' so the generated host name matches the"
               . " existing one.\n  Array error: $err"
                 if $err =~ /already|exists|in use|duplicate/i;
-            die "Failed to create host '$name' on the array: $err";
+            die "Failed to create host '$name' on the array: $err\n";
         }
         return $name;
     }

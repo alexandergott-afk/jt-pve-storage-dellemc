@@ -641,7 +641,7 @@ sub alloc_image {
         eval { $api->volume_delete($id, storeid => $storeid) };
         $class->_invalidate_list_cache($scfg, $storeid);
         die "Volume created but this node could not be identified to the"
-          . " array, so it was removed again: $err";
+          . " array, so it was removed again: $err\n";
     }
 
     eval { $api->volume_map($id, $host_id, nvme => !$class->_is_sdc($scfg)) };
@@ -656,7 +656,7 @@ sub alloc_image {
         eval { $api->volume_delete($id, storeid => $storeid) };
         $class->_invalidate_list_cache($scfg, $storeid);
         die "Failed to map the new volume to this node; it was removed"
-          . " again: $err";
+          . " again: $err\n";
     }
 
     return $pve_volname;
@@ -700,10 +700,14 @@ sub free_image {
     # reading it again later would report a refused delete as success.
     my $delete_error = $@;
 
+    # The array decides whether the template marker may go: a linked clone is
+    # a snapshot OF THE MARKER, so PowerFlex refuses to remove it while one
+    # exists. Trying and being refused is safe, and it is the only reliable
+    # test — the refusal text is the same for "it still has a snapshot" and
+    # "something was cloned from it". See the same passage in Common::BlockBase.
     if ($isBase || $volname =~ /^base-/) {
         if ($delete_error) {
-            if ($delete_error !~ /descendant|snapshot|child|depend/i
-                && $class->_purge_own_snapshots($scfg, $storeid, $array_name,
+            if ($class->_purge_own_snapshots($scfg, $storeid, $array_name,
                     base_only => 1, errors => \@snapshot_errors)) {
                 eval { $api->volume_delete($id, storeid => $storeid) };
                 $delete_error = $@;
@@ -723,9 +727,9 @@ sub free_image {
 
         die "Cannot delete volume '$volname': the array reports dependent"
           . " objects, which on PowerFlex means snapshots or clones made from"
-          . " it. Delete those first.\n  Array error: $err"
+          . " it. Delete those first.\n  Array error: $err\n"
             if $err =~ /descendant|snapshot|child|depend/i;
-        die "Failed to delete volume '$array_name': $err";
+        die "Failed to delete volume '$array_name': $err\n";
     }
 
     $class->_invalidate_list_cache($scfg, $storeid);
@@ -1072,7 +1076,7 @@ sub volume_snapshot_delete {
           . " depend on it, which means clones were made from it. Delete"
           . " those first.\n  Array error: $err"
             if $err =~ /descendant|child|depend/i;
-        die "Failed to delete snapshot '$snap' of volume '$volname': $err";
+        die "Failed to delete snapshot '$snap' of volume '$volname': $err\n";
     }
 
     $class->_invalidate_list_cache($scfg, $storeid);
@@ -1274,7 +1278,7 @@ sub clone_image {
         eval { $api->volume_delete($target_id, storeid => $storeid) };
         $class->_invalidate_list_cache($scfg, $storeid);
         die "The clone was created but could not be mapped to this node, so"
-          . " it was removed again: $host_error";
+          . " it was removed again: $host_error\n";
     }
 
     return $linked_to_base ? "$volname/$target_volname" : $target_volname;

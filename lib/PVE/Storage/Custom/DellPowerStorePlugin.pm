@@ -534,7 +534,7 @@ sub _array_ensure_host {
               . " storage at the existing host by setting"
               . " 'dell-cluster-name' to match it.\n  Array error: $err"
                 if $err =~ /already|conflict|in use/i;
-            die "Failed to create host '$name' on the array: $err";
+            die "Failed to create host '$name' on the array: $err\n";
         }
         return $name;
     }
@@ -558,7 +558,7 @@ sub _array_ensure_host {
         die "Failed to add this node's initiator(s) to host '$name': $names."
           . " They are most likely registered to another host object on the"
           . " array; remove that registration in PowerStore Manager.\n"
-          . "  Array error: $err";
+          . "  Array error: $err\n";
     }
 
     return $name;
