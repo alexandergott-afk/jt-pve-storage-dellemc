@@ -1,3 +1,28 @@
+jt-pve-storage-dellemc (0.7.9~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * pve-dell-config-get's --insecure flag did nothing: both branches of the
+    expression behind it produced the same value. Certificate verification is
+    off by default in recover mode, which matches the plugin's own default and
+    is what recovery against a self-signed certificate needs; --verify-ssl now
+    turns it on, and both flags also apply when the details come from
+    storage.cfg.
+  * A protection domain named in pflex-protection-domain is now a requirement
+    rather than a tie-breaker. It was only consulted when the pool name was
+    ambiguous, so a storage configured with a domain could still land on a
+    pool in a different one — which is what naming the domain was meant to
+    prevent.
+  * An endpoint that manages more than one PowerFlex system says so rather
+    than silently using whichever was listed first.
+  * A REST client built without a type no longer produces an uninitialised
+    value warning on top of whatever error it was reporting.
+  * docs/TESTING.md now says where each unverified endpoint can be checked:
+    PowerStore publishes Swagger UI on the array itself, and the PowerVault
+    commands can be tried over SSH first.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 09:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.8~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

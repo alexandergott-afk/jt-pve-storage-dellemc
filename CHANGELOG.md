@@ -7,6 +7,35 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.9~beta1] - 2026-07-27
+
+### Fixed
+- **`pve-dell-config-get --insecure` did nothing.** Both branches of the
+  expression behind it produced the same value, so certificate verification
+  was off whether or not the flag was given. It stays off by default in
+  recover mode — that matches the plugin's own `dell-ssl-verify` default, and
+  a certificate error while recovering from an outage is an obstacle rather
+  than a protection — and `--verify-ssl` turns it on. Both flags now also
+  apply when the array details come from `storage.cfg`.
+- **`pflex-protection-domain` was only a tie-breaker.** It was consulted when
+  a pool name was ambiguous and ignored when it was not, so a storage
+  configured with a domain could still be pointed at a pool in a different
+  one. It is a requirement now, and a pool that is not in the named domain is
+  refused with the domains it was found in.
+- An endpoint that manages more than one PowerFlex system says so instead of
+  silently using whichever appeared first.
+- A REST client built without a type no longer adds an uninitialised-value
+  warning on top of the error it was reporting.
+
+### Added
+- `docs/TESTING.md` says where each unverified endpoint can be checked:
+  PowerStore publishes Swagger UI on the array itself at
+  `https://<mgmt-ip>/swaggerui`, and the PowerVault commands can be tried over
+  SSH before the plugin sends them over HTTPS.
+- `t/16-docs.t` runs the recovery tool's `--help`. Getopt::Long validates its
+  option table when it is called rather than when the file compiles, and an
+  outage is the worst moment to discover a broken one.
+
 ## [0.7.8~beta1] - 2026-07-27
 
 ### Fixed

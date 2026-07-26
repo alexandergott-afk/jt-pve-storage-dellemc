@@ -155,4 +155,38 @@ for my $language ('', '_zh-TW') {
         'troubleshooting still gives the safe flush sequence');
 }
 
+# ---------------------------------------------------------------------------
+# The recovery tool's own surface
+#
+# It is operator-facing code that runs during an outage. A broken option table
+# only fails at runtime — Getopt::Long validates its specification when it is
+# called, not when the file compiles — and that is the worst possible moment
+# to find out.
+# ---------------------------------------------------------------------------
+
+SKIP: {
+    my $tool = -f 'bin/pve-dell-config-get' ? 'bin/pve-dell-config-get'
+             : '../bin/pve-dell-config-get';
+    skip 'the recovery tool is not in this tree', 4 unless -f $tool;
+
+    my $help = `perl -Ilib $tool --help 2>&1`;
+    my $status = $? >> 8;
+
+    is($status, 0, '--help exits cleanly');
+    like($help, qr/pve-dell-config-get \S+ - recover VM configurations/,
+        '... and names itself and its version');
+    like($help, qr/--recover/, '... and documents recover mode');
+
+    # The version has to match the package being built, or an operator
+    # reporting a problem reports the wrong one.
+    my $makefile = slurp('Makefile') // slurp('../Makefile') // '';
+    my ($version) = $makefile =~ /^VERSION\s*=\s*(\S+)/m;
+
+    SKIP: {
+        skip 'cannot read the version from the Makefile', 1 unless $version;
+        like($help, qr/\Q$version\E/,
+            "... and reports the version being built ($version)");
+    }
+}
+
 done_testing();

@@ -26,6 +26,12 @@ English: [TESTING.md](TESTING.md)
 | 用來辨識連結複製來源的欄位（`protection_data.source_id`、`ancestorVolumeId`） | `DellPowerStorePlugin.pm`、`DellPowerFlexPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | NVMe-TCP | — | 不在 1.0 範圍 |
 
+### 該去哪裡確認
+
+陣列本身就會提供自己的 API 參考。PowerStore 是 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，本外掛用到的每一個路徑都列在那裡，而且會直接產生對應的 `curl` 指令；請在信任任何端點之前先逐一比對。Dell 已公開的文件中，對於有文件的物件型別顯示的是相同的形狀 —— `POST /volume_group/{id}/clone`、`POST /file_system/{id}/snapshot` —— 與這裡使用的 `/volume/{id}/clone`、`/volume/{id}/snapshot` 一致，但「與同類物件的寫法一致」並不等於已驗證。
+
+PowerVault 的參考則是 ME4／ME5 Series CLI Reference Guide，而且可以先透過 SSH 逐條試跑指令，再交給外掛以 HTTPS 送出。
+
 ### 最該優先驗證的四項
 
 只要把本外掛指向任何一台陣列，請先做這四件事。每一項都很便宜，而每一項一旦錯了都是無聲的失敗。

@@ -143,8 +143,15 @@ sub set_timeout {
 # storage can be grepped out of a busy journal.
 sub log_prefix {
     my ($self) = @_;
-    my $id = defined $self->{storeid} ? ":$self->{storeid}" : '';
-    return "[$self->{type}$id]";
+
+    # Never warn while building a warning. A client constructed without a type
+    # — a subclass under test, or one built by hand — must still produce a
+    # usable message rather than an uninitialised-value warning on top of
+    # whatever went wrong.
+    my $type = $self->{type} // 'dellemc';
+    my $id   = defined $self->{storeid} ? ":$self->{storeid}" : '';
+
+    return "[$type$id]";
 }
 
 sub _msg {

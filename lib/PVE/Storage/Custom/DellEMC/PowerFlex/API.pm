@@ -271,6 +271,15 @@ sub system_id {
     die $self->_msg("the array reported no PowerFlex system. Check that this"
         . " address is the PowerFlex Manager or gateway.") . "\n" unless @$systems;
 
+    # More than one system behind a single manager is possible, and picking
+    # the first silently would put volumes on whichever one happened to be
+    # listed first.
+    $self->log_warn("this endpoint manages " . scalar(@$systems)
+        . " PowerFlex systems; using '" . ($systems->[0]{name}
+        // $systems->[0]{id} // '?') . "'. Point the storage at a manager that"
+        . " serves one system if that is not the intended one.")
+        if @$systems > 1;
+
     return $self->{_system_id} = $systems->[0]{id};
 }
 
@@ -292,17 +301,27 @@ sub storage_pool_by_name {
     }
 
     return undef unless @matches;
-    return $matches[0] if @matches == 1;
 
-    # A pool name is only unique within a protection domain, so an ambiguous
-    # name must be resolved rather than guessed at.
+    # A protection domain the operator named is a requirement, not a
+    # tie-breaker. Ignoring it when the pool name happens to be unique would
+    # quietly point the storage at a pool in a different domain — which is
+    # exactly what the operator was trying to prevent by naming one.
     if (defined $domain && length $domain) {
         for my $pool (@matches) {
             return $pool if ($pool->{protectionDomainId} // '') eq $domain
                          || ($pool->{protectionDomainName} // '') eq $domain;
         }
+
+        die $self->_msg("storage pool '$name' exists on this system, but not"
+            . " in protection domain '$domain'. Found in: "
+            . join(', ', map { $_->{protectionDomainName}
+                            // $_->{protectionDomainId} // '?' } @matches)) . "\n";
     }
 
+    return $matches[0] if @matches == 1;
+
+    # A pool name is only unique within a protection domain, so an ambiguous
+    # name must be resolved rather than guessed at.
     die $self->_msg("storage pool '$name' exists in more than one protection"
         . " domain. Set pflex-protection-domain to say which one.") . "\n";
 }

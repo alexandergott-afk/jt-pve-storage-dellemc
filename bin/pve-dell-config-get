@@ -33,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.8~beta1';
+my $VERSION = '0.7.9~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -57,7 +57,13 @@ Options:
       --password PASS    REST API password              (recover mode)
       --protocol PROTO   iscsi (default) or fc          (recover mode)
       --cluster NAME     Cluster name used in host names, default 'pve'
-      --insecure         Do not verify the array's TLS certificate
+      --insecure         Do not verify the array's TLS certificate. This is
+                         already the default in recover mode, matching the
+                         plugin's own dell-ssl-verify default
+      --verify-ssl       Do verify it. Recovery usually runs against an array
+                         with a self-signed certificate, so this is off by
+                         default; turn it on when the array has a certificate
+                         your node trusts
       --timeout SECONDS  Device wait timeout, default 60
   -q, --quiet            Only print the configuration itself
   -h, --help             This text
@@ -96,6 +102,7 @@ GetOptions(
     'protocol=s'   => \$opt{protocol},
     'cluster=s'    => \$opt{cluster},
     'insecure'     => \$opt{insecure},
+    'verify-ssl'   => \$opt{verify_ssl},
     'timeout=i'    => \$opt{timeout},
     'q|quiet'      => \$opt{quiet},
     'h|help'       => \$opt{help},
@@ -160,7 +167,11 @@ if ($opt{recover}) {
         'dell-password'     => $opt{password},
         'dell-protocol'     => $opt{protocol},
         'dell-cluster-name' => $opt{cluster},
-        'dell-ssl-verify'   => $opt{insecure} ? 0 : 0,
+        # Off unless asked for. Recovery is normally run against an array
+        # with a self-signed certificate, and a certificate error at that
+        # moment is an obstacle, not a protection. --insecure is accepted for
+        # people who type it out of habit and is what happens anyway.
+        'dell-ssl-verify'   => ($opt{verify_ssl} && !$opt{insecure}) ? 1 : 0,
     };
 } else {
     $scfg = read_storage_cfg($storeid);
@@ -176,6 +187,8 @@ if ($opt{recover}) {
     $scfg->{'dell-portal'}   = $opt{portal}   if defined $opt{portal};
     $scfg->{'dell-username'} = $opt{username} if defined $opt{username};
     $scfg->{'dell-password'} = $opt{password} if defined $opt{password};
+    $scfg->{'dell-ssl-verify'} = 0 if $opt{insecure};
+    $scfg->{'dell-ssl-verify'} = 1 if $opt{verify_ssl} && !$opt{insecure};
 }
 
 die "Storage '$storeid' has no dell-portal configured\n"
@@ -282,7 +295,8 @@ my $prefix = $NAMING->volume_prefix($storeid);
 $prefix .= "${vmid}-vmconf-" if defined $vmid;
 
 sub list_backups {
-    my $volumes = $api->volume_list(defined $vmid ? $prefix : $prefix) // [];
+    # $prefix already narrows to one VM when a vmid was given.
+    my $volumes = $api->volume_list($prefix) // [];
 
     my @backups;
     for my $volume (@$volumes) {

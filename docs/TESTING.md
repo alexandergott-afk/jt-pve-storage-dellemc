@@ -28,6 +28,21 @@ version it was observed on.
 | Thin-clone parent field used to report linked clones (`protection_data.source_id`, `ancestorVolumeId`) | `DellPowerStorePlugin.pm`, `DellPowerFlexPlugin.pm` | NOT VERIFIED ON HARDWARE |
 | NVMe-TCP | — | out of scope for 1.0 |
 
+### Where to check them
+
+The array publishes its own API reference. On PowerStore that is Swagger UI at
+`https://<mgmt-ip>/swaggerui`, which lists every path this plugin uses and
+generates the equivalent `curl` command; check each endpoint there before
+trusting it. Dell's published documentation shows the same shape for the
+object types it does document — `POST /volume_group/{id}/clone`,
+`POST /file_system/{id}/snapshot` — which is consistent with the
+`/volume/{id}/clone` and `/volume/{id}/snapshot` used here, but consistency
+with a sibling object type is not verification.
+
+On PowerVault the reference is the ME4 / ME5 Series CLI Reference Guide, and
+the commands can be checked one at a time over SSH before the plugin sends
+them over HTTPS.
+
 ### Verifying the four that matter most
 
 Do these first on any array this plugin is pointed at. Each one is cheap, and

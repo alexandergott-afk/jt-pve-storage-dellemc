@@ -555,4 +555,48 @@ SKIP: {
     is($V->is_valid_volume_name('a' x 32), 1, 'PowerVault still allows 32');
 }
 
+# ---------------------------------------------------------------------------
+# A protection domain the operator named is a requirement
+#
+# A pool name is only unique within a domain. Treating the domain as a
+# tie-breaker — used only when the name is ambiguous — means that a storage
+# configured with a domain can still land on a pool in a different one, which
+# is precisely what naming the domain was meant to prevent.
+# ---------------------------------------------------------------------------
+
+{
+    my $api = bless {}, 'PVE::Storage::Custom::DellEMC::PowerFlex::API';
+
+    my @pools = (
+        { id => 'p1', name => 'pool-a', protectionDomainName => 'domain-1' },
+        { id => 'p2', name => 'pool-b', protectionDomainName => 'domain-2' },
+        { id => 'p3', name => 'pool-b', protectionDomainName => 'domain-3' },
+    );
+
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::storage_pool_list =
+        sub { [@pools] };
+
+    is($api->storage_pool_by_name('pool-a')->{id}, 'p1',
+        'a pool with a unique name resolves without a domain');
+
+    is($api->storage_pool_by_name('pool-a', 'domain-1')->{id}, 'p1',
+        'and still resolves when the domain agrees');
+
+    ok(!eval { $api->storage_pool_by_name('pool-a', 'domain-9') },
+        'a pool that is not in the named domain is refused');
+    like($@, qr/not\s+in protection domain/,
+        '... saying which domains it was found in');
+
+    ok(!eval { $api->storage_pool_by_name('pool-b') },
+        'an ambiguous name without a domain is refused');
+    like($@, qr/more than one protection domain/, '... saying why');
+
+    is($api->storage_pool_by_name('pool-b', 'domain-3')->{id}, 'p3',
+        'and the domain picks the right one of the two');
+
+    is($api->storage_pool_by_name('nosuch'), undef,
+        'a pool that does not exist is undef, not an error');
+}
+
 done_testing();
