@@ -7,6 +7,38 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.24~beta1] - 2026-07-27
+
+### Fixed
+- **PowerStore volumes would have been invisible to PVE.** The name-prefix
+  filter used `%` as the `ilike` wildcard. Every example in the Dell PowerStore
+  REST API Developers Guide spells that wildcard `*` — and a wildcard the array
+  reads as an ordinary character matches nothing, so the volume listing would
+  have come back empty while the array still held every volume. Nothing would
+  have failed: an empty listing is exactly what a storage with no volumes
+  looks like.
+- **The DELL-EMC-TOKEN is now refreshed from any response that carries one.**
+  Dell documents the CSRF token as something to obtain with a GET before each
+  write, which leaves open whether the array reissues it as a session goes on.
+  If it does, holding the login-time token would have failed every write while
+  every read kept working — a failure that reads as a permissions problem.
+- Clearing a PowerStore session now empties the cookie jar, so a re-login
+  after a 401 does not present the rejected `auth_cookie` alongside fresh
+  credentials.
+
+### Changed
+- A PowerStore name-prefix listing that comes back empty is retried once
+  without the filter and matched locally, with a single warning naming the
+  cause. Whichever wildcard form an appliance accepts, the plugin can no
+  longer lose volumes over it.
+- A name filter the array applies more broadly than a prefix can no longer
+  pull another storage's volumes into this one's listing: the prefix is
+  rechecked on every row that arrives.
+- `docs/TESTING.md` now records what has been read from the PowerStore
+  developers guide — the session and CSRF rules, the filter form, the operator
+  list, the wildcard — so a first tester can tell it apart from what is still
+  inferred.
+
 ## [0.7.23~beta1] - 2026-07-27
 
 ### Added

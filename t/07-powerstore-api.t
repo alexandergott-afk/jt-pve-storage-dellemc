@@ -179,6 +179,64 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 }
 
 {
+    # Dell documents the CSRF token as something to fetch with a GET before
+    # each write, which leaves open whether the array reissues it during a
+    # session. If it does and this client keeps presenting the login-time one,
+    # every write eventually fails while every read still works — a failure
+    # that would look like a permissions problem.
+    my $n = 0;
+    my ($api, $ua) = make_api(handler => sub {
+        my $h = HTTP::Headers->new('DELL-EMC-TOKEN' => 'rotated-' . ++$n);
+        $h->header('Content-Type' => 'application/json');
+        return HTTP::Response->new(200, undef, $h, '[]');
+    });
+
+    $api->cluster_get();
+    $api->cluster_get();
+
+    is($ua->requests->[-1]->header('DELL-EMC-TOKEN'), 'rotated-1',
+        'a token offered on a response is used on the next request');
+
+    $api->cluster_get();
+    is($ua->requests->[-1]->header('DELL-EMC-TOKEN'), 'rotated-2',
+        'and keeps tracking it as the array rotates');
+}
+
+{
+    # An array that never rotates must not be disturbed by the tracking.
+    my ($api, $ua) = make_api();
+    $api->cluster_get();
+    $api->cluster_get();
+    is($ua->requests->[-1]->header('DELL-EMC-TOKEN'), 'tok-123',
+        'a token that never changes stays put');
+}
+
+{
+    # The session cookie is as much of the credential as the token. Leaving a
+    # rejected one in the jar means the re-login presents a stale cookie
+    # alongside fresh Basic credentials.
+    # Built without an injected user agent, so this exercises the real one the
+    # plugin constructs — the only place the cookie jar actually exists.
+    my $api = $API->new(portal => '10.0.0.5', username => 'u', password => 'p',
+        storeid => 'ps1', type => 'dellpowerstore');
+
+    my $jar = $api->ua->cookie_jar;
+    ok($jar, 'the real user agent carries a cookie jar');
+
+    $jar->set_cookie(0, 'auth_cookie', 'stale', '/', '10.0.0.5');
+    my $before = 0;
+    $jar->scan(sub { $before++ });
+    is($before, 1, 'with the session cookie in it');
+
+    $api->_mark_session({ token => 'tok' });
+    $api->_clear_session();
+
+    my $left = 0;
+    $jar->scan(sub { $left++ });
+    is($left, 0, 'clearing the session empties the cookie jar');
+}
+
+{
     # A login that returns no token must fail with something diagnosable
     # rather than proceeding unauthenticated.
     my $ua = FakeArray->new(handler => sub { json_response(200, []) });
@@ -204,16 +262,80 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
     is($volumes->[0]{name}, 'pve-ps1-100-disk0', 'first volume');
 
     my $query = $ua->query_of(-1);
-    is($query->{name}, 'ilike.pve-ps1-%', 'filtered server-side by name prefix');
+    is($query->{name}, 'ilike.pve-ps1-*', 'filtered server-side by name prefix');
     is($query->{type}, 'eq.Primary', 'snapshots excluded by default');
     like($query->{select}, qr/\bwwn\b/, 'the WWN is requested explicitly');
     like($query->{select}, qr/\bsize\b/, 'and the size');
     is($query->{limit}, 200, 'a page size is set');
     is($query->{offset}, 0, 'starting at the first page');
 
-    # The prefix must reach the array percent-encoded.
-    like($ua->last_request->uri->as_string, qr/name=ilike\.pve-ps1-%25/,
-        'the wildcard is percent-encoded on the wire');
+    # Dell's own examples spell the ilike wildcard '*', not '%'. A wildcard
+    # this array reads as an ordinary character matches nothing, and every
+    # volume silently disappears from PVE while the array still holds them.
+    like($ua->last_request->uri->as_string, qr/name=ilike\.pve-ps1-(?:\*|%2A)/i,
+        'the documented wildcard reaches the array');
+}
+
+{
+    # An array that reads the wildcard as an ordinary character. The filtered
+    # query matches nothing, which is indistinguishable from "this storage is
+    # empty" — so the client must look again without the filter rather than
+    # report every volume as gone.
+    my @warned;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+        my %q = URI->new($req->uri)->query_form;
+        return json_response(200, []) if defined $q{name};   # the filter misses
+        return json_response(200, fixture('volume'));
+    });
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::DellEMC::PowerStore::API::log_warn =
+        sub { push @warned, $_[1] };
+
+    my $volumes = $api->volume_list('pve-ps1-');
+    is(scalar @$volumes, 2, 'the volumes are found anyway');
+    is($volumes->[0]{name}, 'pve-ps1-100-disk0', 'and are the right ones');
+
+    is(scalar @warned, 1, 'and it says so exactly once');
+    like($warned[0], qr/ilike wildcard/, '... naming what is wrong');
+    like($warned[0], qr/filtering locally/, '... and what it did instead');
+
+    # A second call must not repeat the warning into the journal every poll.
+    $api->volume_list('pve-ps1-');
+    is(scalar @warned, 1, 'and not once per poll thereafter');
+}
+
+{
+    # A filter the array applies too broadly is the other direction of the
+    # same mistake: another storage's volumes must not arrive in this one's
+    # listing just because the array matched a substring.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, []) unless $key eq 'GET /api/rest/volume';
+        return json_response(200, [
+            { id => 'v1', name => 'pve-ps1-100-disk0' },
+            { id => 'v2', name => 'other-pve-ps1-999-disk0' },
+            { id => 'v3', name => 'unrelated' },
+        ]);
+    });
+
+    my $volumes = $api->volume_list('pve-ps1-');
+    is_deeply([map { $_->{name} } @$volumes], ['pve-ps1-100-disk0'],
+        'only names that really start with the prefix are kept');
+}
+
+{
+    # An empty storage stays empty — the fallback must not invent rows, and
+    # must not warn about a filter that was working correctly.
+    my @warned;
+    my ($api) = make_api(handler => sub { json_response(200, []) });
+    no warnings 'redefine';
+    local *PVE::Storage::Custom::DellEMC::PowerStore::API::log_warn =
+        sub { push @warned, $_[1] };
+
+    is_deeply($api->volume_list('pve-ps1-'), [], 'no volumes, no rows');
+    is_deeply(\@warned, [], 'and nothing to complain about');
 }
 
 {
@@ -389,7 +511,7 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
         'and to the snapshots of this volume');
 
     $api->snapshot_list(prefix => 'pve-ps1-');
-    is($ua->query_of(-1)->{name}, 'ilike.pve-ps1-%', 'prefix listing filter');
+    is($ua->query_of(-1)->{name}, 'ilike.pve-ps1-*', 'prefix listing filter');
 
     $api->volume_restore('vol-1', 'snap-1');
     is($ua->last_request->uri->path, '/api/rest/volume/vol-1/restore', 'restore path');
@@ -508,7 +630,7 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 
     my $hosts = $api->host_list('pve-mycluster-');
     is(scalar @$hosts, 2, 'hosts listed');
-    is($ua->query_of(-1)->{name}, 'ilike.pve-mycluster-%', 'host prefix filter');
+    is($ua->query_of(-1)->{name}, 'ilike.pve-mycluster-*', 'host prefix filter');
 
     my $id = $api->host_create('pve-mycluster-node3',
         [{ port_name => 'iqn.1993-08.org.debian:01:node3', port_type => 'iSCSI' }]);

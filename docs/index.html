@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.23~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.24~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.24~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerStore volumes would have been invisible to PVE: the name filter used the wrong ilike wildcard, and an empty listing looks exactly like a storage with no volumes. An empty prefix listing is now rechecked locally, so the question cannot lose volumes either way.</span>
+            <span class="lang-zh">PowerStore 上的 volume 會完全看不到：名稱過濾用錯了 ilike 萬用字元，而「空的列舉」看起來就跟「沒有任何 volume 的儲存」一模一樣。現在前綴列舉若為空會在本地重新比對，因此不論答案是哪一種都不會弄丟 volume。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.23~beta1</div>

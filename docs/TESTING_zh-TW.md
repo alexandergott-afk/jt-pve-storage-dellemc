@@ -12,8 +12,8 @@ English: [TESTING.md](TESTING.md)
 |---|---|---|
 | REST 端點路徑 | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | 回應欄位名稱（`size`、`wwn`、`logical_used`、`protection_data`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
-| 過濾語法（`eq.`、`ilike.`、`cs.{...}`、`->>`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
-| 認證流程（`login_session`、`DELL-EMC-TOKEN`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| 過濾語法（`eq.`、`ilike.`、`cs.{...}`、`->>`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 比較運算子前綴與 `*` 萬用字元是從開發者指南讀來的 |
+| 認證流程（`login_session`、`DELL-EMC-TOKEN`、`auth_cookie`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 標頭、cookie 與「非 GET 一律需要 token」是從開發者指南讀來的 |
 | 容量來源（`space_metrics_by_cluster`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | multipath 比對用的 SCSI vendor／product 字串 | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
 | WWN 轉 multipath WWID | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
@@ -159,7 +159,20 @@ help create host
 
 ### PowerStore（出自 4.x REST 文件）
 
-以下每一項都**未驗證**，端點與過濾語法也是。
+請求的形狀有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：
+
+| 從指南讀到的 | 內容 |
+|---|---|
+| session | `GET /login_session` 搭配 HTTP Basic，會回傳 `DELL-EMC-TOKEN` 標頭與 `auth_cookie`；兩者共同構成後續請求的憑證 |
+| CSRF | 「Requests other than GET require the DELL-EMC-TOKEN header」—— token 取自某次 GET 的回應，因此本外掛也會採用任何回應給出的最新一份 |
+| 過濾寫法 | `?<attribute>=[not.]<operator>.<value>` |
+| 運算子 | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
+| `ilike` 萬用字元 | 指南裡每一個範例都寫成 `*`（`?name=ilike.User*`），本外掛送出的也是這一種 |
+| 參數 | `select`（以逗號分隔的屬性）、`order`、`async` |
+
+如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前綴列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
+
+以下欄位仍**未驗證**，端點也是。
 
 | 欄位 | 用途 |
 |---|---|

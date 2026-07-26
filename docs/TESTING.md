@@ -14,8 +14,8 @@ version it was observed on.
 |---|---|---|
 | REST endpoint paths | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | Response field names (`size`, `wwn`, `logical_used`, `protection_data`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
-| Filter syntax (`eq.`, `ilike.`, `cs.{...}`, `->>`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
-| Authentication (`login_session`, `DELL-EMC-TOKEN`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| Filter syntax (`eq.`, `ilike.`, `cs.{...}`, `->>`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE — the operator prefixes and the `*` wildcard are read from the developers guide |
+| Authentication (`login_session`, `DELL-EMC-TOKEN`, `auth_cookie`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE — the header, the cookie and "non-GET requires the token" are read from the developers guide |
 | Capacity source (`space_metrics_by_cluster`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | SCSI vendor / product strings for multipath | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
 | WWN to multipath WWID conversion | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
@@ -189,8 +189,25 @@ absent.
 
 ### PowerStore (from the 4.x REST documentation)
 
-Every one of these is **unverified**. The endpoints and the filter syntax are
-too.
+Some of the request shape *was* read from the Dell PowerStore REST API
+Developers Guide, and is quoted here so a first tester can tell it apart from
+the rest:
+
+| Read from the guide | What it says |
+|---|---|
+| Session | `GET /login_session` with HTTP Basic returns the `DELL-EMC-TOKEN` header and an `auth_cookie`; both authenticate the rest of the session |
+| CSRF | "Requests other than GET require the DELL-EMC-TOKEN header" — obtained from a GET response, so this plugin also takes the newest one any response offers |
+| Filter form | `?<attribute>=[not.]<operator>.<value>` |
+| Operators | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
+| `ilike` wildcard | every example in the guide spells it `*` (`?name=ilike.User*`), which is what this plugin sends |
+| Parameters | `select` (comma-separated attributes), `order`, `async` |
+
+A wildcard the array reads differently would match nothing and make every
+volume vanish from PVE while the array still holds them, so a name-prefix
+listing that comes back empty is retried without the filter and matched
+locally — with a warning naming the cause. Report that warning if you see it.
+
+The field names below are still **unverified**. So are the endpoints.
 
 | Field | Read for |
 |---|---|

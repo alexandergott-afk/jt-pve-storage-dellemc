@@ -1,3 +1,34 @@
+jt-pve-storage-dellemc (0.7.24~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerStore: the ilike wildcard is now '*', which is what every example in
+    the Dell PowerStore REST API Developers Guide spells it as. The plugin
+    had been sending '%'. A wildcard the array reads as an ordinary character
+    matches nothing, so a name-prefix listing would have come back empty and
+    every volume would have disappeared from PVE while the array still held
+    them - silently, and indistinguishably from an empty storage.
+  * PowerStore: a name-prefix listing that comes back empty is now retried
+    without the filter and matched locally, with one warning naming the
+    cause. The wildcard question can no longer make the plugin lose volumes,
+    whichever form this appliance accepts.
+  * PowerStore: a name filter the array applies more broadly than a prefix
+    can no longer pull another storage's volumes into this one's listing.
+  * PowerStore: the DELL-EMC-TOKEN is refreshed from any response that
+    carries one. Dell documents the CSRF token as something to fetch with a
+    GET before each write, which leaves open whether the array reissues it
+    during a session; if it does, holding the login-time token would fail
+    every write while every read kept working.
+  * PowerStore: clearing a session now empties the cookie jar, so a re-login
+    after a 401 does not present the rejected auth_cookie alongside fresh
+    credentials.
+  * docs/TESTING.md records what has now been read from the PowerStore
+    developers guide - the session and CSRF rules, the filter form, the
+    operator list, the wildcard - so a first tester can tell it apart from
+    what is still inferred.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 02:51:51 +0800
+
 jt-pve-storage-dellemc (0.7.23~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

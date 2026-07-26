@@ -23,7 +23,8 @@ use MIME::Base64 qw(encode_base64);
 #
 # Filtering follows PostgREST conventions, which PowerStore adopted:
 #   name=eq.<value>            exact match
-#   name=ilike.<prefix>%25     case-insensitive prefix ('%' percent-encoded)
+#   name=ilike.<prefix>*       case-insensitive match, '*' the documented
+#                              wildcard (see _prefix_filter)
 #   type=eq.Snapshot           enum match
 # Filters are applied server-side, always. Listing every volume and filtering
 # locally turns each poll into a full inventory transfer, and this plugin
@@ -100,6 +101,37 @@ sub _auth_headers {
     # The cookie jar on the user agent carries the session cookie; the token
     # is what the array checks on writes.
     return ('DELL-EMC-TOKEN' => $self->{_session}{token});
+}
+
+# Dell documents the CSRF token as something to fetch with a GET before each
+# write, which leaves it open whether the array reissues it as the session
+# goes on. Rather than depend on the answer, take the newest one the array
+# has offered: if it never rotates, this writes back the same string.
+sub _note_response {
+    my ($self, $resp) = @_;
+
+    return unless $self->{_session};
+
+    my $token = $resp->header('DELL-EMC-TOKEN');
+    return unless defined $token && length $token;
+
+    $self->{_session}{token} = $token;
+
+    return;
+}
+
+# The session cookie is as much of the credential as the token is, so a
+# cleared session must not leave the old one in the jar for the next login to
+# present alongside fresh Basic credentials.
+sub _clear_session {
+    my ($self) = @_;
+
+    if (my $ua = $self->{_ua}) {
+        my $jar = $ua->can('cookie_jar') ? $ua->cookie_jar : undef;
+        $jar->clear() if $jar && $jar->can('clear');
+    }
+
+    return $self->SUPER::_clear_session();
 }
 
 sub _logout {
@@ -208,6 +240,74 @@ sub _collection {
     }
 
     return \@rows;
+}
+
+# A prefix match, done in the way Dell's own examples write it.
+#
+# The developers guide documents ilike as a case-insensitive match "with
+# wildcard support" and every example it gives spells the wildcard '*'
+# (?name=ilike.User*). PostgREST, which this filter syntax comes from, accepts
+# '%' as well — but only the '*' form is documented, so that is the one to
+# send.
+#
+# Getting this wrong is not a visible failure. A wildcard the array treats as
+# an ordinary character matches nothing, the collection comes back empty, and
+# every volume on the storage disappears from PVE while the array still holds
+# them. So the wildcard is never trusted on its own: see _collection_prefixed.
+sub _prefix_filter {
+    my ($self, $prefix) = @_;
+
+    return 'ilike.' . $prefix . '*';
+}
+
+# A collection filtered by name prefix, that cannot silently come back empty
+# because the array read the wildcard differently than documented.
+#
+# The server-side filter is what keeps a poll from transferring the whole
+# array's inventory every ten seconds, so it stays. But an empty result is
+# also exactly what a misread wildcard produces, and that answer is
+# indistinguishable from "this storage has no volumes yet". When the filtered
+# query finds nothing, ask once more without the name filter and match the
+# prefix here. On a storage that genuinely holds nothing this costs one listing
+# of volumes that are not ours; if it ever finds rows the filter missed, the
+# wildcard is wrong for this array and the log says so in as many words.
+sub _collection_prefixed {
+    my ($self, $endpoint, $prefix, $params, %opts) = @_;
+
+    my $filtered = $self->_collection($endpoint,
+        { %{ $params // {} }, name => $self->_prefix_filter($prefix) }, %opts);
+
+    # Trust the prefix, not the filter: a match that is broader than a prefix
+    # would otherwise pull in another storage's volumes.
+    my @kept = grep { defined $_->{name} && index($_->{name}, $prefix) == 0 }
+        @$filtered;
+
+    return \@kept if @kept;
+
+    my $all = $self->_collection($endpoint, $params, %opts);
+    my @local = grep { defined $_->{name} && index($_->{name}, $prefix) == 0 }
+        @$all;
+
+    if (@local) {
+        $self->_warn_wildcard($endpoint, $prefix, scalar @local);
+    }
+
+    return \@local;
+}
+
+sub _warn_wildcard {
+    my ($self, $endpoint, $prefix, $found) = @_;
+
+    return if $self->{_wildcard_warned};
+    $self->{_wildcard_warned} = 1;
+
+    $self->log_warn("the array's name filter matched nothing on $endpoint for"
+        . " prefix '$prefix', but $found row(s) match it here. This appliance"
+        . " reads the ilike wildcard differently than the developers guide"
+        . " documents; the plugin is filtering locally instead, which is"
+        . " correct but slower. Please report it.");
+
+    return;
 }
 
 # The fields worth asking for on a volume. Selecting explicitly keeps the
@@ -336,13 +436,12 @@ sub volume_list {
     my ($self, $prefix, %opts) = @_;
 
     my $params = { select => $self->_volume_select };
-    if (defined $prefix && length $prefix) {
-        # '%' has to reach the array percent-encoded; URI does that for us.
-        $params->{name} = 'ilike.' . $prefix . '%';
-    }
     $params->{type} = 'eq.Primary' unless $opts{include_snapshots};
 
-    return $self->_collection('/volume', $params, %opts);
+    return $self->_collection('/volume', $params, %opts)
+        unless defined $prefix && length $prefix;
+
+    return $self->_collection_prefixed('/volume', $prefix, $params, %opts);
 }
 
 sub volume_delete {
@@ -434,9 +533,8 @@ sub snapshot_list {
         # The source id lives inside a JSON column, hence the ->> operator.
         $params->{'protection_data->>source_id'} = 'eq.' . $opts{source_id};
     }
-    if (defined $opts{prefix} && length $opts{prefix}) {
-        $params->{name} = 'ilike.' . $opts{prefix} . '%';
-    }
+    return $self->_collection_prefixed('/volume', $opts{prefix}, $params, %opts)
+        if defined $opts{prefix} && length $opts{prefix};
 
     return $self->_collection('/volume', $params, %opts);
 }
@@ -484,7 +582,9 @@ sub host_list {
     my ($self, $prefix, %opts) = @_;
 
     my $params = { select => 'id,name,os_type,host_initiators' };
-    $params->{name} = 'ilike.' . $prefix . '%' if defined $prefix && length $prefix;
+
+    return $self->_collection_prefixed('/host', $prefix, $params, %opts)
+        if defined $prefix && length $prefix;
 
     return $self->_collection('/host', $params, %opts);
 }

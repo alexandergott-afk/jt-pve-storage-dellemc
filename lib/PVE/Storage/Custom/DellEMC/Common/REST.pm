@@ -304,6 +304,11 @@ sub _clear_session {
     return;
 }
 
+# Called on every response before its status code is interpreted. The default
+# is to ignore it; a subclass whose array rotates a session token overrides
+# this to keep the stored one current.
+sub _note_response { return }
+
 sub ensure_session {
     my ($self) = @_;
 
@@ -396,6 +401,12 @@ sub _request {
         }
 
         my $resp = $self->{_ua}->request($req);
+
+        # Arrays that rotate a CSRF token hand the new one back on the
+        # response. Give the subclass a look at every response, success or
+        # not, before anything decides what the status code means. A hook that
+        # dies here would turn a working request into a failure, so it cannot.
+        eval { $self->_note_response($resp, $method, $endpoint); 1 };
 
         if ($resp->is_success) {
             $restore->();
