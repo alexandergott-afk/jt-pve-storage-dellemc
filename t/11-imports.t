@@ -106,6 +106,32 @@ for my $file (sort @files) {
 
     is_deeply(\@bare, [], "$file: every die message ends at a newline")
         or diag(join("\n  ", '', @bare));
+
+    # Deciding what an array meant by reading the words it chose.
+    #
+    # Twice now this has shipped a defect that only shows up on a real array:
+    # a 422 hint this plugin appends contains "clones", and 'add
+    # host-members' contains "member". Reading /not found/ out of an error is
+    # the same mistake pointed at existence — an array saying "storage pool
+    # not found" would be taken to mean the VOLUME is absent, and the caller
+    # then creates a second one.
+    #
+    # Use the status code (REST: allow_status, get_or_undef) or ask a
+    # question that answers itself, such as listing and looking.
+    my @prose;
+    while ($source =~ /^(.*\$\@\s*=~.*)$/mg) {
+        my $line = $1;
+        next if $line =~ m{^\s*#};
+        # A tolerated duplicate on a write is a different thing: it says the
+        # state is already what was asked for, and that is what 'tolerate' is
+        # declared for at the call site.
+        next if $line =~ /already|exists|duplicate|in use/i;
+        push @prose, $line =~ s/^\s+|\s+$//gr;
+    }
+
+    is_deeply(\@prose, [],
+        "$file: no decision is made by matching an array's error text")
+        or diag(join("\n  ", '', @prose));
 }
 
 done_testing();

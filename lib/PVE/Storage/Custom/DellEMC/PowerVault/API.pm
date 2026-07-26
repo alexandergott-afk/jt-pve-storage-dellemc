@@ -451,15 +451,37 @@ sub volume_get_by_name {
     # 'pve-ps1-100-d10'. The trailing positional argument is the documented
     # place for a comma-separated list of volume names.
     my $data = eval { $self->_cmd(['show', 'volumes', 'details', $name], %opts) };
-    if ($@) {
-        # A missing volume is an error to the CLI, not an empty list.
-        return undef if $@ =~ /not (?:found|exist)|does not exist|invalid/i;
-        die $@;
+    my $error = $@;
+
+    # A missing volume is an error to the CLI, not an empty list — and the
+    # only thing separating that error from a real one is the wording the
+    # array chose. Reading it would mean deciding "this volume does not
+    # exist" from a sentence that may have been about something else, and the
+    # caller's next move is to create one.
+    #
+    # So the wording is not read. A pattern listing answers the same question
+    # without ambiguity: if the array can list volumes and this name is not
+    # among them, it is not there. If the listing fails too, the original
+    # error was real and is what gets reported.
+    if ($error) {
+        my $rows = eval { $self->volume_list($name, %opts) };
+        die $error if $@ || !defined $rows;
+
+        return $self->_exact_volume($rows, $name);
     }
 
-    my $rows = $self->_objects($data, 'volumes');
-    for my $row (@$rows) {
-        return $row if ($row->{'volume-name'} // $row->{name} // '') eq $name;
+    return $self->_exact_volume($self->_objects($data, 'volumes'), $name);
+}
+
+sub _exact_volume {
+    my ($self, $rows, $name) = @_;
+
+    for my $row (@{ $rows // [] }) {
+        next unless ref($row) eq 'HASH';
+        # Both spellings are compared, not just whichever is defined first.
+        my @names = grep { defined && length }
+            $row->{'volume-name'}, $row->{name};
+        return $row if grep { $_ eq $name } @names;
     }
 
     return undef;

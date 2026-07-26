@@ -396,28 +396,40 @@ sub volume_list {
 sub volume_get {
     my ($self, $id, %opts) = @_;
 
-    my $data = eval { $self->get("/api/instances/Volume::$id", undef, %opts) };
-    return undef if $@ && $@ =~ /HTTP 404|not found/i;
-    die $@ if $@;
+    # The status code decides, not the message. An array is free to say
+    # "not found" about something other than this volume, and reading that
+    # as "the volume is gone" is how a second one gets created.
+    my $data = $self->get_or_undef("/api/instances/Volume::$id", undef, %opts);
 
     return ref($data) eq 'HASH' ? $data : undef;
 }
 
 # Exact name lookup. PowerFlex offers queryIdByKey for this, which avoids
 # pulling the whole volume list.
+#
+# This endpoint reports a name it does not know as an ERROR, which puts the
+# whole weight of "does this volume exist?" on telling that error apart from
+# a real one. The old answer was to match the message for 'not found' — and
+# an array that says "storage pool not found" about a bad pool would then be
+# read as "the volume is gone", so the caller creates a second one.
+#
+# 404 is answered as absent, on the status code alone. Anything else is not
+# guessed at: the volume list settles it. That costs a listing only when the
+# lookup failed, and it can be wrong in neither direction.
 sub volume_id_by_name {
     my ($self, $name, %opts) = @_;
 
-    my $id = eval {
-        $self->post('/api/types/Volume/instances/action/queryIdByKey',
-            { name => $name }, %opts);
-    };
+    my $resp = $self->_request('POST',
+        '/api/types/Volume/instances/action/queryIdByKey',
+        { name => $name }, %opts, raw => 1, allow_status => [404]);
 
-    if ($@) {
-        # A missing volume is reported as an error by this endpoint.
-        return undef if $@ =~ /HTTP 404|not found|could not be found/i;
-        die $@;
+    return undef if $resp->code == 404;
+
+    unless ($resp->is_success) {
+        return $self->_volume_id_by_name_from_list($name, %opts);
     }
+
+    my $id = $self->_decode_success($resp, 'POST', 'queryIdByKey');
 
     # The reply is a bare quoted id.
     $id = $id->{id} if ref($id) eq 'HASH';
@@ -425,6 +437,20 @@ sub volume_id_by_name {
     $id =~ s/^"|"$//g if !ref($id);
 
     return (defined $id && length $id) ? $id : undef;
+}
+
+sub _volume_id_by_name_from_list {
+    my ($self, $name, %opts) = @_;
+
+    my $rows = eval { $self->volume_list(%opts) } // [];
+
+    for my $row (@$rows) {
+        next unless ref($row) eq 'HASH';
+        next unless defined $row->{name} && $row->{name} eq $name;
+        return $row->{id};
+    }
+
+    return undef;
 }
 
 sub volume_get_by_name {

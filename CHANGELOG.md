@@ -7,6 +7,29 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.33~beta1] - 2026-07-27
+
+### Fixed
+- **No existence check decides its answer by reading the words an array
+  chose.** Three did: PowerFlex `volume_get` and `volume_id_by_name`, and
+  PowerVault `volume_get_by_name`, all matching `/not found/` against the
+  error. An array saying "storage pool not found" about a wrong pool would
+  have been read as "this volume is gone", and what a caller does next with
+  that answer is create a second one.
+- They read the status code now, or ask a question that cannot be
+  misunderstood. On PowerVault, where the CLI reports a missing volume as an
+  error rather than an empty list, a pattern listing that succeeds without the
+  name in it is the proof — and if the listing fails too, the array's original
+  error is raised rather than guessed at.
+
+### Added
+- `get_or_undef` in the REST layer: undef for the status codes that mean
+  absent, decoded JSON otherwise, and no message read anywhere.
+- `t/11-imports.t` fails on any new decision made by matching an array's error
+  text. This is the third time the project has made that mistake — after a 422
+  hint containing the word "clones", and `add host-members` containing
+  "member" — so it is now a rule with a test behind it rather than a lesson.
+
 ## [0.7.32~beta1] - 2026-07-27
 
 ### Fixed

@@ -509,6 +509,28 @@ sub get {
     return $self->_request('GET', $self->_with_query($endpoint, $params), undef, %opts);
 }
 
+# GET an object that may not exist: undef for the status codes given, decoded
+# JSON otherwise.
+#
+# The alternative is to catch the exception and read the message for '404' or
+# 'not found', and that is the trap this project keeps falling into. An array
+# is free to say "storage pool not found" about a request whose pool was
+# wrong, and a caller matching /not found/ then reports the VOLUME as absent —
+# so the next thing it does is create a second one. The status code says what
+# the array meant; its prose says what a human should read.
+sub get_or_undef {
+    my ($self, $endpoint, $params, %opts) = @_;
+
+    my $absent = delete $opts{absent} // [404];
+
+    my $resp = $self->_request('GET', $self->_with_query($endpoint, $params),
+        undef, %opts, raw => 1, allow_status => $absent);
+
+    return undef if grep { $_ == $resp->code } @$absent;
+
+    return $self->_decode_success($resp, 'GET', $endpoint);
+}
+
 sub post {
     my ($self, $endpoint, $data, %opts) = @_;
     return $self->_request('POST', $endpoint, $data, %opts);

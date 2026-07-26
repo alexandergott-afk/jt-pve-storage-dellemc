@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.32~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.33~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.33~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">"Does this volume exist?" was answered by matching the words an array chose. An array saying "storage pool not found" would have been read as "the volume is gone" — and the next thing a caller does with that answer is create a second one. A test now fails on any new decision made that way.</span>
+            <span class="lang-zh">「這個 volume 存在嗎？」原本是靠比對陣列所選的字句來回答。陣列若回「storage pool not found」，會被讀成「這個 volume 不見了」—— 而呼叫端拿到這個答案之後就會再建一個。現在只要出現新的這類判斷，就會有測試失敗。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.32~beta1</div>

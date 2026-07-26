@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.33~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * No existence check decides its answer by reading the words an array
+    chose. Three of them did: PowerFlex volume_get and volume_id_by_name,
+    and PowerVault volume_get_by_name, all matching /not found/. An array
+    saying "storage pool not found" about a wrong pool would have been read
+    as "this volume is gone" - and the caller's next move is to create a
+    second one.
+  * They use the status code now (REST gained get_or_undef and the
+    allow_status option), or they ask a question that answers itself: on
+    PowerVault a pattern listing that succeeds without the name in it is
+    proof, and if the listing fails too the original error is raised rather
+    than guessed at.
+  * t/11-imports.t fails on any new decision made by matching an array's
+    error text, so this cannot come back quietly. It is the third time in
+    this project.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:48:56 +0800
+
 jt-pve-storage-dellemc (0.7.32~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

@@ -435,14 +435,43 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 }
 
 {
-    # The CLI reports a missing volume as an error, not an empty list.
+    # The CLI reports a missing volume as an ERROR, not an empty list, and
+    # the only thing separating that error from a real one is the wording
+    # the array chose. So the wording is not read: a pattern listing that
+    # succeeds and does not contain the name settles it.
+    my @paths;
     my ($api) = make_api(handler => sub {
         my ($req, $path) = @_;
-        return reply(err_status('The volume was not found.'))
+        push @paths, $path;
+        return reply(ok_status()) unless $path =~ m{/show/volumes};
+        # The exact-name form fails; the pattern listing works and is empty.
+        return reply({ %{ ok_status() }, volumes => [] })
+            if $path =~ m{/pattern/};
+        return reply(err_status('The volume was not found.'));
+    });
+
+    is($api->volume_get_by_name('gone'), undef, 'a missing volume reads as undef');
+    ok((grep { m{/pattern/gone} } @paths),
+        'and the answer came from a listing, not from reading the message');
+}
+
+{
+    # An array whose wording happens to contain 'not found' for a reason that
+    # has nothing to do with this volume must not be read as "it is gone".
+    # If the listing cannot settle it either, the original error is what the
+    # caller gets — creating a second volume is the one unacceptable outcome.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(err_status('Storage pool not found.'))
             if $path =~ m{/show/volumes};
         return reply(ok_status());
     });
-    is($api->volume_get_by_name('gone'), undef, 'a missing volume reads as undef');
+
+    my $answer = eval { $api->volume_get_by_name('pve-me5-100-d0') };
+    ok(!defined($answer) && $@, 'an unexplained failure is raised, not read as absent')
+        or diag('answered: ' . (defined $answer ? 'a row' : 'undef'));
+    like($@ // '', qr/Storage pool not found/,
+        'and the array\'s own words are what the operator sees');
 }
 
 # ---------------------------------------------------------------------------
