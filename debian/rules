@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Pure Perl, nothing to build.
+
+override_dh_auto_install:
+	# Installation is driven by the Makefile rather than debian/install so
+	# that the module list has a single source of truth. The Makefile
+	# discovers lib/**/*.pm and bin/* at build time, which keeps packaging
+	# unchanged as modules are added phase by phase.
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/jt-pve-storage-dellemc PREFIX=/usr
+
+override_dh_auto_test:
+	# Syntax checks run in CI (`make test`), not during package build.
+
+override_dh_auto_clean:
+	$(MAKE) clean

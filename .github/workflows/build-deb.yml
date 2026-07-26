@@ -1,0 +1,63 @@
+name: Build Debian Package
+
+# Manually-triggered .deb build. Mirrors what `make deb` does locally, so a
+# packaged build can be pulled straight from the GitHub Actions UI without a
+# Debian dev box.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Syntax and safety checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Guarded separately from `make test` so a failure here is obvious in
+      # the job list: the capital-F flush wipes every unused map on the node.
+      - name: Forbid system-wide multipath flush
+        run: make check-multipath-flush
+
+      - name: Perl syntax checks
+        run: make syntax
+
+      - name: Unit tests
+        run: make unit
+
+  build-deb:
+    name: Build .deb
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential debhelper fakeroot
+
+      - name: Build Debian package
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect Debian package
+        run: |
+          mkdir -p artifacts
+          cp ../jt-pve-storage-dellemc_*_all.deb artifacts/
+          ls -la artifacts/
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: jt-pve-storage-dellemc-deb
+          path: artifacts/jt-pve-storage-dellemc_*_all.deb
+          if-no-files-found: error
+          retention-days: 30

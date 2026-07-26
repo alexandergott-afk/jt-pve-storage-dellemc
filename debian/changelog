@@ -1,0 +1,13 @@
+jt-pve-storage-dellemc (0.1.0-1) unstable; urgency=medium
+
+  * Phase 0: project skeleton.
+  * Packaging: debian/ set, Makefile with install/uninstall/test/deb targets,
+    GitHub Actions build workflow.
+  * Safety: CI guard that fails the build if the system-wide multipath flush
+    (`multipath -F`, capital F, which must never be used) appears anywhere in
+    shipped code or documentation.
+  * Docs: bilingual README skeleton (English / Traditional Chinese) with the
+    multipath safety rules and the hardware-verification disclaimer.
+  * No storage plugin code yet — this release installs no PVE storage type.
+
+ -- Jason Cheng (Jason Tools) <jason@jason.tools>  Sun, 26 Jul 2026 00:00:00 +0800

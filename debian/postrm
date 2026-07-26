@@ -1,0 +1,20 @@
+#!/bin/bash
+set -e
+
+STATE_DIR="/var/lib/pve-storage-dellemc"
+LOCK_DIR="/var/run/pve-storage-dellemc"
+
+case "$1" in
+    purge)
+        # WWID tracking state only. Nothing here touches devices or the array.
+        rm -rf "$STATE_DIR" "$LOCK_DIR"
+        ;;
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,37 @@
+Source: jt-pve-storage-dellemc
+Section: admin
+Priority: optional
+Maintainer: Jason Cheng (Jason Tools) <jason@jason.tools>
+Build-Depends: debhelper (>= 12)
+Standards-Version: 4.5.0
+Homepage: https://github.com/jasoncheng7115/jt-pve-storage-dellemc
+
+Package: jt-pve-storage-dellemc
+Architecture: all
+Depends: ${misc:Depends},
+         proxmox-ve (>= 9.1) | pve-manager (>= 9.1),
+         libwww-perl,
+         libjson-perl,
+         liburi-perl,
+         open-iscsi,
+         multipath-tools,
+         sg3-utils,
+         psmisc
+Recommends: lsscsi, nfs-common
+Description: Dell EMC Storage Plugins for Proxmox VE
+ This package provides Proxmox VE custom storage plugins for Dell EMC
+ storage arrays. Each product family is registered as its own PVE storage
+ type; they share a common host-side layer for iSCSI/FC login, SCSI device
+ lifecycle and dm-multipath handling.
+ .
+ Storage types provided:
+  - dellpowerstore  Dell PowerStore over iSCSI or Fibre Channel
+ .
+ Features:
+  - Direct volume provisioning (one VM disk = one array volume)
+  - Snapshot create/list/delete/rollback
+  - Thin clone based linked clones and templates
+  - Multipath I/O with orphan device reaping
+  - Cluster-aware mapping for live migration
+ .
+ The plugin must be installed on every node of the cluster.

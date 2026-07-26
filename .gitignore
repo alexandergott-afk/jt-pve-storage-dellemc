@@ -1,0 +1,11 @@
+*.deb
+*.changes
+*.buildinfo
+*.substvars
+debian/.debhelper/
+debian/jt-pve-storage-dellemc/
+debian/debhelper-build-stamp
+debian/files
+debian/*.log
+.claude/
+ref/

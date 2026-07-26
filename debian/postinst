@@ -1,0 +1,352 @@
+#!/bin/bash
+set -e
+
+MULTIPATH_CONF="/etc/multipath.conf"
+MULTIPATH_CONF_D="/etc/multipath/conf.d"
+STATE_DIR="/var/lib/pve-storage-dellemc"
+LOCK_DIR="/var/run/pve-storage-dellemc"
+
+# ANSI colors (only meaningful on a terminal; harmless in apt logs).
+RED='\033[0;31m'
+YEL='\033[0;33m'
+RST='\033[0m'
+
+print_safety_warning() {
+    cat <<'BANNER'
+
+==============================================================================
+ Dell EMC Plugin: CRITICAL Multipath Safety Rules
+==============================================================================
+ 1. NEVER run `multipath -F` (capital F). It flushes ALL unused multipath
+    maps system-wide. In a mixed environment this disconnects any storage
+    that happens to be idle, including non-Dell storage. Always flush one
+    specific map: `multipath -f /dev/mapper/<wwid>` (lowercase f).
+
+ 2. To apply changes to /etc/multipath.conf use
+    `systemctl restart multipathd` — NOT `systemctl reload multipathd`.
+    Reload only re-reads the file; restart actually reapplies device-mapper
+    state. The plugin uses restart in its own helpers for the same reason.
+
+ 3. AVOID `no_path_retry queue` and `dev_loss_tmo infinity`. Combined with
+    stale device residue they can put PVE daemons into uninterruptible
+    sleep (D state) and require a node reboot.
+
+ 4. Install this package on EVERY node of the cluster. A node without the
+    plugin reports "Parameter verification failed (400)" or
+    "No such storage" for Dell EMC storages.
+==============================================================================
+BANNER
+}
+
+detect_dangerous_multipath_settings() {
+    local files=()
+    [ -f "$MULTIPATH_CONF" ] && files+=("$MULTIPATH_CONF")
+    if [ -d "$MULTIPATH_CONF_D" ]; then
+        while IFS= read -r f; do files+=("$f"); done \
+            < <(find "$MULTIPATH_CONF_D" -maxdepth 1 -type f -name '*.conf' 2>/dev/null)
+    fi
+    [ ${#files[@]} -gt 0 ] || return 0
+
+    local found=0
+    local hits=""
+    local f
+    for f in "${files[@]}"; do
+        if grep -Eq '^[[:space:]]*no_path_retry[[:space:]]+queue\b' "$f"; then
+            hits+="  - no_path_retry queue (in $f)\n"
+            found=1
+        fi
+        if grep -Eq '^[[:space:]]*queue_if_no_path\b' "$f"; then
+            hits+="  - queue_if_no_path (in $f)\n"
+            found=1
+        fi
+        if grep -Eq '^[[:space:]]*dev_loss_tmo[[:space:]]+infinity\b' "$f"; then
+            hits+="  - dev_loss_tmo infinity (in $f)\n"
+            found=1
+        fi
+    done
+
+    if [ "$found" = "1" ]; then
+        printf "${RED}"
+        cat <<'EOF'
+
+==============================================================================
+ DANGEROUS MULTIPATH SETTINGS DETECTED
+==============================================================================
+ These settings can hang PVE unrecoverably when a LUN is deleted on the
+ array while stale local devices still exist:
+
+EOF
+        printf "$hits"
+        cat <<'EOF'
+
+ Recommended replacements:
+   no_path_retry 30
+   fast_io_fail_tmo 5
+   dev_loss_tmo 60
+
+ This package will NOT modify your multipath configuration automatically.
+ Review and adjust manually, then run:
+   systemctl restart multipathd      # restart, NOT reload
+==============================================================================
+
+EOF
+        printf "${RST}"
+    fi
+}
+
+detect_stale_dell_devices() {
+    command -v multipath >/dev/null 2>&1 || return 0
+    command -v awk >/dev/null 2>&1 || return 0
+
+    # `multipath -ll` can itself block on a wedged path; bound it.
+    local out
+    out=$(timeout 15 multipath -ll 2>/dev/null) || return 0
+
+    # Map header lines look like:
+    #   36xxxxxxxxxxxxxxx dm-3 DellEMC,PowerStore ...
+    # The vendor/product strings are NOT yet verified against hardware
+    # (see README disclaimer); match both DellEMC and the legacy DGC/EMC
+    # spellings so the check is useful either way.
+    local stale
+    stale=$(echo "$out" | awk '
+        /^[a-z0-9]+ dm-[0-9]+ (DellEMC|DELL|EMC|DGC)/ {
+            if (name && pathcount > 0 && pathcount == failcount) print name
+            name=$1; pathcount=0; failcount=0; next
+        }
+        /[ \t]+(active|failed|faulty)[ \t]+(ready|faulty|ghost|shaky)/ {
+            pathcount++
+            if ($0 ~ /(failed|faulty)[ \t]+(faulty|shaky)/) failcount++
+            if ($0 ~ /failed[ \t]+ready/) failcount++
+        }
+        END {
+            if (name && pathcount > 0 && pathcount == failcount) print name
+        }
+    ')
+
+    if [ -n "$stale" ]; then
+        printf "${YEL}"
+        cat <<'EOF'
+
+==============================================================================
+ STALE DELL EMC MULTIPATH DEVICES DETECTED
+==============================================================================
+ These Dell EMC multipath devices have all paths failed. They are likely
+ residue from volumes already deleted on the array:
+
+EOF
+        echo "$stale" | sed 's/^/  - /'
+        cat <<'EOF'
+
+ They are NOT removed automatically — they may belong to manually attached
+ LUNs or to another tool. To remove one safely:
+
+   multipathd disablequeueing map <wwid>
+   dmsetup message <wwid> 0 fail_if_no_path
+   multipath -f /dev/mapper/<wwid>
+   # if that fails:
+   dmsetup remove --force --retry <wwid>
+==============================================================================
+
+EOF
+        printf "${RST}"
+    fi
+}
+
+detect_missing_lvm_global_filter() {
+    local LVMCONF="/etc/lvm/lvm.conf"
+    [ -f "$LVMCONF" ] || return 0
+    grep -Eq '^\s*global_filter\s*=' "$LVMCONF" && return 0
+
+    printf "${YEL}"
+    cat <<'EOF'
+
+==============================================================================
+ MISSING LVM global_filter — HOST LVM MAY ACTIVATE GUEST VGs
+==============================================================================
+ /etc/lvm/lvm.conf has no `global_filter`. This is common on nodes upgraded
+ from earlier PVE releases. Without it the host LVM scanner reads every
+ block device, including SAN multipath LUNs, and may auto-activate volume
+ groups that live INSIDE guest disks. Those show up as "holders" on the
+ multipath device and block volume deletion.
+
+ Symptoms:
+   - `pvesm free` fails with "device is still in use (has holders)"
+   - `vgs` / `pvs` warn about duplicate VG names
+   - /sys/block/<dm-N>/holders/ contains unexpected dm-* entries
+
+ Suggested fix, inside the `devices { }` section of /etc/lvm/lvm.conf:
+
+     global_filter = [ "r|/dev/mapper/36.*|", "r|/dev/dm-.*|", "a|.*|" ]
+
+ Then:
+     vgchange -an <guest_vg_name>
+     systemctl restart lvm2-monitor
+     vgscan --cache
+==============================================================================
+
+EOF
+    printf "${RST}"
+}
+
+warn_inflight_operations() {
+    # Reloading PVE services is a graceful SIGHUP re-exec and does not abort
+    # running workers, so this is a heads-up rather than a block.
+    local hits
+    hits=$(pgrep -af 'qmrestore|vzdump|qm +(move-disk|move_disk|clone|migrate|importdisk)|pvesm +(alloc|free|import|export|extractconfig)' 2>/dev/null \
+        | grep -Ev 'pgrep|warn_inflight_operations' || true)
+    if [ -n "$hits" ]; then
+        echo ""
+        echo "  [NOTICE] Storage-affecting operations appear to be in flight:"
+        echo "$hits" | sed 's/^/      /'
+        echo "  Reloading PVE services now (graceful SIGHUP — nothing is aborted)."
+        echo "  Press Ctrl-C within 5 seconds to skip and reload later with:"
+        echo "      systemctl reload pvedaemon pvestatd pveproxy"
+        sleep 5
+    fi
+}
+
+reload_pve_services() {
+    # PVE daemons load storage plugin modules at startup and keep them in
+    # memory, so new .pm files have no effect until the daemons pick them up.
+    # We use `reload` (SIGHUP re-exec) rather than `restart`: if old code left
+    # D-state children behind, the stop phase of a restart hangs on them.
+    # Because reload does not reliably re-read Perl modules on every PVE
+    # version, an upgrade additionally prints the manual restart step below.
+    local old_version="$1"
+
+    for svc in pvedaemon pvestatd pveproxy; do
+        if timeout 5 systemctl is-active --quiet "$svc" 2>/dev/null; then
+            timeout 30 systemctl reload "$svc" 2>/dev/null || \
+                echo "  [WARN] Could not reload $svc"
+        else
+            timeout 30 systemctl start "$svc" 2>/dev/null || true
+        fi
+    done
+    echo "PVE services reloaded to pick up new plugin code."
+
+    if [ -n "$old_version" ]; then
+        local Y="" N=""
+        if [ -t 1 ]; then Y=$'\033[1;33m'; N=$'\033[0m'; fi
+        cat <<EOF
+
+${Y}==============================================================================
+ ACTION REQUIRED AFTER THIS UPGRADE (every cluster node)
+==============================================================================${N}
+ The plugin files were updated and PVE services were reloaded (SIGHUP), but
+ on many PVE versions reload does NOT reload Perl modules — pvestatd can keep
+ running the OLD plugin code from memory. To activate the new code:
+
+     systemctl restart pvestatd
+
+ Run this on EVERY node. Verify the MainPID actually changed:
+
+     systemctl show -p MainPID pvestatd
+${Y}==============================================================================${N}
+EOF
+    fi
+}
+
+verify_required_binaries() {
+    # When the .deb is installed with `dpkg -i`, dependencies are NOT pulled
+    # in. The Perl modules land on disk and every later operation fails deep
+    # inside the plugin with "No such file or directory". Catch it here.
+    local missing=()
+    local needed_bin=(multipathd multipath kpartx iscsiadm sg_inq blockdev fuser)
+    local b
+
+    for b in "${needed_bin[@]}"; do
+        command -v "$b" >/dev/null 2>&1 || missing+=("$b")
+    done
+
+    [ ${#missing[@]} -eq 0 ] && return 0
+
+    cat <<'EOF' >&2
+
+==============================================================================
+ ERROR: Required binaries are not installed on this system
+==============================================================================
+ The Dell EMC plugin needs these binaries, which are not on PATH:
+
+EOF
+    printf '   - %s\n' "${missing[@]}" >&2
+    cat <<'EOF' >&2
+
+ They come from packages this .deb already declares as dependencies:
+   - multipath-tools  (multipath, multipathd, kpartx)
+   - open-iscsi       (iscsiadm)
+   - sg3-utils        (sg_inq)
+   - util-linux       (blockdev)
+   - psmisc           (fuser)
+
+ `dpkg -i` does not install dependencies. Recover with:
+
+   apt --fix-broken install
+
+ Or install with apt in the first place (recommended):
+
+   apt install ./jt-pve-storage-dellemc_*_all.deb
+
+ This package stays in configured-failed state until they are present.
+==============================================================================
+
+EOF
+    return 1
+}
+
+case "$1" in
+    configure)
+        if ! verify_required_binaries; then
+            exit 1
+        fi
+
+        echo "Dell EMC Storage Plugins installed."
+        echo ""
+        echo "To configure PowerStore storage:"
+        echo "  pvesm add dellpowerstore <storage-id> \\"
+        echo "    --dell-portal <mgmt-ip> \\"
+        echo "    --dell-username <user> \\"
+        echo "    --dell-password <password> \\"
+        echo "    --dell-protocol iscsi \\"
+        echo "    --content images,rootdir \\"
+        echo "    --shared 1"
+        echo ""
+        echo "See /usr/share/doc/jt-pve-storage-dellemc/README.md for details."
+
+        if timeout 5 systemctl is-active --quiet iscsid 2>/dev/null; then
+            echo "iSCSI initiator daemon is running."
+        else
+            echo "NOTE: iscsid is not running. Starting..."
+            timeout 10 systemctl enable iscsid 2>/dev/null || true
+            timeout 10 systemctl start iscsid 2>/dev/null || true
+        fi
+
+        if timeout 5 systemctl is-active --quiet multipathd 2>/dev/null; then
+            echo "Multipath daemon is running."
+        else
+            echo "NOTE: multipathd is not running. Starting..."
+            timeout 10 systemctl enable multipathd 2>/dev/null || true
+            timeout 10 systemctl start multipathd 2>/dev/null || true
+        fi
+
+        # WWID tracking state, so the first status() call does not have to
+        # create these under a lock.
+        install -d -m 0700 "$STATE_DIR" 2>/dev/null || true
+        install -d -m 0700 "$LOCK_DIR"  2>/dev/null || true
+
+        print_safety_warning
+        detect_dangerous_multipath_settings
+        detect_stale_dell_devices
+        detect_missing_lvm_global_filter
+        warn_inflight_operations
+        # $2 is the previously configured version: empty on fresh install.
+        reload_pve_services "$2"
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
