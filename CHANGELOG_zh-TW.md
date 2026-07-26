@@ -3,7 +3,7 @@
 本專案所有值得記錄的變更都寫在這裡。
 English version: [CHANGELOG.md](CHANGELOG.md)
 
-## [0.5.0] - 2026-07-26
+## [0.5.0~beta1] - 2026-07-26
 
 Phase 2 至 4。`dellpowerstore` storage type 已經存在。
 

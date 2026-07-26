@@ -20,13 +20,28 @@
     </p>
 </header>
 
-<div class="notice">
-    <strong>Version 0.5.0 — not yet run against a PowerStore array.</strong>
-    The code is complete for PowerStore, but every array-facing detail — REST
-    paths and field names, the SCSI vendor and product strings, the WWN to
-    WWID conversion, the whole Fibre Channel path — is still unverified. Use a
-    non-production cluster and a non-production array. 1.0.0 is the
-    on-hardware test pass, not more code.
+<div class="notice danger">
+    <strong>&#9888; BETA SOFTWARE (0.5.0~beta1) — read before installing</strong>
+    <p>
+        This release <strong>has never been run against a physical Dell EMC
+        array</strong>. Every array-facing behaviour is unverified: the REST
+        endpoints and field names, the SCSI vendor and product strings that
+        decide which devices the plugin will touch, the WWN to WWID
+        conversion, and the entire Fibre Channel path.
+    </p>
+    <p>
+        <strong>Do not install this on a production cluster, and do not point
+        it at an array holding data you care about.</strong> A storage plugin
+        runs as root, creates and deletes volumes on the array, and
+        manipulates block devices on every node. A defect can destroy virtual
+        machine data, take a storage offline, or leave a node in a state that
+        only a reboot clears — and because multipath and SCSI state is shared,
+        the damage is not necessarily limited to this plugin's own storage.
+    </p>
+    <p>
+        Use a test cluster, a test array, and independent backups. See
+        <a href="#disclaimer">Disclaimer and risk</a> below.
+    </p>
 </div>
 
 <p>
@@ -46,21 +61,22 @@
 </thead>
 <tbody>
 <tr><td>1</td><td><strong>PowerStore</strong></td><td><code>dellpowerstore</code></td><td>iSCSI / FC (dm-multipath)</td><td><strong>in development</strong></td></tr>
-<tr><td>2</td><td>PowerScale</td><td><code>dellpowerscale</code></td><td>NFS (directory semantics)</td><td>planned</td></tr>
+<tr><td>2</td><td>PowerVault ME5</td><td><code>dellme5</code></td><td>iSCSI / FC / SAS (dm-multipath)</td><td><strong>next</strong></td></tr>
 <tr><td>3</td><td>PowerFlex</td><td><code>dellpowerflex</code></td><td>SDC kernel module</td><td>planned</td></tr>
 <tr><td>4</td><td>PowerMax</td><td><code>dellpowermax</code></td><td>FC / iSCSI (dm-multipath)</td><td>planned</td></tr>
-<tr><td>—</td><td>Unity XT, PowerVault ME5</td><td>—</td><td>iSCSI / FC / SAS</td><td>not scheduled</td></tr>
+<tr><td>—</td><td>PowerScale</td><td><code>dellpowerscale</code></td><td>NFS (directory semantics)</td><td>not scheduled</td></tr>
+<tr><td>—</td><td>Unity XT</td><td><code>dellunity</code></td><td>iSCSI / FC</td><td>not scheduled</td></tr>
 <tr><td>—</td><td>ObjectScale, PowerProtect</td><td>—</td><td>—</td><td>out of scope</td></tr>
 </tbody>
 </table>
 </div>
 
 <p>
-    Each family gets its own storage type because a single type cannot describe
-    both block and NAS storage: PVE asks a plugin for its content types and
-    disk formats before any configuration is parsed. The host-side layer is
-    shared, so adding a family is a plugin file and an API client rather than a
-    restructuring — see
+    Each family gets its own storage type: PVE asks a plugin for its content
+    types and disk formats before any configuration is parsed, so one type
+    cannot describe families that differ in what they can hold. The host-side
+    layer is shared, so adding a block family is a plugin file and an API
+    client rather than a restructuring — see
     <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.
 </p>
 
@@ -171,14 +187,92 @@ apt install ./jt-pve-storage-dellemc_&lt;version&gt;_all.deb</code></pre>
     <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp">jt-pve-storage-netapp</a></li>
 </ul>
 
+<h2 id="disclaimer">Disclaimer and risk</h2>
+
+<h3>Development status</h3>
+
+<p>
+    This is <strong>beta software</strong>, published so that it can be
+    tested. It has not been run against a physical Dell EMC array even once.
+    Everything marked <code>NOT VERIFIED ON HARDWARE</code> in
+    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>
+    — currently every array-facing behaviour — may simply be wrong.
+</p>
+
+<h3>What can go wrong</h3>
+
+<p>
+    A Proxmox VE storage plugin runs as root on every node. This one creates
+    and deletes volumes on the array, maps them to hosts, and manipulates SCSI
+    and device-mapper state. Realistic failure modes include:
+</p>
+
+<ul>
+    <li><strong>Data loss.</strong> A volume deleted, overwritten by a
+        rollback, or truncated by a wrong size calculation takes the virtual
+        machine's data with it.</li>
+    <li><strong>Storage outage.</strong> A defect on the activation or status
+        path can leave a storage <code>inactive</code>, and because Proxmox VE
+        polls storages sequentially, a slow or hanging one delays every other
+        storage on the node.</li>
+    <li><strong>Node hangs.</strong> I/O to a device with no working path can
+        put processes into uninterruptible sleep, which no signal clears.
+        Recovery is a reboot.</li>
+    <li><strong>Collateral damage.</strong> Multipath and SCSI state is shared
+        across the node. A mistake in device cleanup can affect storage this
+        plugin does not own, from other vendors or other plugins.</li>
+</ul>
+
+<p>
+    The design takes these seriously — the safety rules above, vendor gating,
+    timeout-bounded device access and the ownership prefix all exist for them
+    — but <em>designed to be safe</em> is not <em>demonstrated to be safe</em>.
+    That demonstration is what 1.0.0 requires.
+</p>
+
+<h3>No warranty</h3>
+
+<p>
+    Provided under the MIT license, <strong>as is and without warranty of any
+    kind</strong>, express or implied, including but not limited to
+    merchantability, fitness for a particular purpose and non-infringement. In
+    no event shall the author be liable for any claim, damages or other
+    liability, including data loss or business interruption, arising from the
+    use of this software. You are solely responsible for evaluating it against
+    your own hardware, firmware version and workload before any production
+    use.
+</p>
+
+<h3>Before you install</h3>
+
+<ul>
+    <li>Use a <strong>non-production</strong> cluster and a
+        <strong>non-production</strong> array.</li>
+    <li>Keep <strong>independent backups</strong> of anything you place on this
+        storage. A storage snapshot is not a backup.</li>
+    <li>Verify at least the four items listed in
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>
+        for your array and firmware.</li>
+    <li>Report what you find:
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/issues">issues</a>.</li>
+</ul>
+
+<h3>Trademarks and affiliation</h3>
+
+<p>
+    An <strong>independent community project</strong>. Not affiliated with,
+    endorsed by, sponsored by, or supported by Dell Technologies. "Dell",
+    "Dell EMC", "PowerStore", "PowerMax", "PowerFlex", "PowerScale", "Unity"
+    and "PowerVault" are trademarks of their respective owners, used here only
+    to identify the hardware this software talks to. Proxmox and Proxmox VE
+    are trademarks of Proxmox Server Solutions GmbH.
+</p>
+
 <footer>
+    <p>MIT licensed. Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</p>
     <p>
-        MIT licensed. An independent community project, not affiliated with,
-        endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC",
-        "PowerStore", "PowerMax", "PowerFlex" and "PowerScale" are trademarks
-        of their respective owners.
+        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/README_zh-TW.md">繁體中文說明與免責聲明</a>
     </p>
-    <p>Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</p>
 </footer>
 
 </main>

@@ -630,7 +630,7 @@ sub activate_storage {
     my ($class, $storeid, $scfg, $cache) = @_;
 
     # This runs on the pvestatd health path: single attempt, short timeout.
-    eval { $class->_array_ping($scfg, status => 1) };
+    eval { $class->_array_ping($scfg, status => 1, storeid => $storeid) };
     if ($@) {
         die "Cannot reach the array at " . ($scfg->{'dell-portal'} // '?')
           . " for storage '$storeid': $@";
@@ -678,7 +678,9 @@ sub _activate_fc {
 sub _activate_iscsi {
     my ($class, $storeid, $scfg) = @_;
 
-    my $portals = eval { $class->_array_get_portals($scfg, status => 1) } // [];
+    my $portals = eval {
+        $class->_array_get_portals($scfg, status => 1, storeid => $storeid)
+    } // [];
     unless (@$portals) {
         die "The array returned no iSCSI target portals for storage"
           . " '$storeid'. Verify that iSCSI is configured on the appliance and"
@@ -825,7 +827,8 @@ sub status {
 
     eval {
         # Health path: short timeout, single attempt.
-        ($total, $used, $avail) = $class->_array_get_capacity($scfg, status => 1);
+        ($total, $used, $avail) =
+            $class->_array_get_capacity($scfg, status => 1, storeid => $storeid);
     };
     if ($@) {
         my $err = $@;

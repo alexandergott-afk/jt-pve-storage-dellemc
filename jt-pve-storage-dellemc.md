@@ -49,11 +49,11 @@
 | 系列 | PVE plugin type | 資料路徑 | 本專案階段 |
 |---|---|---|---|
 | **PowerStore** | `dellpowerstore` | iSCSI / FC（dm-multipath） | **Phase 1〜4，本文件主體** |
-| PowerScale | `dellpowerscale` | NFS（目錄語意） | Phase 6，另立子規格 |
+| PowerVault ME5 | `dellme5` | iSCSI / FC / SAS（dm-multipath） | Phase 6，開發中 |
 | PowerFlex | `dellpowerflex` | SDC kernel module（`/dev/scini*`） | Phase 7，另立子規格 |
 | PowerMax | `dellpowermax` | FC / iSCSI（dm-multipath） | Phase 8，另立子規格 |
+| PowerScale | `dellpowerscale` | NFS（目錄語意） | 不排入（PVE 內建 NFS 已涵蓋） |
 | Unity XT | `dellunity` | iSCSI / FC | 不排入，除非客戶付費 |
-| PowerVault ME5 | `dellme5` | iSCSI / FC / SAS | 不排入 |
 | ObjectScale / PowerProtect | — | — | **不做**（不適合 PVE storage plugin 模型） |
 
 **Phase 1〜5 只做 PowerStore。** 但目錄結構、base class、共用模組從第一天就要按多系列設計，不能寫死成 PowerStore-only。
@@ -714,11 +714,11 @@ Description: Dell EMC Storage Plugins for Proxmox VE
 
 ### Phase 6 以後（另立子規格，本文件不展開）
 
-> **順序更新（2026-07-26）**：改為 PowerStore → PowerScale → PowerFlex → PowerMax。
+> **順序更新（2026-07-26）**：改為 PowerStore → PowerVault ME5 → PowerFlex → PowerMax。PowerScale 因為是 NFS、且 PVE 內建 NFS 儲存已涵蓋，改為不排入。
 
-- [ ] PowerScale（`dellpowerscale`）：OneFS PAPI、目錄／NFS 語意、**不繼承 BlockBase**
+- [ ] PowerVault ME5（`dellme5`）：SMC REST API、iSCSI／FC／SAS、**繼承 BlockBase** ← 開發中
 - [ ] PowerFlex（`dellpowerflex`）：SDC kernel module、`/dev/scini*`、**不繼承 BlockBase**
-- [ ] PowerMax（`dellpowermax`）：Unisphere for PowerMax REST、storage group／masking view 模型
+- [ ] PowerMax（`dellpowermax`）：Unisphere for PowerMax REST、storage group／masking view 模型、**繼承 BlockBase**
 
 ---
 

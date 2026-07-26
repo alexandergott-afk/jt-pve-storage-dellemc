@@ -219,6 +219,10 @@ sub translate_error {
     # front of the array is still more useful than nothing.
     if (!length($detail) && defined $body && length($body)) {
         ($detail = $body) =~ s/\s+/ /g;
+        # Perl appends "at <file> line <n>." to transport errors; the file is
+        # LWP's, not ours, and it only distracts the operator.
+        $detail =~ s/ at \S+ line \d+\.?//g;
+        $detail =~ s/^\s+|\s+$//g;
         $detail = substr($detail, 0, 200);
     }
 
@@ -415,6 +419,13 @@ sub _request {
     $restore->();
 
     $last_error //= 'request failed';
+
+    # A failure inside _login arrives already tagged. Two copies of the same
+    # prefix in one line make the message harder to read, not easier.
+    my $prefix = $self->log_prefix;
+    $last_error =~ s/^\Q$prefix\E\s*//;
+    chomp $last_error;
+
     die $self->_msg("$method $endpoint failed: $last_error") . "\n";
 }
 

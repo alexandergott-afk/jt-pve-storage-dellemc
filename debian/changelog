@@ -1,5 +1,8 @@
-jt-pve-storage-dellemc (0.5.0-1) unstable; urgency=medium
+jt-pve-storage-dellemc (0.5.0~beta1-1) unstable; urgency=medium
 
+  * BETA RELEASE. Not for production use. See the disclaimer in README.md:
+    this has never been run against a physical Dell EMC array, a defect can
+    destroy VM data or hang a node, and there is no warranty of any kind.
   * Phases 2 to 4: the dellpowerstore storage type now exists. It has NOT
     been run against a PowerStore array - see docs/TESTING.md, where every
     array-facing detail is still listed as unverified.

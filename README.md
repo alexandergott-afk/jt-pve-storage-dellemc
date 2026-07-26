@@ -4,6 +4,27 @@ Dell EMC storage plugins for Proxmox VE.
 
 **[繁體中文說明](README_zh-TW.md)**
 
+> ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
+>
+> **This is a beta release (0.5.0~beta1). It has never been run against a
+> physical Dell EMC array.** Every array-facing behaviour is unverified: the
+> REST endpoints and field names, the SCSI vendor and product strings that
+> decide which devices the plugin will touch, the WWN to WWID conversion, and
+> the entire Fibre Channel path.
+>
+> **Do not install this on a production cluster or point it at an array
+> holding data you care about.** A storage plugin runs as root, creates and
+> deletes volumes on the array, and manipulates block devices on every node.
+> A defect here can destroy virtual machine data, take a storage offline, or
+> leave a node in a state that only a reboot clears — and because multipath
+> and SCSI state is shared, the damage is not necessarily limited to this
+> plugin's own storage.
+>
+> Use a test cluster, a test array, and independent backups of anything you
+> put on it. See [Disclaimer and risk](#disclaimer-and-risk) below and
+> [docs/TESTING.md](docs/TESTING.md) for exactly what has and has not been
+> verified.
+
 One package, one shared host-side layer, and one PVE storage type per Dell EMC
 product family. The first family implemented is **PowerStore** over iSCSI or
 Fibre Channel, using direct volume provisioning (one VM disk = one array
@@ -14,8 +35,8 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.5.0 — the `dellpowerstore` plugin is code complete, and has
-> NOT been run against a PowerStore array.**
+> **Version 0.5.0~beta1 — the `dellpowerstore` plugin is code complete, and
+> has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
 > is a release to test with, on a non-production cluster and a non-production
@@ -29,7 +50,7 @@ all operate on a single VM disk as their natural unit.
 | 3 | PowerStore REST API client | **done** |
 | 4 | `dellpowerstore` plugin, recovery tool, docs | **code done**, on-hardware pass outstanding |
 | 5 | FC verification, PVE 9.2 verification, 1.0.0 release | needs hardware |
-| 6+ | PowerScale, then PowerFlex, then PowerMax (separate specs) | not started |
+| 6+ | PowerVault ME5, then PowerFlex, then PowerMax (separate specs) | ME5 in progress |
 
 The full development specification lives in
 [`jt-pve-storage-dellemc.md`](jt-pve-storage-dellemc.md).
@@ -44,15 +65,21 @@ an API client, not a restructuring.
 | Order | Family | PVE storage type | Data path | Status |
 |---|---|---|---|---|
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
-| 2 | PowerScale | `dellpowerscale` | NFS (directory semantics) | planned |
+| 2 | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS (dm-multipath) | **next** |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module (`/dev/scini*`) | planned |
 | 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath) | planned |
+| — | PowerScale | `dellpowerscale` | NFS (directory semantics) | not scheduled |
 | — | Unity XT | `dellunity` | iSCSI / FC | not scheduled |
-| — | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS | not scheduled |
 | — | ObjectScale, PowerProtect | — | — | out of scope |
 
-PowerScale and PowerFlex do not inherit the block base class: one is NAS with
-directory semantics, the other has its own kernel-module data path.
+ME5 and PowerMax will inherit the block base class. PowerFlex will not: its
+data path is a kernel module presenting `/dev/scini*`, with no SAN login and
+no dm-multipath.
+
+PowerScale is not scheduled. It is NAS, so it would need its own directory
+semantics and content types rather than the block layer everything else here
+shares — Proxmox VE's built-in NFS storage already covers most of what it
+would offer.
 
 Object and backup-appliance products are out of scope on purpose: they do not
 fit the PVE storage plugin model.
@@ -93,22 +120,66 @@ including storage that has nothing to do with this plugin — out of service.
 
 ---
 
-## Disclaimer
+## Disclaimer and risk
 
-- This is an **independent, community project**. It is not affiliated with,
-  endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC",
-  "PowerStore", "PowerMax", "PowerFlex" and "PowerScale" are trademarks of
-  their respective owners.
-- Provided under the MIT license, **without warranty of any kind**. You are
-  responsible for validating it against your own hardware, firmware version
-  and workload before production use.
-- Items **not yet verified on physical hardware** are marked
-  `NOT VERIFIED ON HARDWARE` in `docs/TESTING.md`. As of 0.5.0 that is every
-  array-facing behaviour: the REST endpoint set and field names, the SCSI
-  vendor and product strings used for multipath matching, the WWN to WWID
-  conversion, and the whole Fibre Channel path.
-- Always test on a non-production cluster and a non-production array first,
-  and keep independent backups of any data you place on this storage.
+### Development status
+
+This is **beta software**, published so that it can be tested. It has not
+been run against a physical Dell EMC array even once. Everything marked
+`NOT VERIFIED ON HARDWARE` in [docs/TESTING.md](docs/TESTING.md) — which is
+currently every array-facing behaviour — may simply be wrong.
+
+### What can go wrong
+
+A Proxmox VE storage plugin runs as root on every node. This one creates and
+deletes volumes on the array, maps them to hosts, and manipulates SCSI and
+device-mapper state. Realistic failure modes include:
+
+- **Data loss.** A volume deleted, overwritten by a rollback, or truncated by
+  a wrong size calculation takes the virtual machine's data with it.
+- **Storage outage.** A defect on the activation or status path can leave a
+  storage `inactive`, and because Proxmox VE polls storages sequentially, a
+  slow or hanging one delays every other storage on the node.
+- **Node hangs.** I/O to a device with no working path can put processes into
+  uninterruptible sleep, which no signal clears. Recovery is a reboot.
+- **Collateral damage.** Multipath and SCSI state is shared across the whole
+  node. A mistake in device cleanup can affect storage this plugin does not
+  own, from other vendors or other plugins.
+
+The design takes these seriously — the safety rules above, the vendor gating,
+the timeout-bounded device access and the ownership prefix all exist for
+them — but *designed to be safe* is not *demonstrated to be safe*. That
+demonstration is what 1.0.0 requires.
+
+### No warranty
+
+Provided under the [MIT license](LICENSE), **as is and without warranty of
+any kind**, express or implied, including but not limited to merchantability,
+fitness for a particular purpose and non-infringement. In no event shall the
+author be liable for any claim, damages or other liability, including data
+loss or business interruption, arising from the use of this software.
+
+You are solely responsible for evaluating it against your own hardware,
+firmware version and workload before any production use.
+
+### Before you install
+
+- Use a **non-production** Proxmox VE cluster and a **non-production** array.
+- Keep **independent backups** of anything you place on this storage. A
+  storage snapshot is not a backup.
+- Read [docs/TESTING.md](docs/TESTING.md) and verify at least the four items
+  listed there for your array and firmware.
+- Report what you find:
+  [issues](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/issues).
+
+### Trademarks and affiliation
+
+This is an **independent community project**. It is not affiliated with,
+endorsed by, sponsored by, or supported by Dell Technologies. "Dell",
+"Dell EMC", "PowerStore", "PowerMax", "PowerFlex", "PowerScale", "Unity" and
+"PowerVault" are trademarks of their respective owners, used here only to
+identify the hardware this software talks to. Proxmox and Proxmox VE are
+trademarks of Proxmox Server Solutions GmbH.
 
 ---
 

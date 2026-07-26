@@ -10,17 +10,22 @@ so each family gets its own and they share the host-side layer.
 | Order | Family | PVE type | Data path | Base class |
 |---|---|---|---|---|
 | 1 | PowerStore | `dellpowerstore` | iSCSI / FC, dm-multipath | `Common::BlockBase` |
-| 2 | PowerScale | `dellpowerscale` | NFS, directory semantics | its own |
+| 2 | PowerVault ME5 | `dellme5` | iSCSI / FC / SAS, dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module, `/dev/scini*` | its own |
 | 4 | PowerMax | `dellpowermax` | FC / iSCSI, dm-multipath | `Common::BlockBase` |
+
+PowerScale and Unity XT are not scheduled. PowerScale is NAS, and Proxmox
+VE's built-in NFS storage already covers most of what a dedicated plugin
+would add.
 
 Why not one plugin with a `--dell-type` option:
 
 - **`plugindata()` is a class method.** PVE calls it to learn the supported
   content types and disk formats *before* any `storage.cfg` parameter is
-  parsed. PowerStore is block storage that can only hold `raw`; PowerScale is
-  NAS that can hold `qcow2`, `subvol`, ISOs and backups. There is no single
-  return value that describes both.
+  parsed. PowerStore is block storage that can only hold `raw`; a NAS family
+  such as PowerScale holds `qcow2`, `subvol`, ISOs and backups. There is no
+  single return value that describes both, and the same applies to PowerFlex,
+  whose volumes appear through a kernel module rather than a SAN login.
 - **The schema cannot express "required only when …".** PVE's JSON schema has
   `optional` and nothing else. A single type would have to declare the union
   of every family's options, and an invalid combination would only fail at
@@ -118,9 +123,10 @@ requires no change to this mechanism, and `t/06` covers it.
    dedicated prefix.
 4. Nothing else. The Makefile discovers new modules and packaging follows.
 
-PowerScale and PowerFlex will not inherit `BlockBase`: NAS with directory
-semantics and a kernel-module data path have almost nothing in common with it
-beyond the REST transport.
+ME5 and PowerMax will inherit `BlockBase` — they are the case it was written
+for. PowerFlex will not: its data path is a kernel module presenting
+`/dev/scini*`, with no SAN login and no dm-multipath, so only the REST
+transport is reusable.
 
 ## Why the plugin is careful about the host
 

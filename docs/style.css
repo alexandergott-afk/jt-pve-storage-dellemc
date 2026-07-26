@@ -10,6 +10,8 @@
     --accent-soft: #eaf2fc;
     --warn-bg: #fff4e5;
     --warn-line: #e3a008;
+    --danger-bg: #fff0ee;
+    --danger-line: #cf222e;
     --code-bg: #f4f6f8;
     --radius: 8px;
 }
@@ -98,6 +100,13 @@ pre code { background: none; padding: 0; }
 }
 
 .notice strong { display: block; margin-bottom: .3rem; }
+.notice p { margin: .5rem 0 0; }
+.notice p:last-child { margin-bottom: 0; }
+
+.notice.danger {
+    background: var(--danger-bg);
+    border-color: var(--danger-line);
+}
 
 .table-wrap { overflow-x: auto; margin: 1rem 0; }
 

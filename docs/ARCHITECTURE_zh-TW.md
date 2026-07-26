@@ -9,13 +9,15 @@ Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，
 | 順序 | 系列 | PVE type | 資料路徑 | 基底類別 |
 |---|---|---|---|---|
 | 1 | PowerStore | `dellpowerstore` | iSCSI／FC、dm-multipath | `Common::BlockBase` |
-| 2 | PowerScale | `dellpowerscale` | NFS、目錄語意 | 自有 |
+| 2 | PowerVault ME5 | `dellme5` | iSCSI／FC／SAS、dm-multipath | `Common::BlockBase` |
 | 3 | PowerFlex | `dellpowerflex` | SDC kernel module、`/dev/scini*` | 自有 |
 | 4 | PowerMax | `dellpowermax` | FC／iSCSI、dm-multipath | `Common::BlockBase` |
 
+PowerScale 與 Unity XT 未排入。PowerScale 是 NAS，而 Proxmox VE 內建的 NFS 儲存已經涵蓋專用外掛能提供的大部分功能。
+
 為什麼不做成單一 plugin 加 `--dell-type` 參數：
 
-- **`plugindata()` 是 class method。** PVE 會在解析任何 `storage.cfg` 參數**之前**呼叫它，取得支援的 content type 與磁碟格式。PowerStore 是 block 儲存、只能放 `raw`；PowerScale 是 NAS、可以放 `qcow2`、`subvol`、ISO 與備份。沒有任何一組回傳值能同時描述兩者。
+- **`plugindata()` 是 class method。** PVE 會在解析任何 `storage.cfg` 參數**之前**呼叫它，取得支援的 content type 與磁碟格式。PowerStore 是 block 儲存、只能放 `raw`；像 PowerScale 這類 NAS 則可以放 `qcow2`、`subvol`、ISO 與備份。沒有任何一組回傳值能同時描述兩者；PowerFlex 也一樣，它的 volume 是透過 kernel module 呈現，而不是經由 SAN 登入。
 - **schema 無法表達「在某條件下才必填」。** PVE 的 JSON schema 只有 `optional`，沒有別的。單一 type 會被迫宣告所有系列參數的聯集，錯誤的組合只會在執行期、在陣列上、在操作進行到一半時才失敗。
 - **type 字串是永久契約。** 日後修改會讓所有既有的 `storage.cfg` 失效。
 
@@ -87,7 +89,7 @@ PVE 會把所有已註冊外掛的 `properties()` 合併成同一份 schema，�
 3. 實作上述抽象方法，並以專屬前綴宣告系列選項。
 4. 沒有其他事情要做。Makefile 會自動探索新模組，打包也會跟著涵蓋。
 
-PowerScale 與 PowerFlex 不會繼承 `BlockBase`：NAS 的目錄語意與 kernel module 資料路徑，除了 REST 傳輸層之外幾乎沒有共通點。
+ME5 與 PowerMax 會繼承 `BlockBase` —— 它們正是這個基底當初設想的對象。PowerFlex 不會：它的資料路徑是 kernel module 呈現的 `/dev/scini*`，沒有 SAN 登入也不走 dm-multipath，只有 REST 傳輸層可以重用。
 
 ## 為什麼外掛在主機端如此謹慎
 

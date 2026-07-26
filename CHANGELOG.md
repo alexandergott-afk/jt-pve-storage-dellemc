@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 繁體中文版本：[CHANGELOG_zh-TW.md](CHANGELOG_zh-TW.md)
 
-## [0.5.0] - 2026-07-26
+## [0.5.0~beta1] - 2026-07-26
 
 Phases 2 to 4. The `dellpowerstore` storage type now exists.
 
