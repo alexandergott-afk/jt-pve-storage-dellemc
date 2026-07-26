@@ -570,4 +570,46 @@ SKIP: {
     unlike($conf, qr/no_path_retry\s+queue/, 'never writes queueing');
 }
 
+# ---------------------------------------------------------------------------
+# Host commands, as the CLI Reference documents them
+#
+# These run on the first activation of the storage, so getting them wrong
+# means the storage never comes up at all. Both were guessed before being
+# checked against Dell's guide, and both guesses were wrong: the keyword is
+# 'initiators', not 'id', and attaching an initiator to an existing host is
+# 'add host-members', not 'set initiator' — which is a different command that
+# names an initiator and does not attach it to anything.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_api();
+
+    $api->host_create('pve-pve-node1',
+        ['iqn.1993-08.org.debian:01:aaaa', 'iqn.1993-08.org.debian:01:bbbb']);
+
+    my $path = $ua->last_request->uri->path;
+    like($path, qr{/api/create/host/initiators/},
+        "create host uses the 'initiators' keyword");
+    like($path, qr{/pve-pve-node1$},
+        '... and the host name comes last, after every parameter');
+    like($path, qr{aaaa%2Ciqn|aaaa,iqn},
+        '... with the initiators as one comma-separated list');
+
+    $api->host_add_initiators('pve-pve-node1',
+        ['iqn.1993-08.org.debian:01:cccc']);
+
+    $path = $ua->last_request->uri->path;
+    like($path, qr{/api/add/host-members/initiators/},
+        'adding an initiator to an existing host uses add host-members');
+    like($path, qr{/pve-pve-node1$}, '... with the host name last');
+    unlike($path, qr{set/initiator},
+        '... and never set initiator, which does something else entirely');
+
+    # Nothing to add is not a command.
+    my $before = scalar @{ $ua->requests };
+    $api->host_add_initiators('pve-pve-node1', []);
+    is(scalar @{ $ua->requests }, $before,
+        'an empty initiator list sends nothing at all');
+}
+
 done_testing();

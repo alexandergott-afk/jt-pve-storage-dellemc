@@ -92,6 +92,20 @@ during development. Still unverified against hardware, but not guesswork:
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`; snapshot names max 32 bytes, unique system-wide | create snapshots |
 
+### Verified against Dell's CLI Reference since
+
+These were guessed and are now read from the ME4/ME5 CLI Guide. Two of the
+guesses were wrong, and both sit on the first activation of the storage:
+
+| Command | As documented | What it was |
+|---|---|---|
+| create a host | `create host initiators <list> <name>` | `create host id <list> <name>` |
+| add an initiator to a host | `add host-members initiators <list> <host>` | `set initiator host <host> <initiator>` — a different command that names an initiator and attaches it to nothing |
+| delete a volume | `delete volumes <list>` | unchanged; confirmed to prompt only in interactive console mode |
+| rename a volume | `set volume name <new> <volume>` | unchanged |
+| unmap | `unmap volume initiator <hosts> <volumes>` | unchanged; omitting the initiator would delete the DEFAULT mapping instead |
+| roll back | `rollback volume [prompt yes\|no] snapshot <snap> <volume>` | now answers the prompt |
+
 ### NOT VERIFIED — check these first
 
 Dell's documentation site refused several requests during development, so

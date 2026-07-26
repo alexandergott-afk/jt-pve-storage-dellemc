@@ -639,26 +639,40 @@ sub host_get_by_name {
     return undef;
 }
 
-# NOT VERIFIED: `create host id <initiator-ids> <name>`.
+# From the CLI Reference:
+#     create host [host-group <g>] [initiators <initiators>] [profile standard] <name>
+#     # create host initiators 10000090fa13870e,10000090fa13870f Host1
+#
+# The keyword is 'initiators', and the host name comes LAST, after every
+# optional parameter. A host holds at most 128 initiators, and its name is
+# limited to 32 bytes without " , . < \ — which is why encode_host_name
+# sanitises to alphanumerics, '-' and '_'.
 sub host_create {
     my ($self, $name, $initiators, %opts) = @_;
 
     die $self->_msg("creating a host needs at least one initiator") . "\n"
         unless ref($initiators) eq 'ARRAY' && @$initiators;
 
-    $self->_cmd(['create', 'host', 'id', join(',', @$initiators), $name], %opts);
+    $self->_cmd(['create', 'host', 'initiators', join(',', @$initiators), $name],
+        %opts);
 
     return $name;
 }
 
-# NOT VERIFIED: `set host-group ... ` / `add host-members`.
+# From the CLI Reference:
+#     add host-members initiators <initiators> <host-name>
+#     # add host-members initiators Init3,Init4 Host1
+#
+# 'set initiator' is a different command: it names an initiator and sets its
+# profile, and does not attach it to anything. The list is comma-separated, so
+# every missing initiator goes in one command rather than one each.
 sub host_add_initiators {
     my ($self, $name, $initiators, %opts) = @_;
 
-    for my $initiator (@$initiators) {
-        # Attaching an initiator to a host is done by naming it into the host.
-        $self->_cmd(['set', 'initiator', 'host', $name, $initiator], %opts);
-    }
+    return 1 unless ref($initiators) eq 'ARRAY' && @$initiators;
+
+    $self->_cmd(['add', 'host-members', 'initiators',
+                 join(',', @$initiators), $name], %opts);
 
     return 1;
 }

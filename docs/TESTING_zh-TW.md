@@ -76,6 +76,19 @@ ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放�
 | `show volumes [details] [pattern <string>] [pool <pool>] [type …]` | show volumes |
 | `create snapshots volumes <volumes> <snap-names>`；快照名稱上限 32 bytes 且全系統唯一 | create snapshots |
 
+### 之後已對照 Dell CLI Reference 查證
+
+以下這些原本是推測的，現在已從 ME4／ME5 CLI Guide 讀出來。其中兩個推測是錯的，而且都落在「儲存第一次啟用」的路徑上：
+
+| 指令 | 文件記載 | 原本寫的 |
+|---|---|---|
+| 建立 host | `create host initiators <清單> <名稱>` | `create host id <清單> <名稱>` |
+| 把 initiator 加入既有 host | `add host-members initiators <清單> <host>` | `set initiator host <host> <initiator>` —— 那是另一個指令，只是為 initiator 命名，不會把它掛到任何 host 上 |
+| 刪除 volume | `delete volumes <清單>` | 不變；已確認只有在互動式主控台模式才會出現確認提示 |
+| 重新命名 volume | `set volume name <新名稱> <volume>` | 不變 |
+| 解除對應 | `unmap volume initiator <hosts> <volumes>` | 不變；若省略 initiator，刪掉的會是**預設對應** |
+| 還原 | `rollback volume [prompt yes\|no] snapshot <快照> <volume>` | 現在會回答那個確認提示 |
+
 ### 尚未查證 —— 請優先確認這些
 
 開發期間 Dell 文件網站多次拒絕存取，因此以下項目雖然遵循同一套 CLI 語法，但並非直接讀自官方指南。它們在 `PowerVault/API.pm` 中都標記為 `NOT VERIFIED`：

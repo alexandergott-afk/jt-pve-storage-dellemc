@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.14~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault would not have come up at all. Two commands on the first
+    activation of the storage were guesses, and both were wrong:
+      - creating a host is 'create host initiators <list> <name>', not
+        'create host id <list> <name>';
+      - attaching an initiator to an existing host is 'add host-members
+        initiators <list> <host>'. What was there, 'set initiator host ...',
+        is a different command that names an initiator and attaches it to
+        nothing, and the syntax was not valid either.
+    Both are now as the ME4/ME5 CLI Reference Guide documents them, and every
+    missing initiator goes in one command instead of one each.
+  * Four other PowerVault commands were checked against the same guide and
+    found correct as written: delete volumes, set volume name, unmap volume,
+    and the size and name limits. docs/TESTING.md records which are now read
+    from documentation rather than inferred.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 14:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.13~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

@@ -5,6 +5,19 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.14~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 原本根本起不來。** 儲存第一次啟用時會用到的兩個指令是推測寫出來的，而不是查 Dell 的 CLI Reference Guide，而且兩個都錯：
+  - 建立 host 的正確寫法是 `create host initiators <清單> <名稱>`；原本送的是 `create host id <清單> <名稱>`。
+  - 把 initiator 加進既有 host 的正確寫法是 `add host-members initiators <清單> <host>`；原本送的是 `set initiator host <host> <initiator>`，那是另一個指令 —— `set initiator` 只是為 initiator 命名並設定 profile，不會把它掛到任何 host 上 —— 而且那樣的語法本身也不成立。
+
+  兩者現在都與指南一致，而且所有缺少的 initiator 會在同一個指令中一次加入，不再一個一個送。
+
+### 變更
+- 另外四個 PowerVault 指令也依同一份指南確認過，寫法正確：`delete volumes`、`set volume name <新名稱> <volume>`、`unmap volume initiator <hosts> <volumes>`，以及 32 位元組的名稱上限。順帶查到兩個有用的細節：`delete volumes` 只有在互動式主控台模式才會出現確認提示，因此腳本不需要任何確認旗標；而 `unmap volume` 若省略 initiator，刪掉的會是**預設對應**而不是明確對應 —— 這正是本外掛一律指名 host 的原因。
+- `docs/TESTING.md` 現在會區分「已從 Dell 文件讀出來的」與「仍屬推測的」。
+
 ## [0.7.13~beta1] - 2026-07-27
 
 ### 新增

@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.14~beta1] - 2026-07-27
+
+### Fixed
+- **PowerVault would not have come up at all.** Two commands on the first
+  activation of a storage were written from inference rather than from Dell's
+  CLI Reference Guide, and both were wrong:
+  - creating a host is `create host initiators <list> <name>`; it was sending
+    `create host id <list> <name>`.
+  - attaching an initiator to an existing host is
+    `add host-members initiators <list> <host>`. It was sending
+    `set initiator host <host> <initiator>`, which is a different command —
+    `set initiator` names an initiator and sets its profile, and attaches it
+    to nothing — and was not valid syntax either.
+
+  Both now match the guide, and every missing initiator is added in one
+  command rather than one per initiator.
+
+### Changed
+- Four other PowerVault commands were read from the same guide and found
+  correct as written: `delete volumes`, `set volume name <new> <volume>`,
+  `unmap volume initiator <hosts> <volumes>`, and the 32-byte name limit.
+  Two useful details came with them: `delete volumes` only prompts in
+  interactive console mode, so a script needs no confirmation flag; and
+  omitting the initiator from `unmap volume` deletes the *default* mapping
+  rather than an explicit one, which is why this plugin always names the host.
+- `docs/TESTING.md` now separates what has been read from Dell's documentation
+  from what is still inferred.
+
 ## [0.7.13~beta1] - 2026-07-27
 
 ### Added
