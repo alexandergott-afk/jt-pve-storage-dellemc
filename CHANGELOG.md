@@ -7,6 +7,19 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.23~beta1] - 2026-07-27
+
+### Added
+- **A table of every field name the API clients read**, in
+  `docs/TESTING.md`: what each is used for, and whether it has been read from
+  Dell's documentation or only inferred. The two worst defects found before
+  the first hardware run were both field names that do not exist, and neither
+  failed loudly — one made every PowerVault pool look full, the other made the
+  mapping check always answer no. The table exists so that one pass over a
+  real response can settle all of them at once.
+- `t/16-docs.t` fails when a field the code reads is missing from that table,
+  so it cannot quietly fall out of date.
+
 ## [0.7.22~beta1] - 2026-07-27
 
 ### Fixed

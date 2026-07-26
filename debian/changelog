@@ -1,3 +1,17 @@
+jt-pve-storage-dellemc (0.7.23~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * docs/TESTING.md now lists every field name the API clients read, what
+    each is used for, and whether it has been read from Dell's documentation
+    or only inferred. The two worst defects found before the first hardware
+    run were both field names that do not exist, and neither failed loudly:
+    a capacity read as zero, a mapping check that always answered no.
+  * A test fails when a field the code reads is missing from that table, so
+    it cannot quietly fall out of date.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 23:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.22~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

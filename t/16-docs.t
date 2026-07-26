@@ -189,4 +189,61 @@ SKIP: {
     }
 }
 
+# ---------------------------------------------------------------------------
+# The field-name table in TESTING.md must not drift
+#
+# Two of the worst defects found before the first hardware run were field
+# names that did not exist. The table exists so an operator can compare it
+# against one real response; a field the code reads but the table omits is a
+# field nobody will check.
+# ---------------------------------------------------------------------------
+
+{
+    my $testing = slurp("$DOCS/TESTING.md") // '';
+
+    ok(length $testing, 'docs/TESTING.md is readable') or skip 'no doc', 1;
+
+    my @sources = (
+        'lib/PVE/Storage/Custom/DellEMC/PowerVault/API.pm',
+        'lib/PVE/Storage/Custom/DellEMC/PowerStore/API.pm',
+        'lib/PVE/Storage/Custom/DellEMC/PowerFlex/API.pm',
+    );
+
+    # Names this plugin writes rather than reads: request bodies it composes
+    # and its own internal state. Only what comes BACK from an array belongs
+    # in the table.
+    my %not_a_response_field = map { $_ => 1 } qw(
+        compressionMethod description expiration_timestamp
+        force_internal_snapshots generation session_ttl token
+        volumeSizeInKb storagePoolId volumeType removeMode
+        snapshotDefs sizeInGB allowMultipleMappings
+    );
+
+    my %seen;
+    for my $file (@sources) {
+        my $text = slurp($file) // slurp("../$file") // '';
+        next unless length $text;
+
+        while ($text =~ /->\{'?([a-zA-Z][a-zA-Z0-9_.-]{3,})'?\}/g) {
+            my $field = $1;
+            next if $not_a_response_field{$field};
+            # Keys this plugin puts into its own hashes.
+            next if $field =~ /^(?:portal|iqn|wwid|ctime|used|size|volume|
+                                  snapname|storage|diskid|type|first_seen|
+                                  miss|created|pid|snapshot|ancestor|row|
+                                  parent|basename|basevmid|isBase|vmid|
+                                  source_id|nqn|state|ana|address|scheme|
+                                  timeout|retries|storeid|logger|port|
+                                  username|password|portal_probe|health)$/x;
+            $seen{$field}++;
+        }
+    }
+
+    my @undocumented = grep { $testing !~ /\Q$_\E/ } sort keys %seen;
+
+    is_deeply(\@undocumented, [],
+        'every array field the clients read appears in the field-name table')
+        or diag("missing from docs/TESTING.md: @undocumented");
+}
+
 done_testing();

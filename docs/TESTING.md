@@ -149,6 +149,85 @@ help create host
 ```
 
 
+## Field names: what has been read, and what has not
+
+Two of the worst defects found before the first hardware run were field names
+that did not exist: PowerVault's pool capacity read `avail-size` where the
+array reports `Avail`, so every pool looked full; and the mapping check
+compared against a host name in a listing that has no host-name column. Both
+were invisible except as behaviour that made no sense.
+
+So here is every field the API clients read. On the first run, compare this
+against what the array actually returns — for PowerStore through Swagger UI
+at `https://<mgmt-ip>/swaggerui`, for PowerVault by running the command over
+SSH, for PowerFlex through the API directly.
+
+### PowerVault ME (from the ME4/ME5 CLI Reference)
+
+| Field | Read for | State |
+|---|---|---|
+| `total-size-numeric` | pool capacity, in 512-byte blocks | documented as **Total Size** |
+| `avail-numeric` | pool free space | documented as **Avail** |
+| `size-numeric` | volume size | documented as **Size** |
+| `allocated-size-numeric` | volume space in use | documented as **Allocated Size** |
+| `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | **not verified** — the first thing to check |
+| `volume-name`, `name` | object name | documented |
+| `identifier`, `nickname` | who a mapping row belongs to | documented as **Identifier** and **Nickname** |
+| `lun` | LUN of a mapping | documented |
+| `media` | `iSCSI`, `FC(P)`, `FC(L)`, `SAS` | documented as **Media** |
+| `target-id` | the IQN of an iSCSI port | documented as **Target ID** |
+| `ip-address` | iSCSI portal address | documented |
+| `status`, `health` | whether a port is usable | documented |
+| `creation-date-time-numeric` | snapshot date | **not verified** |
+| `name-numeric`, `status-numeric` | fallback spellings tried when the plain field is absent | — |
+| `port-type`, `primary-ip-address` | older spellings of Media and IP Address | — |
+| `host-id`, `host`, `name` | further spellings a mapping row may use for who it belongs to | — |
+
+`-numeric` fields are counted in 512-byte blocks; the plain field is a
+formatted string like `1996.7GB` and is only parsed when the numeric one is
+absent.
+
+### PowerStore (from the 4.x REST documentation)
+
+Every one of these is **unverified**. The endpoints and the filter syntax are
+too.
+
+| Field | Read for |
+|---|---|
+| `id`, `name`, `size`, `logical_used` | volumes |
+| `wwn` | the WWID the host will see — check this first |
+| `protection_data.source_id` | which snapshot a thin clone came from |
+| `creation_timestamp` | snapshot date, an ISO 8601 string |
+| `physical_total`, `physical_used`, `total_physical`, `total_used` | capacity |
+| `host_id`, `logical_unit_number` | mappings |
+| `address`, `target_iqn`, `appliance_id` | iSCSI portals |
+| `host_group_id`, `volume_id` | mapping rows |
+| `messages[].message_l10n`, `messages[].code` | the array's own error text |
+
+### PowerFlex (from the REST documentation)
+
+| Field | Read for | State |
+|---|---|---|
+| `id`, `name`, `sizeInKb`, `volumeSizeInKb` | volumes | corroborated |
+| `ancestorVolumeId` | which volume a snapshot came from | **not verified** |
+| `creationTime` | snapshot date | **not verified** |
+| `mappedSdcInfo`, `sdcId`, `hostId` | mappings | corroborated |
+| `sdcGuid`, `sdcIp` | finding this node's SDC | **not verified** |
+| `maxCapacityInKb`, `capacityInUseInKb`, `thinCapacityInUseInKb` | pool capacity | **not verified** |
+| `protectionDomainId`, `protectionDomainName` | resolving an ambiguous pool name | **not verified** |
+| `capacityAvailableForVolumeAllocationInKb` | pool capacity, fallback | **not verified** |
+| `access_token`, `refresh_token` | the 4.x login reply | **not verified** |
+| `errorCode`, `message` | the array's own error text | **not verified** |
+| `volumeIdList` | the ids a snapshot request created | **not verified** |
+| `ipList`, `storagePort`, `systemNqn`, `nqn` | the SDT endpoints for NVMe/TCP | **not verified** |
+
+
+A field that is missing does not fail loudly. A size reads as 0, a WWID as
+undef, a capacity as full. The plugin refuses to act on some of those — an
+orphan pass with no WWIDs at all is abandoned rather than treated as "every
+volume was deleted" — but the only real answer is to compare this table
+against one real response.
+
 ## Automated checks
 
 ```bash

@@ -128,6 +128,71 @@ help create host
 ```
 
 
+## 欄位名稱：哪些已經查證、哪些還沒
+
+在第一次上實機之前找到的缺陷中，最嚴重的兩個都是「欄位名稱根本不存在」：PowerVault 的儲存池容量讀的是 `avail-size`，而陣列回報的是 `Avail`，於是每個儲存池看起來都是滿的；而對應狀態的檢查，是拿 host 名稱去比對一份根本沒有 host 名稱欄位的清單。這兩者除了「行為說不通」之外都不會有任何徵兆。
+
+因此以下列出 API 客戶端讀取的每一個欄位。第一次上機時，請拿它跟陣列實際回傳的內容比對 —— PowerStore 用 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，PowerVault 用 SSH 直接下指令，PowerFlex 直接打 API。
+
+### PowerVault ME（出自 ME4／ME5 CLI Reference）
+
+| 欄位 | 用途 | 狀態 |
+|---|---|---|
+| `total-size-numeric` | 儲存池容量，單位為 512 位元組區塊 | 文件記載為 **Total Size** |
+| `avail-numeric` | 儲存池可用空間 | 文件記載為 **Avail** |
+| `size-numeric` | volume 大小 | 文件記載為 **Size** |
+| `allocated-size-numeric` | volume 已使用空間 | 文件記載為 **Allocated Size** |
+| `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | **未驗證** —— 這是第一個該確認的 |
+| `volume-name`、`name` | 物件名稱 | 已記載 |
+| `identifier`、`nickname` | 一列對應屬於誰 | 文件記載為 **Identifier** 與 **Nickname** |
+| `lun` | 對應的 LUN | 已記載 |
+| `media` | `iSCSI`、`FC(P)`、`FC(L)`、`SAS` | 文件記載為 **Media** |
+| `target-id` | iSCSI 連接埠的 IQN | 文件記載為 **Target ID** |
+| `ip-address` | iSCSI portal 位址 | 已記載 |
+| `status`、`health` | 連接埠是否可用 | 已記載 |
+| `creation-date-time-numeric` | 快照時間 | **未驗證** |
+| `name-numeric`、`status-numeric` | 主要欄位不存在時嘗試的替代拼法 | — |
+| `port-type`、`primary-ip-address` | Media 與 IP Address 的舊拼法 | — |
+| `host-id`、`host`、`name` | 對應資料列可能用來表示「屬於誰」的其他拼法 | — |
+
+`-numeric` 欄位以 512 位元組區塊計；不帶後綴的欄位是像 `1996.7GB` 這樣的格式化字串，只有在數值欄位不存在時才會被解析。
+
+### PowerStore（出自 4.x REST 文件）
+
+以下每一項都**未驗證**，端點與過濾語法也是。
+
+| 欄位 | 用途 |
+|---|---|
+| `id`、`name`、`size`、`logical_used` | volume |
+| `wwn` | 主機將看到的 WWID —— 請優先確認這個 |
+| `protection_data.source_id` | 精簡複製是從哪個快照來的 |
+| `creation_timestamp` | 快照時間，ISO 8601 字串 |
+| `physical_total`、`physical_used`、`total_physical`、`total_used` | 容量 |
+| `host_id`、`logical_unit_number` | 對應 |
+| `address`、`target_iqn`、`appliance_id` | iSCSI portal |
+| `host_group_id`、`volume_id` | 對應資料列 |
+| `messages[].message_l10n`、`messages[].code` | 陣列自己的錯誤文字 |
+
+### PowerFlex（出自 REST 文件）
+
+| 欄位 | 用途 | 狀態 |
+|---|---|---|
+| `id`、`name`、`sizeInKb`、`volumeSizeInKb` | volume | 已旁證 |
+| `ancestorVolumeId` | 快照是從哪個 volume 來的 | **未驗證** |
+| `creationTime` | 快照時間 | **未驗證** |
+| `mappedSdcInfo`、`sdcId`、`hostId` | 對應 | 已旁證 |
+| `sdcGuid`、`sdcIp` | 找出本節點的 SDC | **未驗證** |
+| `maxCapacityInKb`、`capacityInUseInKb`、`thinCapacityInUseInKb` | 儲存池容量 | **未驗證** |
+| `protectionDomainId`、`protectionDomainName` | 解析有歧義的儲存池名稱 | **未驗證** |
+| `capacityAvailableForVolumeAllocationInKb` | 儲存池容量，備援欄位 | **未驗證** |
+| `access_token`、`refresh_token` | 4.x 的登入回應 | **未驗證** |
+| `errorCode`、`message` | 陣列自己的錯誤文字 | **未驗證** |
+| `volumeIdList` | 快照請求建立出來的 id | **未驗證** |
+| `ipList`、`storagePort`、`systemNqn`、`nqn` | NVMe/TCP 的 SDT 端點 | **未驗證** |
+
+
+欄位不存在時不會大聲失敗。容量會讀成 0、WWID 讀成 undef、可用空間讀成滿的。本外掛對其中幾種情況會拒絕動作 —— 例如一次完全讀不到 WWID 的清理，會直接放棄而不是當成「所有 volume 都被刪了」—— 但真正的解法只有一個：拿這張表跟一份真實回應比對。
+
 ## 自動化檢查
 
 ```bash
