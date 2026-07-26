@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.7.32~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * volume_has_feature no longer dies on a volume name it cannot read. It is
+    called in a loop over a VM's configuration, so a die there aborts the
+    whole operation over a question that was never the problem.
+  * pve-dell-config-get detaches only what it attached. A volume already
+    mapped to this node was mapped by someone else, and unmapping it on exit
+    was a change nobody asked for.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:40:25 +0800
+
 jt-pve-storage-dellemc (0.7.31~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

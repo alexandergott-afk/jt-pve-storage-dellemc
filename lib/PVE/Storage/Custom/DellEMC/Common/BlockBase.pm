@@ -2434,7 +2434,11 @@ sub volume_has_feature {
     # 'base-100-disk-0/vm-101-disk-0', which starts with 'base-' while being
     # the least base-like volume there is — and calling it one would answer
     # 'no' to snapshot and rename for every linked clone on the storage.
-    my $isBase = ($class->parse_volname($volname))[5];
+    # eval: parse_volname dies on a name it does not recognise, and this is
+    # called in a loop over a VM's configuration. A name this plugin cannot
+    # read is not this question's problem — answer for an ordinary volume and
+    # let whatever actually touches it report the real error.
+    my $isBase = eval { ($class->parse_volname($volname))[5] };
 
     my $key = $snapname ? 'snap' : ($isBase ? 'base' : 'current');
 

@@ -538,6 +538,15 @@ ok(!$P->volume_has_feature($scfg, 'template', $storeid, 'vm-100-disk-0', 'snap1'
         'nor renamed');
 }
 
+# volume_has_feature is called in a loop over a VM's configuration, so a
+# volname it cannot read must not abort the whole operation.
+{
+    my $answer = eval { $P->volume_has_feature($scfg, 'snapshot', $storeid,
+        'something-else-entirely') };
+    ok(defined $answer, 'an unreadable volname is answered, not died on')
+        or diag("died with: $@");
+}
+
 ok(!$P->volume_has_feature($scfg, 'nonsense', $storeid, 'vm-100-disk-0'),
     'unknown features are not claimed');
 is($P->storage_can_replicate($scfg, $storeid, 'raw'), 0, 'no storage replication');

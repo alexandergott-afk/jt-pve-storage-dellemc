@@ -7,6 +7,17 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.32~beta1] - 2026-07-27
+
+### Fixed
+- `volume_has_feature` no longer dies on a volume name it cannot read. It is
+  called in a loop over a VM's configuration, so a die there aborts the whole
+  operation over a question that was never what failed.
+- `pve-dell-config-get` detaches only the volume it attached itself. A volume
+  already mapped to this node was mapped by something else, for a reason the
+  tool does not know, and unmapping it on the way out was a change nobody
+  asked for.
+
 ## [0.7.31~beta1] - 2026-07-27
 
 ### Fixed

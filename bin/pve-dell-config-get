@@ -33,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.31~beta1';
+my $VERSION = '0.7.32~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -79,8 +79,9 @@ Examples:
   pve-dell-config-get -r --portal 10.0.0.5 --username pveadmin \\
       --password secret ps1 100 before-upgrade
 
-The volume is attached to this node read-only for the duration and detached
-again afterwards, including when the tool fails partway.
+The volume is mounted read-only for the duration. If this tool attached it, it
+detaches it again afterwards, including when it fails partway. A volume that
+was already mapped to this node is left as it was found.
 EOF
 
     exit($exit // 0);
@@ -443,11 +444,15 @@ $SIG{$_} = sub { cleanup(); exit(1) } for qw(INT TERM HUP);
 my $config;
 
 my $ok = eval {
+    # Only what this tool attached is detached again on the way out. A volume
+    # that was already mapped was mapped by someone else, for a reason this
+    # tool does not know, and unmapping it on exit would be a change nobody
+    # asked for.
     unless ($api->is_mapped($chosen->{id}, $host_id)) {
         info("Attaching the volume to this node");
         $api->volume_attach($chosen->{id}, host_id => $host_id);
+        $attached = 1;
     }
-    $attached = 1;
 
     info("Waiting for the device (WWID $wwid)");
     my $device = get_device_by_wwid($wwid);
@@ -525,8 +530,10 @@ and talks to the array itself rather than going through pvesm, so it still
 works when the PVE stack does not. With C<--recover> it does not read
 storage.cfg at all and takes the array details from its options.
 
-The volume is attached read-only for the duration and detached again
-afterwards, including on failure and on SIGINT.
+The volume is mounted read-only for the duration. If this tool attached it, it
+detaches it again afterwards — including on failure and on SIGINT. A volume
+that was already mapped to this node is left mapped, because something else
+put it there.
 
 =head1 AUTHOR
 
