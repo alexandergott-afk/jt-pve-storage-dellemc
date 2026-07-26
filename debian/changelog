@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.7.18~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * New document docs/FIRST_RUN.md, in both languages: what to do on the
+    first run against a real array, in order, with what to check after each
+    step and what each failure most likely means. It is written around the
+    four things everything else depends on — the SCSI vendor and product
+    strings, the WWID conversion, the published portals, and the multipath
+    drop-in — because those are the ones that were inferred rather than read.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 18:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.17~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

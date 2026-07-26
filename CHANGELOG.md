@@ -7,6 +7,18 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.18~beta1] - 2026-07-27
+
+### Added
+- `docs/FIRST_RUN.md` and its Traditional Chinese counterpart: what to do on
+  the first run against a real array. The order to work through, what to look
+  at after each step, and what each failure most likely means — written around
+  the four things everything else depends on and which were inferred rather
+  than read from Dell's documentation: the SCSI vendor and product strings
+  that gate every device, the WWN-to-WWID conversion, the portals the array
+  publishes, and the multipath drop-in. It also says plainly which refusals
+  are deliberate, so a correct refusal is not mistaken for a defect.
+
 ## [0.7.17~beta1] - 2026-07-27
 
 ### Fixed
