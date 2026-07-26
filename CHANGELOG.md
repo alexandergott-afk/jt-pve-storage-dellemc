@@ -7,6 +7,24 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.31~beta1] - 2026-07-27
+
+### Fixed
+- **A linked clone could not have been snapshotted or renamed.**
+  `volume_has_feature` decided whether a volume was a base image by whether
+  its name starts with `base-`. A linked clone is named
+  `base-100-disk-0/vm-101-disk-0`: it starts with `base-` while being the
+  least base-like volume on the storage. Every linked clone was therefore
+  answered as a base image, and PVE refuses `qm snapshot` and a rename
+  outright when the plugin says no — with "the feature is not available on
+  this storage" and nothing to debug. It comes from `parse_volname` now, which
+  is how `RBDPlugin` does it.
+
+### Added
+- `t/15-pve-contract.t` checks what each plugin answers for a linked clone,
+  alongside the `parse_volname` comparison added in 0.7.30. Both failures had
+  the same root: a volname form that two things disagreed about.
+
 ## [0.7.30~beta1] - 2026-07-27
 
 ### Fixed

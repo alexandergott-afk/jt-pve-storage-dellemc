@@ -1299,8 +1299,12 @@ sub volume_has_feature {
         rename     => { current => 1 },
     };
 
-    my $key = $snapname ? 'snap' : 'current';
-    $key = 'base' if !$snapname && $volname && $volname =~ /^base-/;
+    # From parse_volname, not from the spelling: a linked clone is named
+    # 'base-100-disk-0/vm-101-disk-0', which starts with 'base-' while being
+    # the least base-like volume there is. See BlockBase::volume_has_feature.
+    my $isBase = ($class->parse_volname($volname))[5];
+
+    my $key = $snapname ? 'snap' : ($isBase ? 'base' : 'current');
 
     return 1 if $features->{$feature} && $features->{$feature}{$key};
     return 0;

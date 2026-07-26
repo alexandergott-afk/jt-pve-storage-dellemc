@@ -2419,6 +2419,9 @@ sub volume_has_feature {
 
     my $features = {
         snapshot   => { current => 1, snap => 1 },
+        # 'current' is deliberate and differs from RBD: clone_image can clone
+        # straight from a volume that is not a template, so PVE may offer a
+        # linked clone of an ordinary disk.
         clone      => { base => 1, current => 1, snap => 1 },
         template   => { current => 1 },
         copy       => { base => 1, current => 1, snap => 1 },
@@ -2426,8 +2429,14 @@ sub volume_has_feature {
         rename     => { current => 1 },
     };
 
-    my $key = $snapname ? 'snap' : 'current';
-    $key = 'base' if !$snapname && $volname && $volname =~ /^base-/;
+    # Whether this is a base image comes from parse_volname, not from the
+    # spelling of the volname. A linked clone is named
+    # 'base-100-disk-0/vm-101-disk-0', which starts with 'base-' while being
+    # the least base-like volume there is — and calling it one would answer
+    # 'no' to snapshot and rename for every linked clone on the storage.
+    my $isBase = ($class->parse_volname($volname))[5];
+
+    my $key = $snapname ? 'snap' : ($isBase ? 'base' : 'current');
 
     return 1 if $features->{$feature} && $features->{$feature}{$key};
     return 0;

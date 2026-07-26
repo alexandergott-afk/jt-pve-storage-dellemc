@@ -299,4 +299,21 @@ for my $plugin (@PLUGINS) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# volume_has_feature, against how PVE actually consumes it
+# ---------------------------------------------------------------------------
+
+# PVE::API2::Qemu refuses a snapshot, a rename or a clone outright when the
+# plugin answers no, so a feature table that misreads its own volname turns
+# into "the feature is not available on this storage" with nothing to debug.
+for my $plugin (@PLUGINS) {
+    my $scfg = {};
+    my $clone = 'base-100-disk-0/vm-101-disk-0';
+
+    ok($plugin->volume_has_feature($scfg, 'snapshot', 'st', $clone),
+        "$plugin allows a snapshot of a linked clone");
+    ok(!$plugin->volume_has_feature($scfg, 'snapshot', 'st', 'base-100-disk-0'),
+        "$plugin does not offer to snapshot a base image itself");
+}
+
 done_testing();

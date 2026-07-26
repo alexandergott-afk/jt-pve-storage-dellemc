@@ -515,6 +515,29 @@ ok($P->volume_has_feature($scfg, 'rename', $storeid, 'vm-100-disk-0'), 'rename')
 ok($P->volume_has_feature($scfg, 'clone', $storeid, 'base-100-disk-0'), 'clone of a base');
 ok(!$P->volume_has_feature($scfg, 'template', $storeid, 'vm-100-disk-0', 'snap1'),
     'a snapshot cannot become a template');
+# A linked clone is named 'base-100-disk-0/vm-101-disk-0'. Deciding what it
+# is by the spelling of the name calls it a base image — the least base-like
+# volume on the storage — and PVE then refuses to snapshot or rename any
+# linked clone, saying the feature is not available on this storage.
+{
+    my $clone = 'base-100-disk-0/vm-101-disk-0';
+
+    ok($P->volume_has_feature($scfg, 'snapshot', $storeid, $clone),
+        'a linked clone can be snapshotted');
+    ok($P->volume_has_feature($scfg, 'rename', $storeid, $clone),
+        'and renamed');
+    ok($P->volume_has_feature($scfg, 'copy', $storeid, $clone),
+        'and copied');
+    ok($P->volume_has_feature($scfg, 'template', $storeid, $clone),
+        'and turned into a template of its own');
+
+    # A real base image is still a base image.
+    ok(!$P->volume_has_feature($scfg, 'snapshot', $storeid, 'base-100-disk-0'),
+        'a base image is not snapshotted directly');
+    ok(!$P->volume_has_feature($scfg, 'rename', $storeid, 'base-100-disk-0'),
+        'nor renamed');
+}
+
 ok(!$P->volume_has_feature($scfg, 'nonsense', $storeid, 'vm-100-disk-0'),
     'unknown features are not claimed');
 is($P->storage_can_replicate($scfg, $storeid, 'raw'), 0, 'no storage replication');

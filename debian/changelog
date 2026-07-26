@@ -1,3 +1,19 @@
+jt-pve-storage-dellemc (0.7.31~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * A linked clone could not have been snapshotted or renamed. Whether a
+    volume was a base image was decided by whether its name starts with
+    'base-', and a linked clone is named base-100-disk-0/vm-101-disk-0 - it
+    starts with 'base-' while being the least base-like volume on the
+    storage. PVE would have refused 'qm snapshot' on any linked clone with
+    "snapshot feature is not available", and the same for a rename. It comes
+    from parse_volname now, as RBDPlugin does it.
+  * t/15-pve-contract.t checks the feature answer for a linked clone against
+    the installed PVE.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 03:36:01 +0800
+
 jt-pve-storage-dellemc (0.7.30~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
