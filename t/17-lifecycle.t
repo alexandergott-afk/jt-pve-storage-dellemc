@@ -414,4 +414,51 @@ is_deeply(volumes_on_array(), [], 'which then deletes cleanly');
         'no volume is left mapped to a host after all of that');
 }
 
+# ---------------------------------------------------------------------------
+# An unreachable array must not be read as "the volume is already gone"
+#
+# PVE removes the disk from the VM configuration as soon as free_image
+# returns. Reporting success when the array could not be asked loses the only
+# reference anyone had to a volume that is still sitting on it — the data is
+# intact and nothing points at it any more.
+#
+# "The array answered and it is not there" is a different fact and is still a
+# successful delete.
+# ---------------------------------------------------------------------------
+
+{
+    $A->reset_array();
+    $A->alloc_image($store, $scfg, 700, 'raw', undef, 1024);
+
+    no warnings 'redefine', 'once';
+    # Test::Array implements the abstract method itself, so that is the one
+    # to replace — overriding the base class would change nothing.
+    local *Test::Array::_array_get_volume =
+        sub { die "Cannot reach the array at 10.0.0.5: connect timed out\n" };
+
+    my $ok = eval { $A->free_image($store, $scfg, 'vm-700-disk-0', 0, 'raw'); 1 };
+    my $err = $@;
+
+    ok(!$ok, 'a delete whose existence check could not reach the array fails')
+        or diag('free_image returned success; PVE would now drop the disk from'
+              . ' the VM configuration while the volume is still on the array');
+    like($err // '', qr/did not answer whether it still exists/,
+        'and says the array could not be asked');
+    like($err // '', qr/still on the array/, 'naming the actual risk');
+
+    # And the volume is untouched.
+    ok(scalar(grep { /700/ } keys %Test::Array::VOL),
+        'the volume is still there, which is the point');
+}
+
+{
+    # The other direction: the array DID answer, and the volume is not there.
+    # That is an ordinary idempotent delete and must still succeed.
+    $A->reset_array();
+
+    my $ok = eval { $A->free_image($store, $scfg, 'vm-701-disk-0', 0, 'raw'); 1 };
+    ok($ok, 'deleting something the array says is absent still succeeds')
+        or diag("died with: $@");
+}
+
 done_testing();

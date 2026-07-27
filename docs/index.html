@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.43~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.44~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -987,6 +987,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.44~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A momentary outage would have made a delete report success, and PVE removes the disk from the VM configuration the moment it does — leaving the volume on the array with nothing pointing at it. "Not there" and "could not ask" are now different answers.</span>
+            <span class="lang-zh">一次短暫的斷線會讓刪除回報成功，而 PVE 在那一刻就會把磁碟從 VM 設定中移除 —— volume 留在陣列上，卻再也沒有東西指向它。現在「不存在」與「問不到」是兩個不同的答案。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.43~beta1</div>

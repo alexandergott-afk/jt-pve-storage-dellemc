@@ -43,6 +43,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     remove_scsi_device
     udev_refresh
     multipath_reload
+    device_matches_wwid
     multipath_resize_map
     get_multipath_device
     get_device_by_wwid
@@ -108,6 +109,12 @@ use constant ALLOC_MAX_ATTEMPTS => 10;
 # How long to wait for an array to report a resize it has accepted, before
 # refreshing the host side regardless.
 use constant RESIZE_SETTLE_TIMEOUT => 30;
+
+# The VM-configuration backup volume, and the ceiling a device has to be under
+# before this plugin will format it. The margin is generous on purpose: the
+# check is there to catch "this is a 2 TB VM disk", not to police alignment.
+use constant CONFIG_VOLUME_SIZE      => 1024 * 1024;
+use constant CONFIG_VOLUME_MAX_BYTES => 64 * 1024 * 1024;
 
 use constant MULTIPATH_CONF_DIR    => '/etc/multipath/conf.d';
 use constant MULTIPATH_CONF_MARKER => 'dellemc-multipath-config-version: ';
@@ -1357,7 +1364,24 @@ sub free_image {
     my $array_name = $class->_array_volname($storeid, $volname);
 
     my $vol = eval { $class->_array_get_volume($scfg, $array_name) };
+    my $lookup_error = $@;
+
+    # "The array says it is not there" and "the array did not answer" are not
+    # the same fact, and only the first one may be reported as a successful
+    # delete. PVE removes the disk from the VM configuration when free_image
+    # returns, so answering success here for an unreachable array loses the
+    # only reference anyone had to a volume that is still on it.
+    #
+    # Every family's lookup returns undef for "not found" and dies for
+    # anything else, so the error is what separates them.
     unless ($vol) {
+        die "Cannot delete volume '$volname': the array did not answer whether"
+          . " it still exists, so this cannot be reported as deleted. PVE would"
+          . " drop the disk from the VM configuration while the volume is still"
+          . " on the array. Retry once the array is reachable.\n"
+          . "  Array error: $lookup_error"
+            if $lookup_error;
+
         warn "Volume '$array_name' is not on the array; it may already have"
            . " been deleted\n";
         return undef;
@@ -2533,7 +2557,7 @@ sub _backup_vm_config {
     # snapshot.
     return 1 if eval { $class->_array_get_volume($scfg, $name) };
 
-    eval { $class->_array_create_volume($scfg, $storeid, $name, 1024 * 1024) };
+    eval { $class->_array_create_volume($scfg, $storeid, $name, CONFIG_VOLUME_SIZE) };
     if ($@) {
         warn "Failed to create the config backup volume: $@";
         return 0;
@@ -2554,7 +2578,8 @@ sub _backup_vm_config {
         $device = wait_for_multipath_device($wwid, %wait)
             or die "the device did not appear\n";
 
-        $class->_write_config_volume($device, $vmid, $snap, $content, $path);
+        $class->_write_config_volume($device, $vmid, $snap, $content, $path,
+            wwid => $wwid);
         eval { cleanup_lun_devices($wwid) };
         1;
     };
@@ -2575,11 +2600,65 @@ sub _backup_vm_config {
     return 1;
 }
 
+# The only place this plugin writes to a block device, so the only place a
+# wrong device costs data rather than an error message.
+#
+# Two independent checks before mkfs, because the device was resolved from a
+# WWID by a lookup that has fallbacks — multipathd may be unreachable, and the
+# /dev/disk/by-id glob behind it matches a substring. Both checks have to pass
+# and neither trusts the other's evidence:
+#
+#   1. The kernel's own opinion of what this device is: a dm uuid of
+#      'mpath-<wwid>', or the NAA in an sd device's wwid attribute / VPD 0x83.
+#   2. Its size. A config volume is 1 MB. A VM's disk is not.
+#
+# Anything that cannot be confirmed is refused. The caller already treats a
+# failed config backup as non-fatal and says so, so refusing costs a skipped
+# backup — against formatting a running VM's disk.
+# Size in bytes, bounded, or undef when it cannot be read. Reads sysfs rather
+# than opening the device: an open on a dm device whose paths are all down is
+# the uninterruptible sleep this module exists to avoid.
+sub _device_size_bytes {
+    my ($device) = @_;
+
+    my $name = eval {
+        PVE::Storage::Custom::DellEMC::Common::Multipath::_resolve_block_device_name($device)
+    };
+    return undef unless defined $name && length $name;
+
+    my $sectors = sysfs_read_with_timeout("/sys/block/$name/size", 3);
+    return undef unless defined $sectors && $sectors =~ /^\s*(\d+)\s*$/;
+
+    # /sys/block/*/size is always in 512-byte sectors, whatever the device's
+    # own logical block size is.
+    return $1 * 512;
+}
+
 sub _write_config_volume {
-    my ($class, $device, $vmid, $snap, $content, $source) = @_;
+    my ($class, $device, $vmid, $snap, $content, $source, %opts) = @_;
 
     my $mount = "/tmp/pve-dellemc-config-$$";
     my $mounted = 0;
+
+    my $wwid = $opts{wwid};
+    die "refusing to format '$device': no WWID was given to check it against."
+      . " This is a bug; the config backup is skipped rather than guessed at.\n"
+        unless defined $wwid && length $wwid;
+
+    unless (device_matches_wwid($device, $wwid)) {
+        die "refusing to format '$device': the kernel does not confirm it is"
+          . " the device for WWID $wwid. It was resolved by a lookup that has"
+          . " fallbacks, and this is the one operation here that destroys what"
+          . " it writes over, so an unconfirmed answer is treated as a wrong"
+          . " one.\n";
+    }
+
+    my $bytes = _device_size_bytes($device);
+    if (defined $bytes && $bytes > CONFIG_VOLUME_MAX_BYTES) {
+        die "refusing to format '$device': it is $bytes bytes. The config"
+          . " backup volume is " . CONFIG_VOLUME_SIZE . " bytes, so this is"
+          . " not it, whatever the WWID lookup said.\n";
+    }
 
     my $ok = eval {
         # 1 MB is too small for a journal.

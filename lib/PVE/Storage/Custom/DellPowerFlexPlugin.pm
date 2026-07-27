@@ -719,6 +719,10 @@ sub free_image {
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
 
+    # Deliberately not wrapped in eval: a lookup that cannot reach the array
+    # must fail the delete, not be read as "already gone". PVE removes the
+    # disk from the VM configuration when free_image returns, so a wrong
+    # "deleted" here loses the only reference to a volume still on the array.
     my $id = $api->volume_id_by_name($array_name, storeid => $storeid);
     unless ($id) {
         warn "Volume '$array_name' is not on the array; it may already have"

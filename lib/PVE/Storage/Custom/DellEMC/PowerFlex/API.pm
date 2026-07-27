@@ -452,9 +452,14 @@ sub volume_id_by_name {
 sub _volume_id_by_name_from_list {
     my ($self, $name, %opts) = @_;
 
-    my $rows = eval { $self->volume_list(%opts) } // [];
+    # If this listing fails too, the answer is unknown — not "absent".
+    # free_image reads undef here as "already deleted" and reports the delete
+    # as done, which makes PVE drop the disk from the VM configuration while
+    # the volume is still on the array. Swallowing the error would turn an
+    # unreachable array into exactly that.
+    my $rows = $self->volume_list(%opts);
 
-    for my $row (@$rows) {
+    for my $row (@{ ref($rows) eq 'ARRAY' ? $rows : [] }) {
         next unless ref($row) eq 'HASH';
         next unless defined $row->{name} && $row->{name} eq $name;
         return $row->{id};

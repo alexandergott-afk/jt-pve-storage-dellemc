@@ -27,7 +27,9 @@ our @EXPORT_OK = qw(
     multipath_reload_throttled
     multipath_resize_map
     multipath_flush
+    multipath_claim_wwid
     multipath_path_health
+    device_matches_wwid
     get_multipath_device
     get_device_by_wwid
     wait_for_multipath_device
@@ -493,6 +495,59 @@ sub multipath_reload {
         allow_nonzero => 1, ignore_errors => 1, timeout => $opts{timeout} // 30);
 
     return 1;
+}
+
+# Is $device really the device for $wwid?
+#
+# Asked immediately before anything WRITES to it. Every lookup in this module
+# resolves a WWID to a device, and each has a fallback: multipathd may be
+# unreachable, so /dev/disk/by-id is globbed instead, and that glob matches a
+# substring. A wrong answer there is harmless for a read and unrecoverable for
+# a write.
+#
+# So this asks the KERNEL what the device is, not the naming: a dm device
+# carries 'mpath-<wwid>' in /sys/block/<dm>/dm/uuid, and an sd device carries
+# the NAA in its own wwid attribute or VPD page 0x83.
+#
+# Returns 1 only on a positive match. Anything it cannot confirm — no sysfs
+# entry, a read that timed out, a device type it does not recognise — is 0.
+# A caller about to destroy data must treat "cannot confirm" as "no".
+sub device_matches_wwid {
+    my ($device, $wwid, %opts) = @_;
+
+    return 0 unless defined $device && defined $wwid && length $wwid;
+
+    my $name = _resolve_block_device_name($device) or return 0;
+    my $read_to = $opts{read_timeout} // SCAN_READ_TIMEOUT;
+
+    my $want = lc($wwid);
+    (my $naa = $want) =~ s/^3//;
+    return 0 unless length $naa >= 8;
+
+    # device-mapper: the uuid is authoritative and cheap.
+    if ($name =~ /^dm-\d+$/) {
+        my $uuid = sysfs_read_with_timeout("/sys/block/$name/dm/uuid", $read_to);
+        return 0 unless defined $uuid;
+        $uuid =~ s/^\s+|\s+$//g;
+        return 1 if lc($uuid) eq "mpath-$want";
+        return 1 if lc($uuid) =~ /^mpath-\Q$want\E\z/;
+        return 0;
+    }
+
+    # A single SCSI path, which is what a node with one path to the array has.
+    if ($name =~ /^sd[a-z]+$/) {
+        my $attr = sysfs_read_with_timeout("/sys/block/$name/device/wwid", $read_to);
+        if (defined $attr && length $attr) {
+            return 1 if lc($attr) =~ /\Q$naa\E/;
+        }
+
+        my $pg83 = sysfs_read_with_timeout("/sys/block/$name/device/vpd_pg83", $read_to);
+        if (defined $pg83 && length $pg83) {
+            return 1 if unpack('H*', $pg83) =~ /\Q$naa\E/i;
+        }
+    }
+
+    return 0;
 }
 
 # Tell multipathd about the paths belonging to ONE WWID.

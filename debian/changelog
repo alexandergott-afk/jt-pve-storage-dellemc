@@ -1,3 +1,27 @@
+jt-pve-storage-dellemc (0.7.44~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * An unreachable array made a delete report success. free_image checked
+    whether the volume existed inside an eval and read any failure as "it may
+    already have been deleted", then returned success. PVE removes the disk
+    from the VM configuration when free_image returns - so an array that was
+    briefly unreachable would have left the volume on the array with nothing
+    in PVE pointing at it. The data is intact and unreachable, which is the
+    worst shape a storage bug can take. "Not there" and "could not ask" are
+    now different answers.
+  * PowerFlex had the same hole one level deeper: the fallback volume listing
+    swallowed its own error and returned an empty list, which reads as
+    "absent".
+  * The config-backup volume is the only device this plugin writes to, and it
+    is now checked twice before mkfs: the kernel's own identification of the
+    device (dm uuid, or the NAA in an sd device's wwid attribute / VPD 0x83)
+    must confirm the WWID, and the device must be small enough to be a 1 MB
+    config volume. Anything unconfirmed is refused; a skipped config backup
+    is already non-fatal.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 13:44:24 +0800
+
 jt-pve-storage-dellemc (0.7.43~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

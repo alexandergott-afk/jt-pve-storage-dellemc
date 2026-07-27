@@ -7,6 +7,32 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.44~beta1] - 2026-07-27
+
+### Fixed
+- **An unreachable array made a delete report success.** `free_image` checked
+  whether the volume existed inside an `eval` and read *any* failure — including
+  a connection timeout — as "it may already have been deleted", then returned
+  success. PVE removes the disk from the VM configuration as soon as
+  `free_image` returns. So a momentary outage would have left the volume on the
+  array with nothing in PVE pointing at it: the data intact, and unreachable.
+  "The array says it is not there" and "the array could not be asked" are now
+  different answers, and only the first is a successful delete.
+- **PowerFlex had the same hole one level deeper.** Its fallback volume listing
+  swallowed its own error and returned an empty list, which the caller reads as
+  "absent". A fallback that cannot answer must say so, not answer no.
+
+### Added
+- **The one device this plugin writes to is now checked twice before `mkfs`.**
+  The config-backup volume is resolved from a WWID by a lookup with fallbacks —
+  multipathd may be unreachable, and the `/dev/disk/by-id` glob behind it
+  matches a substring. Before formatting, the kernel's own identification of
+  the device must confirm the WWID (a dm uuid of `mpath-<wwid>`, or the NAA in
+  an sd device's `wwid` attribute or VPD page 0x83), **and** the device must be
+  small enough to be a 1 MB config volume. Anything that cannot be confirmed is
+  refused — a skipped config backup is already treated as non-fatal, which is
+  the right price against formatting a running VM's disk.
+
 ## [0.7.43~beta1] - 2026-07-27
 
 ### Fixed
