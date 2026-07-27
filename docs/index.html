@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.52~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.53~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -460,21 +460,27 @@
         <div class="step__number">1</div>
         <div class="step__content">
             <div class="step__title">
-                <span class="lang-en">Get the package</span>
-                <span class="lang-zh">取得套件</span>
+                <span class="lang-en">Download the release package</span>
+                <span class="lang-zh">下載發行版套件</span>
             </div>
             <p>
-                <span class="lang-en">A prebuilt <code>.deb</code> is attached to every
-                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>,
-                    with a <code>SHA256SUMS</code> file beside it. Or build one from source:</span>
+                <span class="lang-en">Every
+                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
+                    carries a prebuilt <code>.deb</code> and a <code>SHA256SUMS</code> beside it. This is the package to install; it is the same build that was tested for that release.</span>
                 <span class="lang-zh">每個
                     <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
-                    都附有預先建置的 <code>.deb</code> 與 <code>SHA256SUMS</code>。也可以自行從原始碼建置：</span>
+                    都附有預先建置的 <code>.deb</code> 與 <code>SHA256SUMS</code>。請安裝這一份 —— 它就是該版本測試時所用的建置。</span>
             </p>
-            <pre><span class="cmd">git</span> clone https://github.com/jasoncheng7115/jt-pve-storage-dellemc.git
-<span class="cmd">cd</span> jt-pve-storage-dellemc
-<span class="cmd">make</span> test    <span class="comment"># syntax checks, unit tests, safety guard</span>
-<span class="cmd">make</span> deb</pre>
+            <pre><span class="comment"># with the .deb and SHA256SUMS downloaded from the release page</span>
+<span class="cmd">sha256sum</span> -c SHA256SUMS <span class="comment"># must say OK before installing</span></pre>
+            <p>
+                <span class="lang-en">Check the sum before installing: this package writes to <code>/etc/multipath/conf.d</code> and talks to your array.</span>
+                <span class="lang-zh">安裝前先核對雜湊值：這個套件會寫入 <code>/etc/multipath/conf.d</code>，也會與你的陣列通訊。</span>
+            </p>
+            <p>
+                <span class="lang-en">GitHub replaces <code>~</code> with <code>.</code> in an asset name, so the file is <code>..._0.7.52.beta1-1_all.deb</code> while the package version is <code>0.7.52~beta1-1</code>. Copy the name from the release page rather than building it from the version.</span>
+                <span class="lang-zh">GitHub 會把附件檔名裡的 <code>~</code> 換成 <code>.</code>，因此檔案是 <code>..._0.7.52.beta1-1_all.deb</code>，而套件版本是 <code>0.7.52~beta1-1</code>。請直接從 release 頁面複製檔名，不要自己用版本號拼。</span>
+            </p>
         </div>
     </div>
 
@@ -507,6 +513,19 @@
             </p>
         </div>
     </div>
+
+    <h3 class="subsection-title">
+        <span class="lang-en">Building from source</span>
+        <span class="lang-zh">從原始碼建置</span>
+    </h3>
+    <p>
+        <span class="lang-en">Only needed to work on the plugin, or to run the test suite against your own PVE version. For installing it, use the release package above &mdash; that is the build the release was tested with.</span>
+        <span class="lang-zh">只有在要修改這個外掛、或想針對你自己的 PVE 版本跑測試套件時才需要。單純安裝請用上面的發行版套件 &mdash; 那才是該版本測試時所用的建置。</span>
+    </p>
+    <pre><span class="cmd">git</span> clone https://github.com/jasoncheng7115/jt-pve-storage-dellemc.git
+<span class="cmd">cd</span> jt-pve-storage-dellemc
+<span class="cmd">make</span> test    <span class="comment"># syntax checks, unit tests, safety guard</span>
+<span class="cmd">make</span> deb</pre>
 </section>
 
 <!-- ---- Quick start ---- -->
@@ -987,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.53~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Install from the release package; building from source is for working on the plugin. Checking the live release also showed the documented verification step could not be carried out — SHA256SUMS is on no release — and that a URL built from the version number 404s.</span>
+            <span class="lang-zh">請安裝發行版套件；從原始碼建置是給要修改這個外掛的人用的。實際檢查線上 release 也發現文件寫的驗證步驟根本無法執行 —— 沒有任何 release 附上 SHA256SUMS —— 而且用版本號拼出來的網址會 404。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.52~beta1</div>

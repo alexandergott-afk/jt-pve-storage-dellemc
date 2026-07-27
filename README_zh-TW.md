@@ -6,7 +6,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 > ## ⚠️ BETA 版軟體 —— 安裝前請務必閱讀
 >
-> **這是 beta 版（0.7.52~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
+> **這是 beta 版（0.7.53~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
 >
 > **請不要安裝在正式環境的叢集，也不要指向存有重要資料的陣列。** 儲存外掛是以 root 權限執行的，它會在陣列上建立與刪除 volume，並在每一台節點上操作區塊裝置。這裡的缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態；而且因為 multipath 與 SCSI 狀態是全節點共用的，受害範圍不一定只限於本外掛自己的儲存。
 >
@@ -18,7 +18,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.7.52~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
+> **版本 0.7.53~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
 > 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
@@ -120,30 +120,46 @@ Proxmox VE 的儲存外掛在每一台節點上都是以 root 權限執行。本
 
 ## 安裝
 
-### 下載安裝包
+請從 [release 頁面](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases) 安裝套件。那一份就是該版本測試時所用的建置；從原始碼建置是給要修改這個外掛的人用的，不是安裝用的。
 
-每個 [release](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases) 都附有預先建置的 `.deb`，請以旁邊的 `SHA256SUMS` 檔案驗證下載內容。
+### 1. 下載並驗證
+
+請從 release 頁面下載 `.deb` 以及旁邊的 `SHA256SUMS`，然後：
+
+```bash
+sha256sum -c SHA256SUMS       # 顯示 OK 之後才安裝
+```
+
+GitHub 會把附件檔名裡的 `~` 換成 `.`，所以 release 頁面上的檔案是 `jt-pve-storage-dellemc_0.7.52.beta1-1_all.deb`，而套件版本是 `0.7.53~beta1-1`。請直接從 release 頁面複製確切檔名，不要自己用版本號拼。
+
+請確實核對雜湊值。這個套件會寫入 `/etc/multipath/conf.d`，也會與你的陣列通訊。
+
+### 2. 在每一台節點上安裝
 
 ```bash
 apt install ./jt-pve-storage-dellemc_<version>_all.deb
 ```
 
-### 或從原始碼建置
+叢集內**每一台**節點都要裝。少裝的節點會回應「Parameter verification failed (400)」或「No such storage」，也無法成為線上遷移的目的地。
+
+請使用 `apt install ./file.deb`，不要用 `dpkg -i`：`dpkg -i` 不會自動安裝相依套件，缺少的執行檔會等到外掛實際操作時才以難以解讀的錯誤浮現。
+
+### 3. 升級之後
+
+```bash
+systemctl restart pvestatd
+```
+
+每一台節點都要執行 —— reload 無法可靠地替換已載入記憶體的 Perl 模組。
+
+### 從原始碼建置
+
+只有在要修改這個外掛、或想針對你自己的 PVE 版本跑測試套件時才需要。
 
 ```bash
 make test            # 對每個模組跑 perl -c，並執行 multipath 安全檢查
 make deb             # 產出 ../jt-pve-storage-dellemc_<version>_all.deb
 ```
-
-在**每一台**節點上安裝：
-
-```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
-```
-
-請使用 `apt install ./file.deb`，不要用 `dpkg -i`：`dpkg -i` 不會自動安裝相依套件，缺少的執行檔會等到外掛實際操作時才以難以解讀的錯誤浮現。
-
-升級後請在每一台節點執行 `systemctl restart pvestatd`；reload 無法可靠地替換已載入記憶體的 Perl 模組。
 
 ---
 

@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.52~beta1). It has never been run against a
+> **This is a beta release (0.7.53~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.52~beta1 — three storage types are code complete, and
+> **Version 0.7.53~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
@@ -195,35 +195,60 @@ trademarks of Proxmox Server Solutions GmbH.
 
 ## Installation
 
-### Download a package
+Install the package from the
+[release page](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases).
+That is the build the release was tested with; building from source is for
+working on the plugin, not for installing it.
 
-Prebuilt `.deb` packages are attached to each
-[release](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases).
-Verify the download against the `SHA256SUMS` file published beside it.
+### 1. Download and verify
+
+Download the `.deb` and the `SHA256SUMS` beside it from the release page,
+then:
+
+```bash
+sha256sum -c SHA256SUMS       # must say OK before you install
+```
+
+GitHub replaces `~` with `.` in an asset name, so the file on the release page
+is `jt-pve-storage-dellemc_0.7.52.beta1-1_all.deb` while the package version is
+`0.7.53~beta1-1`. Copy the exact name from the release page rather than
+building it from the version.
+
+Check the sum. This package writes to `/etc/multipath/conf.d` and talks to
+your array.
+
+### 2. Install on every node
 
 ```bash
 apt install ./jt-pve-storage-dellemc_<version>_all.deb
 ```
 
-### Or build from source
-
-```bash
-make test            # perl -c on every module + multipath safety guard
-make deb             # produces ../jt-pve-storage-dellemc_<version>_all.deb
-```
-
-Install on **every** node:
-
-```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
-```
+**Every** node in the cluster. One without the package answers "Parameter
+verification failed (400)" or "No such storage", and cannot be a live
+migration target.
 
 Use `apt install ./file.deb`, not `dpkg -i`: `dpkg -i` does not pull in
 dependencies, and the missing binaries only surface later as failures deep
 inside the plugin.
 
-After an upgrade, run `systemctl restart pvestatd` on every node — a reload
-does not reliably replace already-loaded Perl modules.
+### 3. After an upgrade
+
+```bash
+systemctl restart pvestatd
+```
+
+On every node — a reload does not reliably replace already-loaded Perl
+modules.
+
+### Building from source
+
+Only needed to work on the plugin, or to run the test suite against your own
+PVE version.
+
+```bash
+make test            # perl -c on every module + multipath safety guard
+make deb             # produces ../jt-pve-storage-dellemc_<version>_all.deb
+```
 
 ---
 

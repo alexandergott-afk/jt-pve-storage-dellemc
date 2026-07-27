@@ -20,9 +20,14 @@ English: [QUICKSTART.md](QUICKSTART.md)
 
 ## 2. 在每一台節點安裝
 
+請從 [release 頁面](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases) 取得 `.deb` —— 那一份就是該版本測試時所用的建置 —— 並在安裝前先驗證：
+
 ```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
+sha256sum -c SHA256SUMS       # 必須顯示 OK
+apt install ./jt-pve-storage-dellemc_*_all.deb
 ```
+
+GitHub 會把附件檔名裡的 `~` 換成 `.`，所以檔案叫 `..._0.7.52.beta1-1_all.deb`，而版本是 `0.7.52~beta1-1`。請從 release 頁面複製檔名。
 
 請使用 `apt install ./file.deb` 而非 `dpkg -i`：`dpkg -i` 不會安裝相依套件，缺少的執行檔要等到很後面才會以外掛內部的錯誤形式浮現。
 

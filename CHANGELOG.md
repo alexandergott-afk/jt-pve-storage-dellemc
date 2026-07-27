@@ -7,6 +7,31 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.53~beta1] - 2026-07-27
+
+### Changed
+- **The documentation installs from the release package first.** Building from
+  source is now presented as what it is — something you do to work on the
+  plugin or to run the suite against your own PVE version — rather than as the
+  first thing an installer reads. The release `.deb` is the build that version
+  was tested with. Changed in the docs site, both READMEs and both QUICKSTARTs
+  so all four agree.
+
+### Fixed
+Checking the live release page found two things the documentation had wrong.
+
+- **`SHA256SUMS` is on no release.** It is listed for upload in the workflow
+  and has been since the first one, yet every published release carries only
+  the `.deb` — so the verification step the docs asked for could not be
+  carried out at all. The workflow now checks the file exists and is non-empty
+  before publishing, and sets `fail_on_unmatched_files`, so a release either
+  has it or fails loudly.
+- **GitHub replaces `~` with `.` in an asset name.** The file is
+  `..._0.7.52.beta1-1_all.deb` while the package version is `0.7.52~beta1-1`,
+  so any command built from the version number 404s — which is what the
+  documented `curl` did. The docs now say to copy the name from the release
+  page, and say why.
+
 ## [0.7.52~beta1] - 2026-07-27
 
 ### Fixed

@@ -23,9 +23,19 @@ On the array:
 
 ## 2. Install on every node
 
+Take the `.deb` from the
+[release page](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases)
+— that is the build the release was tested with — and verify it before
+installing:
+
 ```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
+sha256sum -c SHA256SUMS       # must say OK
+apt install ./jt-pve-storage-dellemc_*_all.deb
 ```
+
+GitHub replaces `~` with `.` in asset names, so the file is named
+`..._0.7.52.beta1-1_all.deb` while the version is `0.7.52~beta1-1`. Copy the
+name from the release page.
 
 Use `apt install ./file.deb` rather than `dpkg -i`: `dpkg -i` does not install
 dependencies, and the missing binaries only surface much later as failures

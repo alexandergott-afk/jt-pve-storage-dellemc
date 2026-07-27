@@ -1,3 +1,23 @@
+jt-pve-storage-dellemc (0.7.53~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The documentation now installs from the release package first and treats
+    building from source as what it is: something you do to work on the
+    plugin, not to install it. The release .deb is the build that version was
+    tested with.
+  * Checking the live release found two things the documentation got wrong.
+    SHA256SUMS was listed for upload but is on no release - every published
+    release has only the .deb - so the verification step the docs asked for
+    could not be carried out. The workflow now fails if the file is missing
+    or empty rather than publishing without it.
+  * GitHub replaces '~' with '.' in an asset name, so the file is
+    ..._0.7.52.beta1-1_all.deb while the package version is 0.7.52~beta1-1.
+    Any command built from the version number 404s, which is what the
+    documented one did.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 19:55:36 +0800
+
 jt-pve-storage-dellemc (0.7.52~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

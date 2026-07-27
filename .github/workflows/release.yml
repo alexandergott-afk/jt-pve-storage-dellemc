@@ -73,11 +73,21 @@ jobs:
 
       - name: Collect artefacts
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           cp ../jt-pve-storage-dellemc_*_all.deb artifacts/
           cd artifacts
           sha256sum *.deb > SHA256SUMS
           ls -la
+
+          # The release page tells people to verify against this file, so a
+          # release without it is a release whose instructions do not work.
+          # Releases up to 0.7.52 were published without it even though it was
+          # listed for upload, and nothing failed — so this checks rather than
+          # assumes.
+          test -s SHA256SUMS
+          echo "SHA256SUMS contents:"
+          cat SHA256SUMS
 
       - name: Upload build artefact
         uses: actions/upload-artifact@v4
@@ -94,6 +104,7 @@ jobs:
           files: |
             artifacts/*.deb
             artifacts/SHA256SUMS
+          fail_on_unmatched_files: true
           # Every 0.x release is a prerelease: nothing has been verified
           # against physical hardware yet. 1.0.0 is the on-hardware test
           # pass, so that is when this stops being true.
