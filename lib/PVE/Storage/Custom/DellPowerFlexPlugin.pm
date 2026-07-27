@@ -1453,6 +1453,55 @@ sub volume_has_feature {
     return 0;
 }
 
+# LXC freezes a container's filesystem before a snapshot only when the storage
+# says it needs it. PVE::LXC::Config asks this, and nothing else does — a VM's
+# consistency is QEMU's business, a container's is the host's.
+#
+# A container's root filesystem is mounted ON THIS HOST and is being written
+# to while the array takes its snapshot. Without a freeze the snapshot is
+# crash-consistent at best: it needs a journal replay on restore and can still
+# have lost writes the container believed were committed.
+#
+# ZFSPlugin — the other plugin where an external appliance takes the snapshot
+# — answers the same way, for the same reason.
+sub volume_snapshot_needs_fsfreeze { return 1 }
+
+# Moving a volume to a storage of another type, `pvesm export`/`import`, and
+# remote migration all go through PVE::Storage::storage_migrate, which asks
+# both storages what transfer formats they have in common. The base class
+# answers "none" for a storage without a 'path', so every one of those was
+# refused before reaching any code here.
+#
+# A volume here is a raw block device, exactly as it is for LVM and RBD, and
+# both of those declare 'raw+size' and let the base class do the transfer
+# through path(). This does the same.
+sub volume_import_formats {
+    my ($class, $scfg, $storeid, $volname, $snapshot, $base_snapshot,
+        $with_snapshots) = @_;
+
+    # Snapshots do not travel with the volume: they live on the array and this
+    # plugin does not keep them as a chain of files.
+    return () if $with_snapshots;
+
+    # A linked clone has no standalone content to send — its base lives on the
+    # array it is being moved away from.
+    return () if defined($base_snapshot);
+
+    return ('raw+size');
+}
+
+sub volume_export_formats {
+    my ($class, $scfg, $storeid, $volname, $snapshot, $base_snapshot,
+        $with_snapshots) = @_;
+
+    # Exporting a snapshot would mean handing out a device for it, which needs
+    # a temporary clone on the array. LVM refuses the same case; so does this.
+    return () if defined($snapshot);
+
+    return $class->volume_import_formats($scfg, $storeid, $volname, $snapshot,
+        $base_snapshot, $with_snapshots);
+}
+
 sub storage_can_replicate { return 0 }
 
 1;

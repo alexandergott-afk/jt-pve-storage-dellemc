@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.49~beta1] - 2026-07-27
+
+### Fixed
+- **LXC container snapshots were taken of a live filesystem.**
+  `PVE::LXC::Config` freezes a container's mountpoints before a snapshot only
+  when the storage answers `volume_snapshot_needs_fsfreeze`. The base class
+  answers 0 and this plugin never overrode it — while a container's root is
+  mounted *on this host* and being written to as the array snapshots it. The
+  result was crash-consistent at best: a journal replay on restore, and writes
+  the container believed were committed possibly gone. All three types answer
+  1 now, as `ZFSPlugin` does for the same reason.
+- **Moving a disk to a storage of another type was refused before any code
+  here ran**, along with `pvesm export`/`import` and remote migration.
+  `storage_migrate` asks both storages for their common transfer formats, and
+  the base class answers "none" for a storage without a `path`. LVM and RBD are
+  raw block storage without a `path` too, and both declare `raw+size`; so does
+  this now. Transferring snapshots with the volume, and a linked clone on its
+  own, are still refused — neither has standalone content to send.
+
+### Added
+- `t/15-pve-contract.t` checks both against the installed PVE, including that
+  the transfer format matches what `LVMPlugin` offers for a raw volume.
+- `CLAUDE.md`: a base method can be wrong here by being *useless* rather than
+  by dying. Several return `()` or 0 when `$scfg->{path}` is unset, which
+  silently refuses a whole feature. Compare against `LVMPlugin` and
+  `RBDPlugin` — the two that are also block storage without a path.
+
 ## [0.7.48~beta1] - 2026-07-27
 
 ### Fixed

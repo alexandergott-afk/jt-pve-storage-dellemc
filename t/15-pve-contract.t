@@ -316,4 +316,60 @@ for my $plugin (@PLUGINS) {
         "$plugin does not offer to snapshot a base image itself");
 }
 
+# ---------------------------------------------------------------------------
+# Methods PVE calls that the base class answers uselessly for a storage
+# without a 'path'
+# ---------------------------------------------------------------------------
+
+for my $plugin (@PLUGINS) {
+    my $scfg = {};
+
+    # LXC freezes a container's filesystem before a snapshot only if the
+    # storage asks it to. A container's root is mounted on THIS host and is
+    # being written to while the array snapshots it; without the freeze the
+    # snapshot is crash-consistent at best. ZFSPlugin, the other plugin where
+    # an external appliance takes the snapshot, answers 1.
+    ok($plugin->volume_snapshot_needs_fsfreeze(),
+        "$plugin asks LXC to freeze a container before a snapshot")
+        or diag('PVE::LXC::Config only freezes mountpoints when this is true;'
+              . ' 0 means container snapshots are taken of a live filesystem');
+
+    # storage_migrate asks both storages for their common transfer formats.
+    # The base class answers "none" for a storage without a 'path', which
+    # refuses every disk move to another storage type, pvesm export/import,
+    # and remote migration before any code here is reached.
+    my @export = $plugin->volume_export_formats($scfg, 'st', 'vm-100-disk-0',
+        undef, undef, 0);
+    is_deeply(\@export, ['raw+size'],
+        "$plugin offers a transfer format, as LVM and RBD do");
+
+    my @import = $plugin->volume_import_formats($scfg, 'st', 'vm-100-disk-0',
+        undef, undef, 0);
+    is_deeply(\@import, ['raw+size'], "$plugin accepts the same one");
+
+    # What must still be refused.
+    is_deeply([$plugin->volume_export_formats($scfg, 'st', 'vm-100-disk-0',
+        undef, undef, 1)], [],
+        "$plugin does not claim to transfer snapshots with the volume");
+    is_deeply([$plugin->volume_export_formats($scfg, 'st',
+        'base-100-disk-0/vm-101-disk-0', undef, 'base-100-disk-0', 0)], [],
+        "$plugin does not claim to transfer a linked clone on its own");
+    is_deeply([$plugin->volume_export_formats($scfg, 'st', 'vm-100-disk-0',
+        'snap1', undef, 0)], [],
+        "$plugin does not claim to export a snapshot directly");
+}
+
+# And the same answers as the plugins PVE ships for raw block volumes, read
+# off the installed source rather than remembered.
+SKIP: {
+    skip 'LVMPlugin is not installed', 1
+        unless eval { require PVE::Storage::LVMPlugin; 1 };
+
+    my @lvm = PVE::Storage::LVMPlugin->volume_import_formats(
+        {}, 'st', 'vm-100-disk-0', undef, undef, 0);
+    is_deeply([$PLUGINS[0]->volume_import_formats({}, 'st', 'vm-100-disk-0',
+        undef, undef, 0)], \@lvm,
+        'the transfer format matches what LVMPlugin offers for a raw volume');
+}
+
 done_testing();

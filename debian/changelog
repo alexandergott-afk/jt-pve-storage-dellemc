@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.49~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * LXC container snapshots were taken of a live filesystem. PVE::LXC::Config
+    freezes a container's mountpoints before a snapshot only when the storage
+    answers volume_snapshot_needs_fsfreeze; the base class answers 0 and this
+    plugin never overrode it. A container's root is mounted on this host and
+    is being written to while the array snapshots it, so the result was
+    crash-consistent at best. All three types answer 1 now, as ZFSPlugin -
+    the other plugin where an external appliance takes the snapshot - does.
+  * Moving a disk to a storage of another type, pvesm export/import and
+    remote migration were all refused before reaching any code here.
+    storage_migrate asks both storages for their common transfer formats, and
+    the base class answers "none" for a storage without a path. LVM and RBD
+    are raw block storage without a path too, and both declare raw+size; so
+    does this now. Snapshots, and a linked clone on its own, are still
+    refused.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 16:02:27 +0800
+
 jt-pve-storage-dellemc (0.7.48~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
