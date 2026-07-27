@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.42~beta1] - 2026-07-27
+
+### Fixed
+- **No multipath operation touches a map this plugin does not own**, except
+  one that cannot be narrowed. `multipathd reconfigure` re-reads every
+  configuration file and reapplies it to every map on the node — other
+  vendors' storage and an operator's own hand-built maps included — and it was
+  being used to make a newly-mapped LUN appear: **on a timer** in
+  `activate_storage`, and on every device wait. Both are gone. A new LUN is
+  claimed with `multipathd add path <sdX>`, for the paths of that one WWID.
+- The one remaining node-wide reconfigure runs only after this plugin's own
+  `conf.d` drop-in changes — multipathd has no per-file reload — and it now
+  says in the log that it is node-wide, and why it is unavoidable there.
+
+### Added
+- `make check-multipath-flush` also fails the build on the `multipathd` form
+  of a node-wide flush, which this plugin must **never** generate. It removes
+  every unused map on the node — other vendors' storage included — under a
+  name the old guard did not recognise.
+- `t/03-multipath.t` asserts that exactly one node-wide reconfigure remains in
+  `BlockBase`, and that claiming a WWID's paths issues no reconfigure at all.
+- `t/11-imports.t` fails on a subroutine defined twice in one file. Perl keeps
+  the last definition and warns on every load — once per `pvesm` call — while
+  the first becomes dead code that still reads like the live one. A helper
+  added during this work hit exactly that; it is gone, and the module's
+  existing one is used instead, which is vendor-gated and strictly better.
+
 ## [0.7.41~beta1] - 2026-07-27
 
 ### Added

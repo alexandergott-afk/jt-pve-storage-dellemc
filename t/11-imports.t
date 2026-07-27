@@ -134,4 +134,30 @@ for my $file (sort @files) {
         or diag(join("\n  ", '', @prose));
 }
 
+# A subroutine defined twice in one file.
+#
+# Perl takes the last definition and warns "Subroutine ... redefined" — on
+# every load, which for a storage plugin is every pvesm call. Worse, the
+# earlier definition becomes dead code that still reads like the live one, so
+# the next person to edit it edits the wrong copy. This shipped once, when a
+# helper was added without noticing the module already had one by that name.
+for my $file (sort @files) {
+    open(my $fh, '<', $file) or next;
+    my $source = do { local $/; <$fh> };
+    close($fh);
+
+    $source =~ s/^__END__.*//ms;
+
+    my %seen;
+    my @duplicates;
+    while ($source =~ /^sub\s+(\w+)\s*\{/mg) {
+        my $name = $1;
+        push @duplicates, $name if $seen{$name}++ == 1;
+    }
+
+    is_deeply(\@duplicates, [], "$file: no subroutine is defined twice")
+        or diag('Perl keeps the LAST one and warns on every load; the first'
+              . " becomes dead code that still looks live: @duplicates");
+}
+
 done_testing();

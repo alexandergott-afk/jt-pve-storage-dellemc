@@ -43,7 +43,6 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     remove_scsi_device
     udev_refresh
     multipath_reload
-    multipath_reload_throttled
     multipath_resize_map
     get_multipath_device
     get_device_by_wwid
@@ -498,8 +497,16 @@ sub _ensure_multipath_config {
     }
 
     warn "Wrote multipath configuration $file\n";
-    # restart, never reload: reload re-reads the file without reapplying
-    # device-mapper state.
+
+    # The one place a host-wide reconfigure is justified: multipathd has no
+    # per-file reload, so a drop-in it has not read is a drop-in that does
+    # nothing. This runs only when the file's content actually changed —
+    # install, upgrade, a version bump — and never on a poll. Say so, because
+    # a reconfigure reapplies configuration to every map on the node,
+    # including storage this plugin has nothing to do with.
+    warn "Asking multipathd to re-read its configuration. This is node-wide;"
+       . " it is the only way to make a new drop-in take effect, and it"
+       . " happens only when $file changes.\n";
     eval { multipath_reload() };
 
     return 1;
@@ -649,7 +656,11 @@ sub _activate_fc {
         $class->_mark_rescan($storeid);
         eval { rescan_fc_hosts(delay => 1) };
         eval { rescan_scsi_hosts(delay => 1) };
-        multipath_reload_throttled();
+        # No 'multipathd reconfigure' here. It is host-wide — it reapplies
+        # configuration to every map on the node, another vendor's storage
+        # included — and this runs on a timer whether or not anything changed.
+        # udev claims new paths on its own; a device that still has not
+        # appeared is dealt with, by name, in wait_for_multipath_device.
         udev_refresh();
     }
 
@@ -757,7 +768,7 @@ sub _activate_iscsi {
         $class->_mark_rescan($storeid);
         eval { rescan_sessions() };
         eval { rescan_scsi_hosts(delay => 1) };
-        multipath_reload_throttled();
+        # Host-wide reconfigure deliberately absent; see _activate_fc.
         udev_refresh();
     }
 

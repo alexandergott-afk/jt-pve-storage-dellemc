@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.41~beta1
+VERSION = 0.7.42~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -92,18 +92,21 @@ unit:
 # `multipath -f /dev/mapper/<wwid>`. Prose that forbids the command is allowed
 # through: such a line must carry never (any case) / 不得 / 不要 / 禁止.
 check-multipath-flush:
-	@echo "Checking for forbidden system-wide multipath flush..."
-	@hits=$$(grep -rnE 'multipath[[:space:]]+(-[A-Za-z]*F|--flush)' \
+	@echo "Checking for forbidden system-wide multipath operations..."
+	@hits=$$(grep -rnE "multipath[[:space:]]+(-[A-Za-z]*F|--flush)|(multipathd|MULTIPATHD)['\", ]*(remove|del)['\", ]+(maps|multipaths)" \
 		$(GUARD_PATHS) --exclude-dir=.git --binary-files=without-match 2>/dev/null \
 		| grep -viE 'never|不得|不要|不會|絕不|禁止' || true); \
 	if [ -n "$$hits" ]; then \
-		echo "ERROR: forbidden system-wide multipath flush found:"; \
+		echo "ERROR: forbidden node-wide multipath operation found:"; \
 		echo "$$hits" | sed 's/^/  /'; \
 		echo ""; \
-		echo "Flush a single map instead: multipath -f /dev/mapper/<wwid>"; \
+		echo "These remove EVERY unused map on the node, including other"; \
+		echo "vendors' storage. Act on one named map instead:"; \
+		echo "  multipath -f /dev/mapper/<wwid>"; \
+		echo "  multipathd remove map <name>"; \
 		exit 1; \
 	fi; \
-	echo "  OK: no system-wide multipath flush found."
+	echo "  OK: no node-wide multipath flush found."
 
 # Everything that must pass before a release, including the checks that catch
 # a half-finished version bump. See docs/RELEASE_TESTING.md; this target is

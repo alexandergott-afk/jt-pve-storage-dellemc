@@ -1,3 +1,29 @@
+jt-pve-storage-dellemc (0.7.42~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * No multipath operation touches a map this plugin does not own, except
+    one that cannot be narrowed. 'multipathd reconfigure' re-reads every
+    configuration file and reapplies it to every map on the node - other
+    vendors' storage included - and it was being used to make a newly-mapped
+    LUN appear: on a timer in activate_storage, and on every device wait.
+    Both are gone. A new LUN is claimed with 'multipathd add path <sdX>' for
+    the paths of that one WWID.
+  * The remaining reconfigure runs only after this plugin's own conf.d
+    drop-in changes, because multipathd has no per-file reload, and it now
+    says in the log that it is node-wide and why.
+  * make check-multipath-flush also fails the build on the multipathd form
+    of a node-wide flush, which this plugin must never generate: it removes
+    every unused map on the node, other vendors' storage included.
+  * A test asserts exactly one node-wide reconfigure remains in BlockBase.
+  * A helper added in this work duplicated one the module already had, which
+    Perl resolves by keeping the last and warning on every load - once per
+    pvesm call. The duplicate is gone (the existing one is vendor-gated and
+    strictly better) and t/11-imports.t now fails on any subroutine defined
+    twice in a file.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 12:34:42 +0800
+
 jt-pve-storage-dellemc (0.7.41~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

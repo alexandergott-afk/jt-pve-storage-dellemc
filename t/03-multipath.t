@@ -309,4 +309,86 @@ CONF
     is($answer, undef, 'and the setting reads as unknown');
 }
 
+# ---------------------------------------------------------------------------
+# Nothing this plugin does may disturb another storage's multipath maps
+#
+# 'multipathd reconfigure' re-reads every configuration file and reapplies it
+# to every map on the node — another vendor's storage included. It used to be
+# how a newly-mapped LUN was made to appear, on a timer and on every device
+# wait. Claiming the paths for one WWID by name does the same job and touches
+# nothing else.
+# ---------------------------------------------------------------------------
+
+{
+    no warnings 'redefine', 'once';
+
+    my @commands;
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd = sub {
+        my ($cmd) = @_;
+        push @commands, join(' ', @$cmd);
+        return ('', '', 0);
+    };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::get_scsi_paths_for_wwid =
+        sub { ['/dev/sdb', '/dev/sdc'] };
+
+    my $n = PVE::Storage::Custom::DellEMC::Common::Multipath::multipath_claim_wwid(
+        '3600abc0000000001');
+
+    is($n, 2, 'every path found for the WWID is offered to multipathd');
+    is_deeply(\@commands, [
+        '/sbin/multipathd add path sdb',
+        '/sbin/multipathd add path sdc',
+    ], 'by name, one at a time');
+
+    unlike(join(' ', @commands), qr/reconfigure/,
+        'and never with a node-wide reconfigure')
+        or diag('a reconfigure reapplies configuration to every map on the'
+              . ' node, including storage this plugin does not manage');
+}
+
+{
+    # No paths for the WWID: nothing to claim, and nothing node-wide as a
+    # consolation prize.
+    no warnings 'redefine', 'once';
+
+    my @commands;
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd =
+        sub { push @commands, join(' ', @{ $_[0] }); return ('', '', 0) };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::get_scsi_paths_for_wwid =
+        sub { [] };
+
+    is(PVE::Storage::Custom::DellEMC::Common::Multipath::multipath_claim_wwid('3600x'),
+        0, 'no paths means nothing claimed');
+    is_deeply(\@commands, [], 'and no command at all is run');
+}
+
+# The periodic rescan in activate_storage must not reconfigure the node. It
+# runs on a timer whether or not anything changed, so a node-wide operation
+# there is a node-wide operation every few minutes, forever.
+{
+    my $source = '';
+    for my $path ('lib/PVE/Storage/Custom/DellEMC/Common/BlockBase.pm',
+                  '../lib/PVE/Storage/Custom/DellEMC/Common/BlockBase.pm') {
+        next unless open(my $fh, '<', $path);
+        local $/;
+        $source = <$fh>;
+        close($fh);
+        last;
+    }
+
+  SKIP: {
+        skip 'BlockBase.pm is not readable from here', 2 unless length $source;
+
+        # One call site only: the drop-in writer, where there is no
+        # alternative because multipathd has no per-file reload.
+        my $calls = () = $source =~ /^\s*(?:eval \{\s*)?multipath_reload\(/mg;
+        is($calls, 1, 'exactly one node-wide reconfigure remains in BlockBase')
+            or diag("found $calls; the only justified one is after writing"
+                  . " this plugin's own multipath drop-in");
+
+        unlike($source, qr/multipath_reload_throttled\(/,
+            'and the periodic rescan paths do not reconfigure the node');
+    }
+}
+
 done_testing();

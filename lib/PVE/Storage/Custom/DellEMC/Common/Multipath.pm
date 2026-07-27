@@ -495,8 +495,46 @@ sub multipath_reload {
     return 1;
 }
 
+# Tell multipathd about the paths belonging to ONE WWID.
+#
+# This is what a host-wide reconfigure was being used for: making a
+# newly-mapped LUN appear. 'multipathd add path' names a single device, so a
+# node that also has another vendor's storage on it is not disturbed to find
+# this plugin's disk — which is the rule this whole module is built around.
+#
+# Returns the number of paths offered to multipathd.
+sub multipath_claim_wwid {
+    my ($wwid, %opts) = @_;
+
+    # get_scsi_paths_for_wwid is vendor-gated: it walks /sys/block, checks the
+    # vendor string before looking at anything else, and matches the WWID
+    # against the device's own wwid attribute or VPD page 0x83. So the paths
+    # handed to multipathd here cannot belong to another vendor's storage even
+    # if a WWID collided.
+    my $paths = get_scsi_paths_for_wwid($wwid, %opts);
+    return 0 unless ref($paths) eq 'ARRAY' && @$paths;
+
+    for my $path (@$paths) {
+        my ($node) = $path =~ m{([a-zA-Z0-9_+-]+)\z};
+        next unless $node;
+        eval {
+            _run_cmd([MULTIPATHD, 'add', 'path', $node],
+                allow_nonzero => 1, ignore_errors => 1,
+                timeout => $opts{timeout} // 10);
+        };
+    }
+
+    return scalar @$paths;
+}
+
 # Rate-limited reconfigure for discovery and polling paths. Returns 1 when a
 # reconfigure was issued, 0 when the cooldown suppressed it.
+#
+# HOST-WIDE. 'multipathd reconfigure' re-reads every configuration file and
+# reapplies it to every map on the node, including other vendors' storage.
+# The only thing that legitimately needs it is a change to this plugin's own
+# drop-in, because there is no per-file reload — so it is not used to make a
+# device appear. multipath_claim_wwid does that, one named path at a time.
 sub multipath_reload_throttled {
     my (%opts) = @_;
 
@@ -746,10 +784,14 @@ sub wait_for_multipath_device {
         return $device if $device;
         last if time() >= $deadline;
 
-        # Step 4: host-wide reconfigure. Skipped on the first round and rate
-        # limited process-wide so concurrent callers cannot storm it.
-        if ($round >= 2) {
-            multipath_reload_throttled();
+        # Step 4: offer multipathd the paths for THIS WWID by name.
+        #
+        # This used to be a host-wide 'multipathd reconfigure', which reapplies
+        # configuration to every map on the node — another vendor's storage
+        # included — to find one disk of ours. Naming the paths does the same
+        # job for the device actually being waited on and touches nothing else.
+        if ($round >= 2 && defined $wwid) {
+            eval { multipath_claim_wwid($wwid) };
             $device = $probe->();
             return $device if $device;
         }

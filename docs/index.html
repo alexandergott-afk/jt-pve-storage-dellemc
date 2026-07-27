@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.41~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.42~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.42~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A node-wide multipath reconfigure was being used to make one LUN appear — on a timer, and on every device wait. It reapplies configuration to every map on the node, other vendors' storage included. A new LUN is now claimed one named path at a time.</span>
+            <span class="lang-zh">原本用一個「節點層級」的 multipath reconfigure 去讓單一 LUN 出現 —— 而且是依計時器執行、每次等待裝置也執行。它會把設定重新套用到節點上的每一個 map，包含其他廠牌的儲存。現在改為逐一指名路徑來認領新的 LUN。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.41~beta1</div>
