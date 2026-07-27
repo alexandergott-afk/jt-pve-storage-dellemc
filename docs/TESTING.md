@@ -209,6 +209,8 @@ the rest:
 | `ilike` wildcard | every example in the guide spells it `*` (`?name=ilike.User*`), which is what this plugin sends |
 | Parameters | `select` (comma-separated attributes), `order`, `async` |
 | Endpoints | every path this plugin uses appears verbatim in Dell's `python-powerstore` SDK: `/login_session`, `/logout`, `/cluster`, `/appliance`, `/volume`, `/volume/{id}`, `/volume/{id}/attach`, `/detach`, `/restore`, `/snapshot`, `/clone`, `/host`, `/host/{id}`, `/host_group`, `/host_volume_mapping`, `/ip_pool_address`, `/ip_port/{id}`, `/job/{id}` |
+| Request bodies | the same SDK's `provisioning.py` sends exactly these: volume create `{name, size, appliance_id, volume_group_id, performance_policy_id, protection_policy_id, description}`; attach/detach `{host_id \| host_group_id, logical_unit_number}`; restore `{from_snap_id, create_backup_snap}`; clone `{name}`; snapshot `{name}`; host create `{name, os_type, initiators}`; add an initiator PATCH `{add_initiators}` |
+| Initiators | `[{port_name, port_type}]` with `port_type` one of `iSCSI`, `FC`, `NVMe`, and `os_type` one of `Windows`, `Linux`, `ESXi`, `AIX`, `HP-UX`, `Solaris` — the enums `ansible-powerstore` documents |
 | Metrics | `POST /metrics/generate` with `{entity, entity_id, interval}`. `space_metrics_by_cluster` is an **entity name for that call**, not a REST collection — reading it as one is what this plugin used to do |
 | Pagination | `limit` (1–2000, default 100) and `offset` URL parameters, or a `Range` request header |
 | Partial results | a collection larger than the limit answers `206 Partial Content` with `Content-Range: 0-99/1000` — the figure after the slash is the total |

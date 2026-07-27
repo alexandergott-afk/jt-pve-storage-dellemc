@@ -1,3 +1,19 @@
+jt-pve-storage-dellemc (0.7.39~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The whole PowerStore request surface is now confirmed against Dell's own
+    python-powerstore SDK and ansible-powerstore collection: every endpoint
+    path, every request body, and the initiator port_type and os_type enums.
+    All of them already matched. docs/TESTING.md lists them so the first
+    tester knows which failures cannot be a wrong request shape.
+  * volume_create passed no options through to the transport, so a per-call
+    timeout had no effect on it.
+  * What remains unverified for PowerStore is the RESPONSE field set - what
+    the array puts in a row - which is what the field-name table is for.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:35:19 +0800
+
 jt-pve-storage-dellemc (0.7.38~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

@@ -177,6 +177,8 @@ help create host
 | `ilike` 萬用字元 | 指南裡每一個範例都寫成 `*`（`?name=ilike.User*`），本外掛送出的也是這一種 |
 | 參數 | `select`（以逗號分隔的屬性）、`order`、`async` |
 | 端點 | 本外掛用到的每一個路徑，都能在 Dell 的 `python-powerstore` SDK 裡逐字找到：`/login_session`、`/logout`、`/cluster`、`/appliance`、`/volume`、`/volume/{id}`、`/volume/{id}/attach`、`/detach`、`/restore`、`/snapshot`、`/clone`、`/host`、`/host/{id}`、`/host_group`、`/host_volume_mapping`、`/ip_pool_address`、`/ip_port/{id}`、`/job/{id}` |
+| 請求內容 | 同一份 SDK 的 `provisioning.py` 送出的就是這些：建立 volume `{name, size, appliance_id, volume_group_id, performance_policy_id, protection_policy_id, description}`；attach／detach `{host_id 或 host_group_id, logical_unit_number}`；restore `{from_snap_id, create_backup_snap}`；clone `{name}`；snapshot `{name}`；建立 host `{name, os_type, initiators}`；新增 initiator 用 PATCH `{add_initiators}` |
+| Initiator | `[{port_name, port_type}]`，`port_type` 為 `iSCSI`、`FC`、`NVMe` 之一，`os_type` 為 `Windows`、`Linux`、`ESXi`、`AIX`、`HP-UX`、`Solaris` 之一 —— 這是 `ansible-powerstore` 記載的列舉值 |
 | 效能與容量指標 | `POST /metrics/generate`，帶 `{entity, entity_id, interval}`。`space_metrics_by_cluster` 是**那個呼叫的 entity 名稱**，不是一個 REST 集合 —— 而把它當成集合來讀，正是本外掛原本的做法 |
 | 分頁 | URL 參數 `limit`（1～2000，預設 100）與 `offset`，或用 `Range` 請求標頭 |
 | 部分結果 | 集合超過 limit 時回應 `206 Partial Content`，並帶 `Content-Range: 0-99/1000` —— 斜線之後的數字是總筆數 |

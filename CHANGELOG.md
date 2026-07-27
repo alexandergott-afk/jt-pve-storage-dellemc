@@ -7,6 +7,21 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.39~beta1] - 2026-07-27
+
+### Changed
+- **The whole PowerStore request surface is confirmed against Dell's own code.**
+  `python-powerstore` lists every endpoint path verbatim and sends exactly the
+  request bodies this plugin sends; `ansible-powerstore` documents the
+  `port_type` and `os_type` enums. All of them already matched. That is now
+  written down in `docs/TESTING.md`, so a first tester knows which failures
+  cannot be a wrong request shape — and what remains unverified is the
+  **response** field set, which is what the field-name table is for.
+
+### Fixed
+- `volume_create` passed no options through to the transport, so a per-call
+  timeout had no effect on it.
+
 ## [0.7.38~beta1] - 2026-07-27
 
 ### Fixed

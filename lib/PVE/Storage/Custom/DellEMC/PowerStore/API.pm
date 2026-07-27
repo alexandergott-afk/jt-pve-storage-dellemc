@@ -15,11 +15,13 @@ use MIME::Base64 qw(encode_base64);
 
 # PowerStore Manager REST client.
 #
-# EVERY endpoint, field name and filter form in this module still needs to be
-# checked against a real appliance with its own Swagger UI at
-# https://<mgmt-ip>/swaggerui — see docs/TESTING.md. They are written from the
-# PowerStore 4.x REST API documentation and the field set differs from 3.x in
-# places.
+# The endpoints and request bodies here are the ones Dell's own
+# python-powerstore SDK sends — PyPowerStore/utils/constants.py for the paths,
+# provisioning.py for the payloads — and the initiator and os_type values are
+# the enums ansible-powerstore documents. What is still unchecked is the
+# RESPONSE field set: what the array puts in a row, which differs between 3.x
+# and 4.x. Compare it against a real appliance's own Swagger UI at
+# https://<mgmt-ip>/swaggerui — see docs/TESTING.md.
 #
 # Filtering follows PostgREST conventions, which PowerStore adopted:
 #   name=eq.<value>            exact match
@@ -515,7 +517,7 @@ sub volume_create {
         $body->{$key} = $opts{$key} if defined $opts{$key};
     }
 
-    my $res = $self->post('/volume', $body);
+    my $res = $self->post('/volume', $body, %opts);
 
     return ref($res) eq 'HASH' ? $res->{id} : undef;
 }
