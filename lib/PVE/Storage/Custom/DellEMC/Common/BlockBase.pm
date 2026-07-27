@@ -1389,16 +1389,27 @@ sub free_image {
 
     my $wwid = $vol->{wwid} // eval { $class->_array_get_wwid($scfg, $array_name) };
 
-    # Refuse while anything is using the device.
+    # Refuse while anything is using the device, AND refuse when that cannot
+    # be established. This path unmaps before it deletes, so acting on a wrong
+    # "not in use" takes the disk out from under whatever is using it.
     if ($wwid) {
         my $device = get_device_by_wwid($wwid);
-        if ($device && is_block_device($device) && is_device_in_use($device)) {
+        if ($device && is_block_device($device)) {
+            my $in_use = is_device_in_use($device);
+
+            die "Cannot delete volume '$volname': whether device $device is"
+              . " still in use could not be determined. Refusing rather than"
+              . " assuming it is free. Check it by hand, or retry once the"
+              . " node is responsive.\n" unless defined $in_use;
+
+            if ($in_use) {
             my $details = eval { get_device_usage_details($device) } // '';
             my $msg = "Cannot delete volume '$volname': device $device is still"
                     . " in use (mounted, has holders, or open by a process).\n";
             $msg .= "\n$details\n" if $details;
             $msg .= "Stop the VM and unmount the device, then retry.\n" unless $details;
             die $msg;
+            }
         }
     }
 
@@ -2276,12 +2287,43 @@ sub volume_snapshot_rollback {
     # A rollback replaces the volume's contents underneath whoever has it
     # open, so refuse while it is in use.
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
-    if ($wwid) {
-        my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && is_block_device($device) && is_device_in_use($device)) {
-            die "Cannot roll back volume '$volname': device $device is still in"
-              . " use. Stop the VM first.\n";
-        }
+
+    # A rollback overwrites the whole volume, and the damage is not visible
+    # until the guest next reads. So the question is whether anything on this
+    # node is using it, and an unknown answer must not be read as "no".
+    #
+    # No WWID is not an unknown, though: every device this plugin discovers is
+    # found BY its WWID, so a volume that never had one cannot have a device
+    # here, and nothing local can be holding it. It does mean the array is not
+    # reporting the field this plugin reads the WWN from — the array answered
+    # for the volume itself a few lines above — which is worth saying once,
+    # because it breaks device discovery everywhere else.
+    unless ($wwid) {
+        $class->_warn_once($storeid, 'rollback-no-wwid',
+            "Rolling back '$volname' without checking local use: the array"
+          . " reported no WWID for it. Nothing on this node can have a device"
+          . " for a volume with no WWID, so the rollback is safe — but device"
+          . " discovery cannot work for this storage either. See"
+          . " docs/TESTING.md on the WWN field name.");
+    }
+
+    my $device = $wwid ? eval { get_device_by_wwid($wwid) } : undef;
+    if ($device && is_block_device($device)) {
+        my $in_use = is_device_in_use($device);
+
+        die "Cannot roll back volume '$volname': whether device $device is in"
+          . " use could not be determined. Refusing rather than assuming it is"
+          . " free.\n" unless defined $in_use;
+
+        die "Cannot roll back volume '$volname': device $device is still in"
+          . " use. Stop the VM first.\n" if $in_use;
+
+        # Flush before, invalidate after. Dirty pages written back AFTER the
+        # array has restored the snapshot would put pre-rollback content on
+        # top of it — a corruption that looks like the rollback half worked.
+        eval { PVE::Tools::run_command(['/bin/sync'], timeout => 10) };
+        eval { PVE::Tools::run_command(['/sbin/blockdev', '--flushbufs', $device],
+            timeout => 10) };
     }
 
     eval { $class->_array_snapshot_rollback($scfg, $storeid, $array_name, $snap_name) };

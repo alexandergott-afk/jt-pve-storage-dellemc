@@ -1,3 +1,27 @@
+jt-pve-storage-dellemc (0.7.45~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * "Is this device in use" now has three answers, and the destructive paths
+    refuse on the third. It used to answer 0 - not in use - for every way of
+    failing to find out: a stat that timed out, unreadable sysfs, a fuser
+    killed by its own timeout. fuser is the only check that sees a running
+    QEMU, which holds the device open with no mount and no holder, so a fuser
+    that did not run left nothing ruling that out. free_image unmaps before
+    it deletes, and a rollback overwrites the whole volume; both now refuse
+    rather than assume.
+  * A rollback flushes the host cache BEFORE the array restores the snapshot,
+    not only after. Dirty pages written back afterwards put pre-rollback
+    content on top of the restored volume, which looks like the rollback half
+    worked. CLAUDE.md has required this since the beginning; the code only
+    did the half after.
+  * A rollback of a volume the array reports no WWID for is allowed and says
+    so once: nothing on this node can hold a device for a volume with no
+    WWID, because that is what devices are discovered by. It does mean device
+    discovery is broken for that storage, which is worth one line in the log.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 13:57:49 +0800
+
 jt-pve-storage-dellemc (0.7.44~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

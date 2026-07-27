@@ -163,9 +163,6 @@ is($resolve_name->(undef), undef, 'undef resolves to undef');
 # Safe behaviour when the device does not exist
 # ---------------------------------------------------------------------------
 
-is(is_device_in_use('/dev/does-not-exist-12345'), 0,
-    'a device that does not exist is not in use');
-is(is_device_in_use(undef), 0, 'undef device is not in use');
 like(get_device_usage_details('/dev/does-not-exist-12345'), qr/does not exist/,
     'usage details reports a missing device');
 like(get_device_usage_details(undef), qr/not specified/,
@@ -389,6 +386,79 @@ CONF
         unlike($source, qr/multipath_reload_throttled\(/,
             'and the periodic rescan paths do not reconfigure the node');
     }
+}
+
+# ---------------------------------------------------------------------------
+# "In use" has three answers, and two destructive paths depend on the third
+#
+# A delete unmaps before it deletes, and a rollback overwrites the whole
+# volume. For both, "I could not tell" has to mean "do not" — reading it as
+# "free" takes the disk out from under a running VM, or corrupts a guest
+# filesystem while it is being written to.
+# ---------------------------------------------------------------------------
+
+is(is_device_in_use('/dev/does-not-exist-12345'), 0,
+    'a path that is not there is a definite no, not an unknown');
+is(is_device_in_use(undef), 0, 'and so is undef');
+
+{
+    # A stat that never comes back is an unknown, not a no.
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::is_block_device =
+        sub { return undef };
+
+    is(is_device_in_use('/dev/mapper/3600abc'), undef,
+        'a stat that did not return leaves the question open')
+        or diag('0 here would let a delete unmap a device a VM is using');
+}
+
+{
+    # fuser is the only check that sees a process holding the device open with
+    # no mount and no holder — a running QEMU. If it could not run, nothing
+    # above it has ruled that out.
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::is_block_device =
+        sub { return 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_resolve_block_device_name =
+        sub { return 'dm-99' };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_read_tables =
+        sub { return ('', '') };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd =
+        sub { die "Command timed out after 10s\n" };
+
+    is(is_device_in_use('/dev/mapper/3600abc'), undef,
+        'a fuser that timed out leaves the question open');
+}
+
+{
+    # And the ordinary answer still works: fuser exits 0 when something holds
+    # the device.
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::is_block_device =
+        sub { return 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_resolve_block_device_name =
+        sub { return 'dm-99' };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_read_tables =
+        sub { return ('', '') };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd =
+        sub { return ('', '', 0) };
+
+    is(is_device_in_use('/dev/mapper/3600abc'), 1, 'a held device is in use');
+}
+
+{
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::is_block_device =
+        sub { return 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_resolve_block_device_name =
+        sub { return 'dm-99' };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_read_tables =
+        sub { return ('', '') };
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd =
+        sub { return ('', '', 1) };
+
+    is(is_device_in_use('/dev/mapper/3600abc'), 0,
+        'and nothing holding it is a confirmed no');
 }
 
 done_testing();

@@ -192,7 +192,10 @@ sub is_block_device {
     if ($@) {
         warn "stat of $path did not return within ${timeout}s; treating it as"
            . " unusable\n";
-        $result = 0;
+        # undef, not 0: "the stat never came back" is not "this is not a block
+        # device". Callers testing truth are unaffected; the ones that must
+        # tell a timeout from a definite no check defined().
+        $result = undef;
     }
 
     alarm($remaining) if $remaining;
@@ -1185,13 +1188,34 @@ sub _dm_name_of {
 # the host uses them, and cleanup_lun_devices removes them. They only count as
 # in-use when they have holders of their own (host LVM having auto-activated a
 # VG from inside the guest disk) or are themselves mounted or in use as swap.
+# 1 = in use, 0 = confirmed not in use, undef = COULD NOT TELL.
+#
+# The third answer matters. Two destructive paths ask this question — a delete
+# and a rollback — and for them "cannot tell" has to mean "do not". Reading an
+# unknown as "free" is how a volume gets unmapped and deleted underneath a
+# running VM, or rolled back while the guest is writing to it.
+#
+# Every check below can fail without proving anything: is_block_device can
+# time out, sysfs can be unreadable, fuser can be killed by its own timeout.
+# Those return undef. Only reaching the end with nothing found returns 0.
+#
+# Callers written as `if (is_device_in_use($d))` keep their old behaviour,
+# because undef is false. The ones that must not are explicit about it.
 sub is_device_in_use {
     my ($device, %opts) = @_;
 
-    return 0 unless $device && is_block_device($device);
+    return 0 unless $device;
+
+    my $is_block = is_block_device($device);
+
+    # A path that is not there, or is not a block device, is definitely not in
+    # use — stat on a missing path fails immediately and touches no driver.
+    # Only a stat that never came back leaves the question open.
+    return undef unless defined $is_block;
+    return 0 unless $is_block;
 
     my $dev_name = _resolve_block_device_name($device);
-    return 0 unless $dev_name;
+    return undef unless $dev_name;
 
     my ($mounts, $swaps) = _read_tables();
 
@@ -1208,7 +1232,7 @@ sub is_device_in_use {
     # then delete a volume that host LVM is actively using.
     my $holders_dir = "/sys/block/$dev_name/holders";
     if (-d $holders_dir) {
-        opendir(my $dh, $holders_dir) or return 0;
+        opendir(my $dh, $holders_dir) or return undef;
         my @holders = grep { !/^\./ } readdir($dh);
         closedir($dh);
 
@@ -1240,13 +1264,20 @@ sub is_device_in_use {
     }
 
     my $safe_device = _untaint_device_path($device);
-    return 0 unless $safe_device;
+    return undef unless $safe_device;
 
     my (undef, undef, $exit) = eval {
         _run_cmd([FUSER, '-s', $safe_device],
             timeout => 10, allow_nonzero => 1, ignore_errors => 1);
     };
-    return 1 if !$@ && defined $exit && $exit == 0;
+    my $fuser_error = $@;
+
+    # fuser is the only check here that sees a process holding the device
+    # open with no mount and no holder — which is exactly what a running QEMU
+    # looks like. If it could not run, nothing above it has ruled that out.
+    return undef if $fuser_error || !defined $exit;
+
+    return 1 if $exit == 0;
 
     return 0;
 }

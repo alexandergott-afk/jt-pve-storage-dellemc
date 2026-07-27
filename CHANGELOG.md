@@ -7,6 +7,30 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.45~beta1] - 2026-07-27
+
+### Fixed
+- **A safety check that could not answer was answering "safe".**
+  `is_device_in_use` returned 0 — not in use — for every way of failing to find
+  out: a stat that timed out, unreadable sysfs, a `fuser` killed by its own
+  timeout. `fuser` is the only check there that sees a running QEMU, which
+  holds the device open with no mount and no holder, so a `fuser` that did not
+  run left nothing ruling that out. It now returns 1 / 0 / **undef**, and the
+  two destructive paths refuse on undef: `free_image` unmaps before it deletes,
+  and a rollback overwrites the whole volume.
+- **A rollback now flushes the host cache before the array restores the
+  snapshot**, not only after. Dirty pages written back afterwards land on top
+  of the restored volume, and the result looks like the rollback half worked.
+  `CLAUDE.md` rule 14 has required "flush before, invalidate after" from the
+  start; only the second half was implemented.
+
+### Changed
+- A rollback of a volume the array reports no WWID for proceeds, and says so
+  once. Devices are discovered *by* WWID, so a volume that never had one cannot
+  have a device on this node and nothing local can be holding it — but it does
+  mean device discovery is broken for that storage, which is worth a line in
+  the log rather than silence.
+
 ## [0.7.44~beta1] - 2026-07-27
 
 ### Fixed

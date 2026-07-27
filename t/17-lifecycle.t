@@ -461,4 +461,51 @@ is_deeply(volumes_on_array(), [], 'which then deletes cleanly');
         or diag("died with: $@");
 }
 
+# A delete must refuse when it cannot establish whether the device is in use.
+# free_image unmaps before it deletes, so acting on a wrong "free" takes the
+# disk out from under whatever is holding it.
+{
+    $A->reset_array();
+    $A->alloc_image($store, $scfg, 800, 'raw', undef, 1024);
+
+    no warnings 'redefine', 'once';
+    local *Test::Array::_array_get_wwid = sub { '3600abc0000000800' };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_device_by_wwid =
+        sub { '/dev/mapper/3600abc0000000800' };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_block_device =
+        sub { 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_device_in_use =
+        sub { undef };   # could not tell
+
+    my $ok = eval { $A->free_image($store, $scfg, 'vm-800-disk-0', 0, 'raw'); 1 };
+    ok(!$ok, 'a delete refuses when in-use cannot be established')
+        or diag('this would unmap and delete a device something may be using');
+    like($@ // '', qr/could not be determined/, 'and says so plainly');
+
+    ok(scalar(grep { /800/ } keys %Test::Array::VOL),
+        'the volume is untouched');
+}
+
+# The same for a rollback, which overwrites the whole volume.
+{
+    $A->reset_array();
+    $A->alloc_image($store, $scfg, 801, 'raw', undef, 1024);
+    $A->volume_snapshot($scfg, $store, 'vm-801-disk-0', 'before');
+
+    no warnings 'redefine', 'once';
+    local *Test::Array::_array_get_wwid = sub { '3600abc0000000801' };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::get_device_by_wwid =
+        sub { '/dev/mapper/3600abc0000000801' };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_block_device =
+        sub { 1 };
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_device_in_use =
+        sub { undef };
+
+    ok(!eval { $A->volume_snapshot_rollback($scfg, $store, 'vm-801-disk-0',
+            'before'); 1 },
+        'a rollback refuses when in-use cannot be established')
+        or diag('this would overwrite a volume a guest may be writing to');
+    like($@ // '', qr/could not be determined/, 'and says so plainly');
+}
+
 done_testing();
