@@ -449,6 +449,14 @@ td.all-families {
     color: var(--text-secondary);
 }
 
+/* The family columns of the feature matrix are centred, headings and values
+   together. Centring the headings alone would leave 'dm-multipath' hanging
+   at the left of a column whose title sits in the middle; centring the values
+   alone is what the spanning rows already do. The first column is the feature
+   name and stays left, because that is what the eye reads down. */
+.feature-matrix th:not(:first-child),
+.feature-matrix td:not(:first-child) { text-align: center; }
+
 td code {
     background: var(--indigo-subtle);
     padding: 1px 5px; border-radius: 3px;

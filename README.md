@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.55~beta1). It has never been run against a
+> **This is a beta release (0.7.56~beta1). It has never been run against a
 > physical Dell EMC array.** Every array-facing behaviour is unverified: the
 > REST endpoints and field names, the SCSI vendor and product strings that
 > decide which devices the plugin will touch, the WWN to WWID conversion, and
@@ -35,7 +35,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.55~beta1 — three storage types are code complete, and
+> **Version 0.7.56~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this
@@ -211,7 +211,7 @@ sha256sum -c SHA256SUMS       # must say OK before you install
 
 GitHub replaces `~` with `.` in an asset name, so the file on the release page
 is `jt-pve-storage-dellemc_0.7.52.beta1-1_all.deb` while the package version is
-`0.7.55~beta1-1`. Copy the exact name from the release page rather than
+`0.7.56~beta1-1`. Copy the exact name from the release page rather than
 building it from the version.
 
 Check the sum. This package writes to `/etc/multipath/conf.d` and talks to

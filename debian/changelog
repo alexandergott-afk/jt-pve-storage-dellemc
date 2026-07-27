@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.7.56~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Documentation site: the three family columns of the feature table are
+    centred, headings and values together. Centring the headings alone would
+    have left 'dm-multipath' at the left of a column whose title sits in the
+    middle. The feature-name column stays left, because that is the one the
+    eye reads down. Scoped to that table; the other twelve are unchanged.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 22:45:23 +0800
+
 jt-pve-storage-dellemc (0.7.55~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

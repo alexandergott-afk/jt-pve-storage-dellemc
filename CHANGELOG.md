@@ -7,6 +7,19 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.56~beta1] - 2026-07-27
+
+### Changed
+- **Documentation site: the three family columns of the feature table are
+  centred**, headings and values together. Centring the headings alone would
+  have left `dm-multipath` sitting at the left of a column whose title is in
+  the middle, and centring the values alone is what the spanning rows already
+  do — so both, or neither.
+
+  The feature-name column stays left-aligned: that is the column the eye reads
+  down. Scoped to this table with a class; the other twelve on the page are
+  unchanged.
+
 ## [0.7.55~beta1] - 2026-07-27
 
 ### Changed
