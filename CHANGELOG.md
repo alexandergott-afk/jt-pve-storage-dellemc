@@ -7,6 +7,36 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.43~beta1] - 2026-07-27
+
+### Fixed
+- **The ownership gate is now actually a gate.** `is_pve_managed_volume` was
+  defined, documented as guarding every destructive path, and tested
+  directly — and called from nowhere at all. It now runs in front of every
+  array-side delete of a volume or a snapshot, with the storeid, on the
+  family's own naming class so each family's separators apply. Wiring it in
+  immediately showed its own definition was incomplete: it refused temporary
+  snapshot-access clones, which this plugin generates and must be able to
+  delete again.
+- **The documentation site defaults to English on every visit.** The language
+  choice was kept in `localStorage`, so one click months ago decided what every
+  later visitor using that browser saw. It now follows the visit rather than
+  the browser, the stale preference is cleared on load, and `?lang=` still
+  works for sharing a specific language.
+- **PowerFlex SDC support on Proxmox VE is stated accurately.** Dell ships the
+  packages and documents the procedure — KB 000462918 names Proxmox VE and the
+  SDC tarball carries a `Debian13_SDC` variant — but Proxmox VE is **not** in
+  the OS support matrix, KB 000272738, at any PowerFlex version. The docs
+  reported the first as though it were the second. Both KBs are now linked so
+  a reader can check rather than trust.
+
+### Added
+- `t/11-imports.t` fails on a subroutine defined twice in one file.
+- The reasoning behind the bare `-b` tests in `PowerFlex/Host.pm` is written
+  down: they are bounded by an alarm the function owns, covering the glob and
+  every test in the loop, and `is_block_device` would replace that single
+  budget with an unbounded number of bounded steps.
+
 ## [0.7.42~beta1] - 2026-07-27
 
 ### Fixed

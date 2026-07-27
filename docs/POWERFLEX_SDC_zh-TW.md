@@ -19,12 +19,15 @@ PowerFlex 的 volume 不是以 SCSI LUN 的形式出現。Proxmox VE 節點有�
 
 SDC 是專有的 kernel module，必須與執行中的 kernel 相符。Dell 並未為 Proxmox VE 的 kernel 提供預先編譯好的 `scini`，因此必須在節點上編譯 —— 這代表一次 kernel 升級就可能讓某台節點在模組重建完成之前完全沒有儲存。
 
-Dell 針對 Proxmox VE 的官方說明（見下方 KB）列出的支援狀態是：
+Dell 對 Proxmox VE 的說法有兩種，而兩者之間的落差，比其中任何一種說法本身更重要。
 
-- **Proxmox VE 8.x**（Debian 12）：PowerFlex 4.5.3 或 3.6.5 以上
-- **Proxmox VE 9.x**（Debian 13）：*規劃中*，預計 PowerFlex 5.1.x
+**Dell 有提供套件，也有寫操作步驟。** KB 000462918 說明如何在「Debian 與 Ubuntu 作業系統，包含 Proxmox Virtual Environment」上安裝 SDC，並直接點名 Debian 12（bookworm）／Proxmox VE 8.x；而 SDC 的 tarball 裡也包含 `Debian13_SDC` 這個變體 —— Debian 13 正是 Proxmox VE 9 的基底。PowerFlex 5.1.x 的文件也已經發布。
 
-本外掛要求 Proxmox VE 9.1，正好落在第二列。若您打算在其上使用 SDC，請先向 Dell 確認目前的支援狀態。
+**但 Proxmox VE 並不在官方的作業系統支援矩陣裡。** KB 000272738 列出的是 Ubuntu LTS、RHEL、Oracle Linux、SLES、CentOS 與 AIX。Debian 不在其中，Proxmox VE 也不在，任何 PowerFlex 版本皆然。
+
+換句話說：在 Proxmox VE 上使用 SDC，是 Dell 有發布安裝說明、也有提供套件的事，但**不是**它的支援矩陣所承諾的事。這對一張支援案件單究竟代表什麼，是要問您的 Dell 業務窗口的問題，而答案不在任何從這裡連得到的文件裡 —— 這才是這一頁原本那段文字的誠實版本。
+
+查證日期 2026-07-27。兩份 KB 都會變動，請以它們為準，不要相信這一頁。
 
 NVMe/TCP 沒有這些問題：initiator 就在 Proxmox 已經提供的 kernel 裡，升級不會讓它壞掉。
 
@@ -37,6 +40,8 @@ NVMe/TCP 沒有這些問題：initiator 就在 Proxmox 已經提供的 kernel �
 | **在 Proxmox VE 上設定 SDC** —— PVE 專屬的操作步驟 | [KB 000466868](https://www.dell.com/support/kbdoc/zh-tw/000466868/powerflex-%E5%A6%82%E4%BD%95%E5%9C%A8-proxmox-ve-%E4%B8%8A%E8%A8%AD%E5%AE%9A-powerflex-sdc) |
 | **支援矩陣** —— 支援的作業系統與 kernel | [E-Lab Navigator：PowerFlex_OS.pdf](https://elabnavigator.dell.com/vault/pdf/PowerFlex_OS.pdf) |
 | **我的 kernel 有支援嗎？** | [KB 000332118](https://www.dell.com/support/kbdoc/en-us/000332118/powerflex-sdc-how-to-determine-kernel-version-is-supported) |
+| **在 Debian 系統上安裝 SDC** —— 直接點名 Proxmox VE，且內含 `Debian13_SDC` 變體 | [KB 000462918](https://www.dell.com/support/kbdoc/en-us/000462918/powerflex-how-to-install-sdc-on-debian-based-server) |
+| **作業系統支援矩陣** —— Proxmox VE **不在**這份清單上 | [KB 000272738](https://www.dell.com/support/kbdoc/en-us/000272738/powerflex-operating-system-os-support-matrix) |
 | **驅動程式的隨選編譯** | [KB 000224134](https://www.dell.com/support/kbdoc/en-us/000224134/how-to-on-demand-compilation-of-the-powerflex-sdc-driver) |
 | 預先編譯的 `.ko` 檔，依 OS 與 PowerFlex 版本分類 | [mft.dell.com](https://mft.dell.com/) |
 | NVMe/TCP 概觀 | [PowerFlex 4.5.x Technical Overview](https://www.dell.com/support/manuals/en-us/scaleio/flex-software-to-45x/nvme-over-tcp-overview) |

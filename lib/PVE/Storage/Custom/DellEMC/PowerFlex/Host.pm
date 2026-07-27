@@ -228,6 +228,8 @@ sub sdc_device_for_volume {
         for my $link (glob(SDC_DEV_GLOB)) {
             next unless $link =~ /\Q$volume_id\E$/i;
             my $device = _untaint_device($link) or next;
+            # See the NVMe sweep below: the alarm above covers the glob and
+            # every test in this loop, which is what bounds it.
             next unless -b $device;
             $found = $device;
             last;
@@ -550,6 +552,11 @@ sub nvme_device_for_volume {
             # Skip partition links; PVE wants the whole namespace.
             next if $link =~ /-part\d+$/;
             my $device = _untaint_device($link) or next;
+            # Bounded by the alarm this function owns, which covers the glob
+            # and every test in the loop — one budget for the whole sweep.
+            # Multipath::is_block_device would be wrong here: it sets its own
+            # alarm per call, so it would replace the one above and turn a
+            # bounded sweep into an unbounded number of bounded steps.
             next unless -b $device;
             $found = $device;
             last;

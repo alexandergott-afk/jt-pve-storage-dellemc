@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.43~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The ownership gate is now actually a gate. is_pve_managed_volume was
+    defined, documented as guarding every destructive path, tested directly -
+    and called from nowhere. It now runs in front of every array-side delete
+    of a volume or a snapshot, with the storeid, on the family's own naming
+    class. Wiring it in immediately showed its own definition was incomplete:
+    it refused temporary snapshot-access clones, which this plugin generates
+    and must be able to delete again.
+  * The documentation site defaults to English on every visit. The language
+    choice was remembered in localStorage, so a choice made once decided what
+    every later visitor to that browser saw. It follows the visit now, and
+    ?lang= still works for sharing a specific language.
+  * PowerFlex SDC support on Proxmox VE is stated accurately. Dell ships the
+    packages and documents the procedure (KB 000462918, which names Proxmox
+    and carries a Debian13_SDC variant), but Proxmox VE is not in the OS
+    support matrix (KB 000272738) at any PowerFlex version. This page used to
+    report the first as though it were the second.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 13:18:11 +0800
+
 jt-pve-storage-dellemc (0.7.42~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

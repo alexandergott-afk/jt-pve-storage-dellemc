@@ -23,13 +23,26 @@ Dell does not ship a prebuilt `scini` for Proxmox VE's kernel, so it is
 compiled on the node — which means a kernel upgrade can leave a node with no
 storage until the module is rebuilt.
 
-Dell's own guidance for Proxmox VE (see the KB below) states support as:
+Dell says two different things about Proxmox VE, and the difference matters
+more than either statement on its own.
 
-- **Proxmox VE 8.x** (Debian 12): PowerFlex 4.5.3 or 3.6.5 and later
-- **Proxmox VE 9.x** (Debian 13): *planned* for PowerFlex 5.1.x
+**Dell ships the packages and documents the procedure.** KB 000462918 covers
+installing the SDC on "Debian and Ubuntu operating systems, including Proxmox
+Virtual Environment", names Debian 12 (bookworm) / Proxmox VE 8.x directly,
+and the SDC tarball contains a `Debian13_SDC` variant — Debian 13 is what
+Proxmox VE 9 is built on. PowerFlex 5.1.x documentation is published.
 
-This plugin requires Proxmox VE 9.1, which is in the second row. If you intend
-to use the SDC there, confirm the current support status with Dell first.
+**Proxmox VE is not in the official OS support matrix.** KB 000272738 lists
+Ubuntu LTS, RHEL, Oracle Linux, SLES, CentOS and AIX. Debian is not there, and
+neither is Proxmox VE, at any PowerFlex version.
+
+So the SDC on Proxmox VE is something Dell publishes instructions for and
+ships a package for, not something their support matrix commits to. What that
+means for a support case is a question for your Dell account team, and the
+answer is not in any document reachable from here — which is the honest
+version of what used to be written on this page.
+
+Verified 2026-07-27. Both KBs change; check them rather than trusting this.
 
 NVMe/TCP has none of these problems: the initiator is in the kernel Proxmox
 already ships, and an upgrade cannot break it.
@@ -43,6 +56,8 @@ Bookmark these; they are the authority, and they change.
 | **SDC on Proxmox VE** — the PVE-specific procedure | [KB 000466868](https://www.dell.com/support/kbdoc/zh-tw/000466868/powerflex-%E5%A6%82%E4%BD%95%E5%9C%A8-proxmox-ve-%E4%B8%8A%E8%A8%AD%E5%AE%9A-powerflex-sdc) |
 | **Support matrix** — supported operating systems and kernels | [E-Lab Navigator: PowerFlex_OS.pdf](https://elabnavigator.dell.com/vault/pdf/PowerFlex_OS.pdf) |
 | **Is my kernel supported?** | [KB 000332118](https://www.dell.com/support/kbdoc/en-us/000332118/powerflex-sdc-how-to-determine-kernel-version-is-supported) |
+| **SDC on Debian-based systems** — names Proxmox VE directly, and ships a `Debian13_SDC` variant | [KB 000462918](https://www.dell.com/support/kbdoc/en-us/000462918/powerflex-how-to-install-sdc-on-debian-based-server) |
+| **OS support matrix** — the list Proxmox VE is *not* on | [KB 000272738](https://www.dell.com/support/kbdoc/en-us/000272738/powerflex-operating-system-os-support-matrix) |
 | **On-demand driver compilation** | [KB 000224134](https://www.dell.com/support/kbdoc/en-us/000224134/how-to-on-demand-compilation-of-the-powerflex-sdc-driver) |
 | Prebuilt `.ko` files, by OS and PowerFlex version | [mft.dell.com](https://mft.dell.com/) |
 | NVMe/TCP overview | [PowerFlex 4.5.x Technical Overview](https://www.dell.com/support/manuals/en-us/scaleio/flex-software-to-45x/nvme-over-tcp-overview) |

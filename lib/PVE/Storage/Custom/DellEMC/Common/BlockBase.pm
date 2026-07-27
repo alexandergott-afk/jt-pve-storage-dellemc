@@ -356,6 +356,32 @@ sub _parse_volname {
 # type: 'base-100-disk-0/vm-101-disk-0' as a name there would name a base
 # image that does not exist on the target, so moving a linked clone off this
 # storage would fail with a message about the wrong volume.
+# The ownership gate, in front of every destructive array call.
+#
+# Nothing should reach a delete with a name this storage did not generate:
+# array names are built by pve_volname_to_array from the storage's own
+# prefix, so a foreign one cannot normally be produced. This is the check
+# that says so out loud, on the argument actually being passed, at the moment
+# it is about to be acted on.
+#
+# The storeid is not optional. The two-argument form only proves the name
+# looks like SOME PVE plugin's, which does not authorise deleting it — a
+# second storage on the same array, or another cluster, produces names of
+# exactly that shape.
+#
+# It is called on $class->naming, so each family's own separators and limits
+# apply rather than the base class's.
+sub _assert_own_object {
+    my ($class, $storeid, $name, $what) = @_;
+
+    return 1 if $class->naming->is_pve_managed_volume($name, $storeid);
+
+    die "Refusing to $what '" . (defined $name ? $name : '(undef)')
+      . "': it is not an object storage '" . (defined $storeid ? $storeid : '?')
+      . "' created. This plugin only ever deletes objects whose names it"
+      . " generated itself; something has gone wrong upstream of here.\n";
+}
+
 sub parse_volname {
     my ($class, $volname) = @_;
 
@@ -1248,6 +1274,7 @@ sub _purge_own_snapshots {
         # removed first.
         $class->_release_snapshot_clones($scfg, $storeid, $name);
 
+        $class->_assert_own_object($storeid, $name, 'delete snapshot');
         eval { $class->_array_snapshot_delete($scfg, $storeid, $name) };
         if ($@) {
             my $err = $@;
@@ -1273,6 +1300,7 @@ sub _release_volume {
         warn "Failed to unmap '$array_name' from host '$host': $@" if $@;
     }
 
+    $class->_assert_own_object($storeid, $array_name, 'delete volume');
     $class->_array_delete_volume($scfg, $storeid, $array_name);
 
     return 1;
@@ -1400,6 +1428,7 @@ sub free_image {
     $class->_purge_own_snapshots($scfg, $storeid, $array_name,
         keep_base => 1, errors => \@snapshot_errors);
 
+    $class->_assert_own_object($storeid, $array_name, 'delete volume');
     eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
 
     # Captured immediately, and everything below works on the copy. $@ is
@@ -1421,6 +1450,7 @@ sub free_image {
         if ($delete_error) {
             if ($class->_purge_own_snapshots($scfg, $storeid, $array_name,
                     base_only => 1, errors => \@snapshot_errors)) {
+                $class->_assert_own_object($storeid, $array_name, 'delete volume');
                 eval { $class->_array_delete_volume($scfg, $storeid, $array_name) };
                 $delete_error = $@;
             }
@@ -2125,6 +2155,7 @@ sub volume_snapshot_delete {
     # away, so this is the normal path, not an edge case.
     $class->_release_snapshot_clones($scfg, $storeid, $snap_name);
 
+    $class->_assert_own_object($storeid, $snap_name, 'delete snapshot');
     eval { $class->_array_snapshot_delete($scfg, $storeid, $snap_name) };
     if ($@) {
         my $err = $@;

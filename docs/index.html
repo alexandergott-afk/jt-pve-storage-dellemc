@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.42~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.43~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -731,16 +731,18 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     </div>
     <div class="alert alert--warning">
         <strong>
-            <span class="lang-en">Dell's own support statement for Proxmox VE</span>
-            <span class="lang-zh">Dell 對 Proxmox VE 的官方支援狀態</span>
+            <span class="lang-en">What Dell says about the SDC on Proxmox VE</span>
+            <span class="lang-zh">Dell 對「在 Proxmox VE 上使用 SDC」的說法</span>
         </strong>
         <ul>
-            <li><span class="lang-en"><strong>Proxmox VE 8.x</strong> (Debian 12): PowerFlex 4.5.3 or 3.6.5 and later</span>
-                <span class="lang-zh"><strong>Proxmox VE 8.x</strong>（Debian 12）：PowerFlex 4.5.3 或 3.6.5 以上</span></li>
-            <li><span class="lang-en"><strong>Proxmox VE 9.x</strong> (Debian 13): <em>planned</em> for PowerFlex 5.1.x</span>
-                <span class="lang-zh"><strong>Proxmox VE 9.x</strong>（Debian 13）：<em>規劃中</em>，預計 PowerFlex 5.1.x</span></li>
-            <li><span class="lang-en">This plugin requires PVE 9.1, which is the second row. Dell does not ship a prebuilt scini for the Proxmox kernel, so it is compiled on the node, and a kernel upgrade can leave that node with no storage until it rebuilds. That is why <code>dell-protocol nvme</code> is the default.</span>
-                <span class="lang-zh">本外掛要求 PVE 9.1，正好落在第二列。Dell 未為 Proxmox kernel 提供預編譯的 scini，必須在節點上編譯，因此一次 kernel 升級就可能讓該節點在模組重建之前沒有儲存。這就是 <code>dell-protocol nvme</code> 是預設值的原因。</span></li>
+            <li><span class="lang-en"><strong>Dell ships the packages and documents the procedure.</strong> KB 000462918 covers installing the SDC on &ldquo;Debian and Ubuntu operating systems, including Proxmox Virtual Environment&rdquo;, names Debian 12 / Proxmox VE 8.x directly, and the SDC tarball contains a <code>Debian13_SDC</code> variant &mdash; Debian 13 is what Proxmox VE 9 is built on. PowerFlex 5.1.x documentation is published.</span>
+                <span class="lang-zh"><strong>Dell 有提供套件，也有寫操作步驟。</strong>KB 000462918 說明如何在「Debian 與 Ubuntu 作業系統，包含 Proxmox Virtual Environment」上安裝 SDC，並直接點名 Debian 12／Proxmox VE 8.x；SDC 的 tarball 裡也包含 <code>Debian13_SDC</code> 變體 —— Debian 13 正是 Proxmox VE 9 的基底。PowerFlex 5.1.x 的文件也已發布。</span></li>
+            <li><span class="lang-en"><strong>Proxmox VE is not in the official OS support matrix.</strong> KB 000272738 lists Ubuntu LTS, RHEL, Oracle Linux, SLES, CentOS and AIX. Debian is not there, and neither is Proxmox VE, at any PowerFlex version.</span>
+                <span class="lang-zh"><strong>但 Proxmox VE 並不在官方的作業系統支援矩陣裡。</strong>KB 000272738 列出的是 Ubuntu LTS、RHEL、Oracle Linux、SLES、CentOS 與 AIX。Debian 不在其中，Proxmox VE 也不在，任何 PowerFlex 版本皆然。</span></li>
+            <li><span class="lang-en">So the SDC here is something Dell publishes instructions for, not something its support matrix commits to. What that means for a support case is a question for your Dell account team. Separately: Dell ships no prebuilt <code>scini</code> for the Proxmox kernel, so it is compiled on the node and a kernel upgrade can leave that node with no storage until it rebuilds. That is why <code>dell-protocol nvme</code> is the default.</span>
+                <span class="lang-zh">也就是說，在這裡使用 SDC 是 Dell 有發布安裝說明的事，但不是它的支援矩陣所承諾的事。這對一張支援案件單代表什麼，是要問您的 Dell 業務窗口的問題。另外一件事：Dell 未為 Proxmox kernel 提供預編譯的 <code>scini</code>，必須在節點上編譯，因此一次 kernel 升級就可能讓該節點在模組重建之前沒有儲存。這就是 <code>dell-protocol nvme</code> 是預設值的原因。</span></li>
+            <li><span class="lang-en">Checked 2026-07-27. Both KBs change; read them rather than trusting this page.</span>
+                <span class="lang-zh">查證日期 2026-07-27。兩份 KB 都會變動，請以它們為準，不要相信這一頁。</span></li>
         </ul>
     </div>
 
@@ -985,6 +987,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.43~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The ownership gate that guards every destructive path was defined, documented and tested — and called from nowhere. It is wired in now, and doing so immediately showed its own definition was incomplete.</span>
+            <span class="lang-zh">守著每一條破壞性路徑的所有權閘門，有定義、有文件、也有測試 —— 但沒有任何地方呼叫它。現在已經接上，而接上的當下就暴露出它自己的定義並不完整。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.42~beta1</div>
@@ -1455,18 +1466,34 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         window.location.href = url.toString();
     };
 
-    // Restore language: URL param > localStorage > default (en)
+    // Language: URL parameter > this visit's choice > English.
+    //
+    // Deliberately sessionStorage and not localStorage. A choice made months
+    // ago should not decide what a new visitor sees: this page is written in
+    // English first, and someone arriving from a link expects to land there.
+    // Within one visit the choice still follows you from page to page, and
+    // ?lang= keeps working for sharing a specific language.
+    var LANG_KEY = 'jt-dellemc-lang';
+
+    // Anyone who used the site before this change has a permanent preference
+    // stored. Clear it, or they would go on seeing the old behaviour forever
+    // with no way to discover why.
+    try { localStorage.removeItem(LANG_KEY); } catch(e) {}
+
+    function applyLang(lang) {
+        document.documentElement.setAttribute('data-lang', lang);
+        document.documentElement.setAttribute('lang',
+            lang === 'zh' ? 'zh-Hant' : 'en');
+    }
+
     var urlLang = new URLSearchParams(window.location.search).get('lang');
     if (urlLang === 'en' || urlLang === 'zh') {
-        document.documentElement.setAttribute('data-lang', urlLang);
-        try { localStorage.setItem('jt-dellemc-lang', urlLang); } catch(e) {}
+        applyLang(urlLang);
+        try { sessionStorage.setItem(LANG_KEY, urlLang); } catch(e) {}
     } else {
-        try {
-            var saved = localStorage.getItem('jt-dellemc-lang');
-            if (saved === 'en' || saved === 'zh') {
-                document.documentElement.setAttribute('data-lang', saved);
-            }
-        } catch(e) {}
+        var saved = null;
+        try { saved = sessionStorage.getItem(LANG_KEY); } catch(e) {}
+        applyLang(saved === 'zh' ? 'zh' : 'en');
     }
 
     // Sidebar toggle (mobile)
