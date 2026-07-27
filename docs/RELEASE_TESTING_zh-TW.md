@@ -173,7 +173,9 @@ pve-dell-config-get nosuchstore 100
 # 3. 帶著新版本再跑一次檢查
 make release-check
 
-# 4. 建置並把套件保留在 repository 中，與相關專案的做法一致
+# 4. 建置並把套件保留在 repository 中。每一版都要留著：
+#    releases/ 就是封存區，測試者才能取得他手上正在跑的那一份建置。
+#    只新增檔案，絕不取代舊的。
 make deb
 cp ../jt-pve-storage-dellemc_<version>_all.deb releases/
 

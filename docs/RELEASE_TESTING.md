@@ -199,7 +199,9 @@ recorded as not executed.
 # 3. Re-run the checks with the new version in place
 make release-check
 
-# 4. Build and keep the package in the repository, as the related projects do
+# 4. Build and keep the package in the repository. Every release stays:
+#    releases/ is the archive, so a tester can fetch exactly the build
+#    they are running. Add the new file, never replace the old one.
 make deb
 cp ../jt-pve-storage-dellemc_<version>_all.deb releases/
 
