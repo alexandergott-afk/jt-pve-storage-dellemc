@@ -5,6 +5,16 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.36~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 建立 volume 時，兩種容量參數拼法都能存活。** ScaleIO REST 參考文件記載的是 `volumeSizeInKb`，而 Dell 自己的 `python-powerflex` SDK 送的是 `volumeSizeInGb`。建立 volume 是任何人使用本外掛的第一件事，因此只接受另一種拼法的陣列，原本會讓第一次 `pvesm alloc` 就卡住。現在先送文件記載的形式，SDK 的形式作為後備，並在記錄中寫下這台陣列採用的是哪一種。
+- 後備**只在 4xx 時**啟用 —— 那代表陣列拒絕了請求、什麼都沒有建立。5xx 有可能已經生效，再送一次就會變成第二個 volume，因此一律不重試，這與傳輸層對所有 POST 的規則一致。
+
+### 變更
+- 多個 PowerFlex 欄位名稱不再標示為未驗證。Dell 自己的 `ansible-powerflex` collection 記載了 `ancestorVolumeId`、`creationTime`、`protectionDomainId`／`protectionDomainName`，以及 `mappedSdcInfo` 的內容（`sdcId`、`sdcName`、`sdcIp`、`accessMode`、`limitIops`）。同一來源也確認了 8 GB 的配置單位、以及陣列是**向上**取整 —— 這正是本外掛原本的做法。
+- `setVolumeSize` 搭配 `sizeInGB`、`removeVolume` 搭配 `removeMode`，都已對照同一份 SDK 確認，並記入模組檔頭。
+
 ## [0.7.35~beta1] - 2026-07-27
 
 ### 修正

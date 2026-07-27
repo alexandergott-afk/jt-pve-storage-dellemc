@@ -202,13 +202,14 @@ help create host
 | 欄位 | 用途 | 狀態 |
 |---|---|---|
 | `id`、`name`、`sizeInKb`、`volumeSizeInKb` | volume | 已旁證 |
-| `ancestorVolumeId` | 快照是從哪個 volume 來的 | **未驗證** |
-| `creationTime` | 快照時間 | **未驗證** |
-| `mappedSdcInfo`、`sdcId`、`hostId` | 對應 | 已旁證 |
+| `ancestorVolumeId` | 快照是從哪個 volume 來的 | Dell 自己的 `ansible-powerflex` volume 模組有記載，出現在快照物件上 |
+| `creationTime` | 快照時間 | 同一來源，volume 物件上的 epoch 時間 |
+| `mappedSdcInfo`、`sdcId` | 對應 | 同一來源：`mappedSdcInfo` 帶有 `sdcId`、`sdcName`、`sdcIp`、`accessMode`、`limitIops` |
+| `hostId` | NVMe host 的對應，與 `sdcId` 一併讀取 | **未驗證** —— SDC 時代的文件並沒有這個欄位，而讀取一個不存在的欄位不會有任何代價 |
 | `mappedHostInfo` | NVMe host 的對應，與 `mappedSdcInfo` 一併讀取 —— 因為這裡回答「空的」等於「再對映一次」 | **未驗證** |
 | `sdcGuid`、`sdcIp` | 找出本節點的 SDC | **未驗證** |
 | `maxCapacityInKb`、`capacityInUseInKb`、`thinCapacityInUseInKb` | 儲存池容量 | **未驗證** |
-| `protectionDomainId`、`protectionDomainName` | 解析有歧義的儲存池名稱 | **未驗證** |
+| `protectionDomainId`、`protectionDomainName` | 解析有歧義的儲存池名稱 | 兩者都出現在 `ansible-powerflex` 的 volume 物件上 |
 | `capacityAvailableForVolumeAllocationInKb` | 儲存池容量，備援欄位 | **未驗證** |
 | `access_token`、`refresh_token` | 4.x 的登入回應 | **未驗證** |
 | `errorCode`、`message` | 陣列自己的錯誤文字 | **未驗證** |

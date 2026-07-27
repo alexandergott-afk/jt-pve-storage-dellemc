@@ -7,6 +7,31 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.36~beta1] - 2026-07-27
+
+### Fixed
+- **PowerFlex volume creation now survives either spelling of the size
+  parameter.** The ScaleIO REST reference documents `volumeSizeInKb`; Dell's
+  own `python-powerflex` SDK sends `volumeSizeInGb`. Creating a volume is the
+  very first thing anyone does with this plugin, so an array that accepts only
+  the other spelling would have stopped the first `pvesm alloc`. The documented
+  form goes first and the SDK's form is the fallback, with a line in the log
+  saying which one the array took.
+- The fallback is taken **only on a 4xx**, which means the array rejected the
+  request and created nothing. A 5xx may have taken effect, and a second
+  attempt there would be a second volume — so those are not retried, the same
+  rule the transport already applies to every POST.
+
+### Changed
+- Several PowerFlex field names are no longer marked unverified.
+  Dell's own `ansible-powerflex` collection documents `ancestorVolumeId`,
+  `creationTime`, `protectionDomainId`/`protectionDomainName`, and the contents
+  of `mappedSdcInfo` (`sdcId`, `sdcName`, `sdcIp`, `accessMode`, `limitIops`).
+  The same source confirms the 8 GB allocation unit and that the array rounds
+  **up**, which is what this plugin already does.
+- `setVolumeSize` with `sizeInGB` and `removeVolume` with `removeMode` are
+  confirmed against the same SDK and are now recorded in the module header.
+
 ## [0.7.35~beta1] - 2026-07-27
 
 ### Fixed

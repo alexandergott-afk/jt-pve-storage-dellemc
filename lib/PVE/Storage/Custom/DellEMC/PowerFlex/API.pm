@@ -30,7 +30,11 @@ use MIME::Base64 qw(encode_base64);
 # Facts taken from the Dell PowerFlex REST API documentation:
 #
 #   POST /api/types/Volume/instances  { volumeSizeInKb, storagePoolId, name,
-#                                       volumeType }
+#                                       volumeType }   (volumeSizeInGb is
+#                                       what Dell's own SDK sends; both are
+#                                       tried, see volume_create)
+#   POST /api/instances/Volume::<id>/action/setVolumeSize { sizeInGB }
+#   POST /api/instances/Volume::<id>/action/removeVolume  { removeMode }
 #   POST /api/instances/System::<id>/action/snapshotVolumes
 #                                     { snapshotDefs: [ { volumeId,
 #                                                          snapshotName } ] }
@@ -474,15 +478,60 @@ sub volume_create {
 
     my $body = {
         name            => $name,
-        volumeSizeInKb  => $self->_size_in_kb($size),
         storagePoolId   => $pool_id,
         volumeType      => $opts{thick} ? 'ThickProvisioned' : 'ThinProvisioned',
     };
     $body->{compressionMethod} = $opts{compression} if defined $opts{compression};
 
-    my $res = $self->post('/api/types/Volume/instances', $body, %opts);
+    # Two spellings of the size, from two Dell sources. The ScaleIO 3.x REST
+    # reference documents volumeSizeInKb; Dell's own python-powerflex SDK
+    # sends volumeSizeInGb. Both are plausible and creating a volume is the
+    # very first thing anyone does with this plugin, so the documented form
+    # goes first and the SDK's form is the fallback.
+    #
+    # The fallback is only taken on a 4xx, which means the array REJECTED the
+    # request and created nothing. A 5xx may have taken effect, and a second
+    # attempt there would be a second volume — so those are not retried, the
+    # same rule the transport applies to every POST.
+    my $res = $self->_create_volume_with_size($body,
+        volumeSizeInKb => $self->_size_in_kb($size), %opts);
 
     return ref($res) eq 'HASH' ? $res->{id} : undef;
+}
+
+sub _create_volume_with_size {
+    my ($self, $body, $field, $value, %opts) = @_;
+
+    my $endpoint = '/api/types/Volume/instances';
+
+    my $resp = $self->_request('POST', $endpoint, { %$body, $field => $value },
+        %opts, raw => 1, allow_status => [400, 422]);
+
+    if ($resp->is_success) {
+        $self->{_volume_size_field} //= $field;
+        return $self->_decode_success($resp, 'POST', $endpoint);
+    }
+
+    # Only the size spelling gets a second try, and only once.
+    if ($field eq 'volumeSizeInKb') {
+        my $gb = int($value / (1024 * 1024));
+        $gb = 1 if $gb < 1;
+
+        my $retry = $self->_request('POST', $endpoint,
+            { %$body, volumeSizeInGb => $gb }, %opts);
+
+        $self->log_warn("this array rejected 'volumeSizeInKb' on a volume"
+            . " create and accepted 'volumeSizeInGb'; using that from here on")
+            unless $self->{_volume_size_field};
+        $self->{_volume_size_field} = 'volumeSizeInGb';
+
+        return $retry;
+    }
+
+    # Nothing left to try: report the array's own refusal.
+    my $body_text = $resp->decoded_content // '';
+    die $self->_msg("POST $endpoint failed: HTTP " . $resp->code
+        . ($body_text =~ /\S/ ? " - $body_text" : '')) . "\n";
 }
 
 # removeMode ONLY_ME deletes this volume alone. INCLUDING_DESCENDANTS would

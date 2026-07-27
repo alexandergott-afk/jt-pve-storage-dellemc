@@ -219,6 +219,60 @@ ok($API->align_size(9 * 1024 ** 3) >= 9 * 1024 ** 3, 'never rounds down');
 }
 
 {
+    # The ScaleIO REST reference documents volumeSizeInKb; Dell's own
+    # python-powerflex SDK sends volumeSizeInGb. Creating a volume is the very
+    # first thing anyone does with this plugin, so an array that only accepts
+    # the other spelling must not stop at the first 'pvesm alloc'.
+    my @bodies;
+    my @warned;
+    my ($api, $ua) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply({}) unless $path eq '/api/types/Volume/instances';
+
+        my $body = decode_json($req->content // '{}');
+        push @bodies, $body;
+
+        return HTTP::Response->new(400, undef,
+            HTTP::Headers->new('Content-Type' => 'application/json'),
+            '{"message":"unknown parameter volumeSizeInKb"}')
+            if exists $body->{volumeSizeInKb};
+
+        return reply({ id => 'vol-gb' });
+    });
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::log_warn =
+        sub { push @warned, $_[1] };
+
+    my $id = $api->volume_create('pve-pf1-100-d0', 20 * 1024 ** 3,
+        storage_pool_id => 'pool-1');
+
+    is($id, 'vol-gb', 'the volume is created with the other size spelling');
+    is(scalar @bodies, 2, 'after exactly one retry');
+    is($bodies[1]{volumeSizeInGb}, 24, 'the fallback sends whole GB, aligned up');
+    ok(!exists $bodies[1]{volumeSizeInKb},
+        'and does not send both spellings at once');
+    like($warned[0] // '', qr/volumeSizeInGb/,
+        'and says which spelling this array wanted');
+}
+
+{
+    # A 5xx may have taken effect. Retrying there would create a second
+    # volume, which is the one outcome a create path may never produce.
+    my $attempts = 0;
+    my ($api) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply({}) unless $path eq '/api/types/Volume/instances';
+        $attempts++;
+        return HTTP::Response->new(500, undef,
+            HTTP::Headers->new('Content-Type' => 'application/json'), '{}');
+    });
+
+    eval { $api->volume_create('pve-pf1-100-d0', $GB8, storage_pool_id => 'p') };
+    ok($@, 'a server error fails the create');
+    is($attempts, 1, 'and the request is sent exactly once');
+}
+
+{
     my ($api) = make_v4();
     eval { $api->volume_create('x' x 40, $GB8, storage_pool_id => 'p') };
     like($@, qr/31/, 'an over-long name is refused with the limit named');

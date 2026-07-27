@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.36~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerFlex: creating a volume sends volumeSizeInKb and falls back to
+    volumeSizeInGb. The ScaleIO REST reference documents the first, Dell's
+    own python-powerflex SDK sends the second, and creating a volume is the
+    very first thing anyone does with this plugin - so an array that accepts
+    only the other spelling no longer stops the first 'pvesm alloc'. The
+    fallback is taken only on a 4xx, which means the array created nothing;
+    a 5xx may have taken effect and is never retried.
+  * docs/TESTING.md: several PowerFlex field names are no longer marked
+    unverified. Dell's own ansible-powerflex collection documents
+    ancestorVolumeId, creationTime, protectionDomainId and the contents of
+    mappedSdcInfo, and confirms the 8 GB allocation unit and that the array
+    rounds up.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:10:57 +0800
+
 jt-pve-storage-dellemc (0.7.35~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

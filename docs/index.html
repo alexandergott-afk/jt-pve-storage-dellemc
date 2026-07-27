@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.35~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.36~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.36~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Dell's REST reference and Dell's own SDK spell the PowerFlex volume-size parameter differently. Creating a volume is the first thing anyone does here, so both are tried — and only on a rejection, never on a server error that may already have created something.</span>
+            <span class="lang-zh">Dell 的 REST 參考文件與 Dell 自己的 SDK，對 PowerFlex 容量參數的拼法並不相同。建立 volume 是使用本外掛的第一件事，因此兩種都會嘗試 —— 而且只在「被拒絕」時，絕不會在「可能已經建立了東西」的伺服器錯誤之後重試。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.35~beta1</div>

@@ -237,13 +237,14 @@ The field names below are still **unverified**. So are the endpoints.
 | Field | Read for | State |
 |---|---|---|
 | `id`, `name`, `sizeInKb`, `volumeSizeInKb` | volumes | corroborated |
-| `ancestorVolumeId` | which volume a snapshot came from | **not verified** |
-| `creationTime` | snapshot date | **not verified** |
-| `mappedSdcInfo`, `sdcId`, `hostId` | mappings | corroborated |
+| `ancestorVolumeId` | which volume a snapshot came from | documented in Dell's own `ansible-powerflex` volume module, which shows it on a snapshot object |
+| `creationTime` | snapshot date | same source, an epoch on the volume object |
+| `mappedSdcInfo`, `sdcId` | mappings | same source: `mappedSdcInfo` carries `sdcId`, `sdcName`, `sdcIp`, `accessMode`, `limitIops` |
+| `hostId` | an NVMe host mapping, read alongside `sdcId` | **not verified** — the SDC-era documentation has no such field, and reading a field that is absent costs nothing |
 | `mappedHostInfo` | NVMe host mappings, read alongside `mappedSdcInfo` because an empty answer here means "map it again" | **not verified** |
 | `sdcGuid`, `sdcIp` | finding this node's SDC | **not verified** |
 | `maxCapacityInKb`, `capacityInUseInKb`, `thinCapacityInUseInKb` | pool capacity | **not verified** |
-| `protectionDomainId`, `protectionDomainName` | resolving an ambiguous pool name | **not verified** |
+| `protectionDomainId`, `protectionDomainName` | resolving an ambiguous pool name | both appear on the volume object in `ansible-powerflex` |
 | `capacityAvailableForVolumeAllocationInKb` | pool capacity, fallback | **not verified** |
 | `access_token`, `refresh_token` | the 4.x login reply | **not verified** |
 | `errorCode`, `message` | the array's own error text | **not verified** |
