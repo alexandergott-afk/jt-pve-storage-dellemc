@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.7.55~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Documentation site: the tables have column separators as well as row
+    ones, so a value can be read against its heading instead of by counting
+    across. Applies to all thirteen tables on the page. The outer edge is
+    left to the wrapper so it is not drawn twice, and a cell that spans the
+    whole width takes no separator - it has no column to be separated from.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 22:23:23 +0800
+
 jt-pve-storage-dellemc (0.7.54~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

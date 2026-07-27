@@ -7,6 +7,20 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.55~beta1] - 2026-07-27
+
+### Changed
+- **Documentation site: the tables have column separators as well as row
+  ones.** A value can now be read against its heading instead of by counting
+  across, which matters most in the four-column feature table. Applies to all
+  thirteen tables on the page.
+
+  The outer edge is left to the wrapper rather than drawn again on the last
+  cell of each row, and a cell spanning the whole width takes no separator —
+  it has no column to be separated from. Header separators use the stronger
+  border colour and body separators the lighter one, so the head still reads
+  as the head.
+
 ## [0.7.54~beta1] - 2026-07-27
 
 ### Changed
