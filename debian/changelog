@@ -1,3 +1,23 @@
+jt-pve-storage-dellemc (0.7.38~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerStore could not have reported its capacity. space_metrics_by_cluster
+    was read as a REST collection; it is an ENTITY NAME for the metrics
+    service, which is reached with POST /metrics/generate and
+    {entity, entity_id, interval}. On an array that does not expose the
+    series as a collection, status() returned undef and the storage showed
+    as inactive with nothing else wrong with it. The documented form is
+    tried first, the collection form second, per-appliance third, and the
+    error names all three.
+  * Metrics records come back oldest first, so the newest is the last one.
+    Taking the first reported the capacity of whenever the window started.
+  * Every REST endpoint this plugin uses is confirmed against Dell's own
+    python-powerstore SDK, which lists them verbatim. docs/TESTING.md says
+    so, and says where to look when Dell's documentation site refuses.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:30:41 +0800
+
 jt-pve-storage-dellemc (0.7.37~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

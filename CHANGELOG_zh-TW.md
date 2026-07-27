@@ -5,6 +5,15 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.38~beta1] - 2026-07-27
+
+### 修正
+- **PowerStore 根本無法回報自己的容量。** `space_metrics_by_cluster` 被當成一個 REST 集合來讀。它其實是效能／容量指標服務的 *entity 名稱*，而該服務要用 `POST /metrics/generate` 搭配 `{entity, entity_id, interval}` 存取 —— 那才是文件記載的形式，也是 Dell 自己的 SDK 送出的形式。在沒有同時把這個序列開放成集合的陣列上，`status()` 會回傳 undef，儲存就顯示為 **inactive**，而其他一切明明都正常。現在先試文件記載的形式，其次是集合形式，再其次是逐一 appliance 加總，而失敗訊息會把三者都列出來。
+- **最新的一筆指標才是當前值。** PowerStore 回傳時是由舊到新，因此取第一筆等於回報「這個時間窗開始時」的容量。
+
+### 變更
+- 本外掛用到的每一個 REST 端點，都已對照 Dell 自己的 `python-powerstore` SDK 確認 —— 它在 `PyPowerStore/utils/constants.py` 中逐字列出了這些路徑。`docs/TESTING.md` 記下了這一點，也記下了當 Dell 文件網站拒絕存取時該去哪裡查：Dell 自己的程式碼。
+
 ## [0.7.37~beta1] - 2026-07-27
 
 ### 修正

@@ -840,11 +840,75 @@ cmp_ok($API->MIN_LUN_ID, '>=', 1,
 }
 
 {
+    # space_metrics_by_cluster is an ENTITY NAME for the metrics service, not
+    # a REST collection. POST /metrics/generate is the documented way to read
+    # one and is what Dell's own SDK sends. An array that does not expose the
+    # series as a collection would otherwise have reported no capacity at all,
+    # which makes status() return undef and the storage show as inactive with
+    # nothing else wrong with it.
+    my @posted;
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+
+        return json_response(200, [{ id => 'cl-1', name => 'Cluster' }])
+            if $key eq 'GET /api/rest/cluster';
+
+        if ($key eq 'POST /api/rest/metrics/generate') {
+            push @posted, decode_json($req->content // '{}');
+            # PowerStore returns these oldest first.
+            return json_response(200, [
+                { timestamp => '2026-07-01T00:00:00Z',
+                  physical_total => 1000, physical_used => 100 },
+                { timestamp => '2026-07-27T00:00:00Z',
+                  physical_total => 21990232555520,
+                  physical_used  => 4398046511104 },
+            ]);
+        }
+
+        # The collection form does not exist on this array.
+        return HTTP::Response->new(404, undef,
+            HTTP::Headers->new('Content-Type' => 'application/json'), '{}')
+            if $key =~ m{space_metrics};
+
+        return json_response(200, []);
+    });
+
+    my ($total, $used, $avail) = $api->get_managed_capacity();
+    is($total, 21990232555520, 'the capacity comes from the metrics service');
+    is($used, 4398046511104, 'and so does the used figure');
+    is($avail, $total - $used, 'available is derived');
+
+    is($posted[0]{entity}, 'space_metrics_by_cluster', 'the entity is named');
+    is($posted[0]{entity_id}, 'cl-1', 'with the cluster it belongs to');
+    ok(defined $posted[0]{interval}, 'and an interval, which the API requires');
+}
+
+{
+    # The newest record is the current one. PowerStore returns them oldest
+    # first, so taking the first row reports the capacity of whenever the
+    # window started rather than of now.
+    my ($api) = make_api(handler => sub {
+        my ($req, $key) = @_;
+        return json_response(200, [{ id => 'cl-1' }])
+            if $key eq 'GET /api/rest/cluster';
+        return json_response(200, [
+            { physical_total => 500, physical_used => 50 },
+            { physical_total => 900, physical_used => 90 },
+        ]) if $key eq 'POST /api/rest/metrics/generate';
+        return json_response(200, []);
+    });
+
+    my ($total) = $api->get_managed_capacity();
+    is($total, 900, 'the newest record is the one reported');
+}
+
+{
     # Neither metric source usable: fail loudly. Reporting zero would make PVE
     # believe the array is empty and let allocations proceed into a full one.
     my ($api) = make_api(handler => sub { json_response(200, []) });
     eval { $api->get_managed_capacity() };
     like($@, qr/could not determine the array's capacity/, 'unknown capacity dies');
+    like($@, qr/metrics/, 'and the message says what was tried');
 }
 
 # ---------------------------------------------------------------------------

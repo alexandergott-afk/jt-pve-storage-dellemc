@@ -12,7 +12,7 @@ version it was observed on.
 
 | Item | Where | Status |
 |---|---|---|
-| REST endpoint paths | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| REST endpoint paths | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE — but every path this plugin uses appears verbatim in Dell's own `python-powerstore` SDK (`PyPowerStore/utils/constants.py`); see below |
 | Response field names (`size`, `wwn`, `logical_used`, `protection_data`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | Filter syntax (`eq.`, `ilike.`, `cs.{...}`, `->>`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE — the operator prefixes and the `*` wildcard are read from the developers guide |
 | Authentication (`login_session`, `DELL-EMC-TOKEN`, `auth_cookie`) | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE — the header, the cookie and "non-GET requires the token" are read from the developers guide |
@@ -208,6 +208,8 @@ the rest:
 | Operators | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
 | `ilike` wildcard | every example in the guide spells it `*` (`?name=ilike.User*`), which is what this plugin sends |
 | Parameters | `select` (comma-separated attributes), `order`, `async` |
+| Endpoints | every path this plugin uses appears verbatim in Dell's `python-powerstore` SDK: `/login_session`, `/logout`, `/cluster`, `/appliance`, `/volume`, `/volume/{id}`, `/volume/{id}/attach`, `/detach`, `/restore`, `/snapshot`, `/clone`, `/host`, `/host/{id}`, `/host_group`, `/host_volume_mapping`, `/ip_pool_address`, `/ip_port/{id}`, `/job/{id}` |
+| Metrics | `POST /metrics/generate` with `{entity, entity_id, interval}`. `space_metrics_by_cluster` is an **entity name for that call**, not a REST collection — reading it as one is what this plugin used to do |
 | Pagination | `limit` (1–2000, default 100) and `offset` URL parameters, or a `Range` request header |
 | Partial results | a collection larger than the limit answers `206 Partial Content` with `Content-Range: 0-99/1000` — the figure after the slash is the total |
 | Offset past the end | `416 Range Not Satisfiable`, which paging can reach legitimately if the collection shrinks between pages, so it ends the paging instead of failing |

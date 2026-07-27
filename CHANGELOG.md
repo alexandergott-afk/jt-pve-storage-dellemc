@@ -7,6 +7,28 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.38~beta1] - 2026-07-27
+
+### Fixed
+- **PowerStore could not have reported its capacity.**
+  `space_metrics_by_cluster` was read as a REST collection. It is an *entity
+  name* for the metrics service, which is reached with
+  `POST /metrics/generate` and `{entity, entity_id, interval}` — that is the
+  documented form and what Dell's own SDK sends. On an array that does not
+  also expose the series as a collection, `status()` returned undef and the
+  storage showed as **inactive** with nothing else wrong with it. The
+  documented form is tried first, the collection form second, per-appliance
+  third, and the failure message names all three.
+- **The newest metrics record is the current one.** PowerStore returns them
+  oldest first, so taking the first row reported the capacity of whenever the
+  window started.
+
+### Changed
+- Every REST endpoint this plugin uses is confirmed against Dell's own
+  `python-powerstore` SDK, which lists them verbatim in
+  `PyPowerStore/utils/constants.py`. `docs/TESTING.md` records that, and
+  records where to look when Dell's documentation site refuses: Dell's code.
+
 ## [0.7.37~beta1] - 2026-07-27
 
 ### Fixed

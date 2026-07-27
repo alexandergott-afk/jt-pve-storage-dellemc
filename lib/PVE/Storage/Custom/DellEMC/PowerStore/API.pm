@@ -346,50 +346,141 @@ sub appliance_list {
     return $self->_collection('/appliance', { select => 'id,name,model' }, %opts);
 }
 
+# Space figures out of one metrics record.
+#
+# Returns (total, used), either of which may be 0 when the record does not
+# carry it. The candidates are collected and the first that is a positive
+# number wins — never a chained // compared against something, which is the
+# shape that has bitten this project four times.
+sub _space_from_metric {
+    my ($self, $row) = @_;
+
+    return (0, 0) unless ref($row) eq 'HASH';
+
+    my $pick = sub {
+        for my $field (@_) {
+            my $value = $row->{$field};
+            return $value + 0 if defined $value && $value =~ /^\d+(?:\.\d+)?$/;
+        }
+        return 0;
+    };
+
+    return (
+        $pick->(qw(physical_total total_physical last_physical_total)),
+        $pick->(qw(physical_used  total_used     last_physical_used)),
+    );
+}
+
+# The newest record in a metrics reply.
+#
+# PowerStore returns these oldest-first, so the last row is the current one.
+# Taking the first would report the capacity of whenever the window started.
+sub _newest_metric {
+    my ($self, $rows) = @_;
+
+    return undef unless ref($rows) eq 'ARRAY' && @$rows;
+
+    my $newest;
+    for my $row (@$rows) {
+        next unless ref($row) eq 'HASH';
+        $newest = $row;
+    }
+
+    return $newest;
+}
+
+# Ask the metrics service for one entity's space figures.
+#
+# POST /metrics/generate { entity, entity_id, interval } is the documented
+# way to read a metric, and it is what Dell's own python-powerstore SDK
+# sends. The entity names are the space_metrics_by_* series. Returns undef
+# rather than dying: the caller has other things to try.
+sub _space_metrics {
+    my ($self, $entity, $entity_id, %opts) = @_;
+
+    return undef unless defined $entity_id && length $entity_id;
+
+    my $rows = eval {
+        $self->post('/metrics/generate',
+            { entity => $entity, entity_id => $entity_id,
+              interval => 'Five_Mins' }, %opts);
+    };
+
+    return $self->_newest_metric($rows);
+}
+
 # ($total, $used, $available) in bytes.
 #
-# Two sources, because which one exists depends on the PowerStore version:
-# the cluster-wide space metrics, and failing that the sum over appliances.
-# NOT YET VERIFIED against hardware — the field names in particular.
+# Three sources, tried in order, because this is the one call that decides
+# whether the storage shows up as active at all.
+#
+#   1. POST /metrics/generate for the cluster. This is the documented form
+#      and the one Dell's SDK uses.
+#   2. GET /space_metrics_by_cluster as a collection. Some versions expose
+#      the series that way; on the ones that do not it is a 404 and costs one
+#      round trip.
+#   3. The same two, per appliance, summed.
+#
+# The plugin used to do (2) alone. space_metrics_by_cluster is an ENTITY NAME
+# for the metrics service, not a REST collection — so on an array where that
+# path does not exist, capacity could not be read at all, status() returned
+# undef and the storage showed as inactive with nothing else wrong with it.
 sub get_managed_capacity {
     my ($self, %opts) = @_;
 
-    my $metrics = eval {
+    my @tried;
+
+    my $cluster = eval { $self->cluster_get(%opts) };
+    my $cluster_id = ref($cluster) eq 'HASH' ? $cluster->{id} : undef;
+
+    if (defined $cluster_id) {
+        push @tried, 'metrics/generate space_metrics_by_cluster';
+        my $row = $self->_space_metrics('space_metrics_by_cluster',
+            $cluster_id, %opts);
+        my ($total, $used) = $self->_space_from_metric($row);
+        return ($total, $used, $total - $used) if $total > 0;
+    }
+
+    push @tried, 'GET /space_metrics_by_cluster';
+    my $rows = eval {
         $self->get('/space_metrics_by_cluster',
             { limit => 1, order => 'timestamp.desc' }, %opts);
     };
-
-    if (ref($metrics) eq 'ARRAY' && @$metrics) {
-        my $row = $metrics->[0];
-        my $total = $row->{physical_total} // $row->{total_physical} // 0;
-        my $used  = $row->{physical_used}  // $row->{total_used}     // 0;
-        if ($total > 0) {
-            return ($total, $used, $total - $used);
-        }
+    if (ref($rows) eq 'ARRAY' && @$rows) {
+        # This form is ordered newest-first by the order parameter above.
+        my ($total, $used) = $self->_space_from_metric($rows->[0]);
+        return ($total, $used, $total - $used) if $total > 0;
     }
 
-    # Fallback: sum the appliances.
+    # Per appliance, summed. Same two forms, same order.
+    push @tried, 'per-appliance metrics';
     my $appliances = eval {
-        $self->_collection('/appliance',
-            { select => 'id,name' }, %opts);
+        $self->_collection('/appliance', { select => 'id,name' }, %opts);
     } // [];
 
     my ($total, $used) = (0, 0);
     for my $appliance (@$appliances) {
-        my $space = eval {
-            $self->get('/space_metrics_by_appliance',
-                { appliance_id => 'eq.' . $appliance->{id}, limit => 1,
-                  order => 'timestamp.desc' }, %opts);
-        };
-        next unless ref($space) eq 'ARRAY' && @$space;
-        my $row = $space->[0];
-        $total += $row->{physical_total} // $row->{total_physical} // 0;
-        $used  += $row->{physical_used}  // $row->{total_used}     // 0;
+        my $id = $appliance->{id} or next;
+
+        my $row = $self->_space_metrics('space_metrics_by_appliance', $id, %opts);
+        unless ($row) {
+            my $legacy = eval {
+                $self->get('/space_metrics_by_appliance',
+                    { appliance_id => 'eq.' . $id, limit => 1,
+                      order => 'timestamp.desc' }, %opts);
+            };
+            $row = (ref($legacy) eq 'ARRAY' && @$legacy) ? $legacy->[0] : undef;
+        }
+
+        my ($t, $u) = $self->_space_from_metric($row);
+        $total += $t;
+        $used  += $u;
     }
 
-    die $self->_msg("could not determine the array's capacity: neither"
-        . " space_metrics_by_cluster nor the per-appliance metrics returned"
-        . " usable figures.") . "\n" unless $total > 0;
+    die $self->_msg("could not determine the array's capacity. Tried: "
+        . join('; ', @tried) . ". None returned a usable total, so this"
+        . " storage cannot report its size. Check that the account may read"
+        . " metrics.") . "\n" unless $total > 0;
 
     return ($total, $used, $total - $used);
 }

@@ -10,7 +10,7 @@ English: [TESTING.md](TESTING.md)
 
 | 項目 | 位置 | 狀態 |
 |---|---|---|
-| REST 端點路徑 | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
+| REST 端點路徑 | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 但本外掛用到的每一個路徑，都能在 Dell 自己的 `python-powerstore` SDK（`PyPowerStore/utils/constants.py`）裡逐字找到；詳見下方 |
 | 回應欄位名稱（`size`、`wwn`、`logical_used`、`protection_data`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | 過濾語法（`eq.`、`ilike.`、`cs.{...}`、`->>`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 比較運算子前綴與 `*` 萬用字元是從開發者指南讀來的 |
 | 認證流程（`login_session`、`DELL-EMC-TOKEN`、`auth_cookie`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 標頭、cookie 與「非 GET 一律需要 token」是從開發者指南讀來的 |
@@ -176,6 +176,8 @@ help create host
 | 運算子 | `eq` `neq` `gt` `gte` `lt` `lte` `ilike` `in` `is` `cs` `cd` |
 | `ilike` 萬用字元 | 指南裡每一個範例都寫成 `*`（`?name=ilike.User*`），本外掛送出的也是這一種 |
 | 參數 | `select`（以逗號分隔的屬性）、`order`、`async` |
+| 端點 | 本外掛用到的每一個路徑，都能在 Dell 的 `python-powerstore` SDK 裡逐字找到：`/login_session`、`/logout`、`/cluster`、`/appliance`、`/volume`、`/volume/{id}`、`/volume/{id}/attach`、`/detach`、`/restore`、`/snapshot`、`/clone`、`/host`、`/host/{id}`、`/host_group`、`/host_volume_mapping`、`/ip_pool_address`、`/ip_port/{id}`、`/job/{id}` |
+| 效能與容量指標 | `POST /metrics/generate`，帶 `{entity, entity_id, interval}`。`space_metrics_by_cluster` 是**那個呼叫的 entity 名稱**，不是一個 REST 集合 —— 而把它當成集合來讀，正是本外掛原本的做法 |
 | 分頁 | URL 參數 `limit`（1～2000，預設 100）與 `offset`，或用 `Range` 請求標頭 |
 | 部分結果 | 集合超過 limit 時回應 `206 Partial Content`，並帶 `Content-Range: 0-99/1000` —— 斜線之後的數字是總筆數 |
 | offset 超過結尾 | `416 Range Not Satisfiable`。分頁過程中若集合在兩頁之間變短，是有可能正常遇到的，因此它會結束分頁而不是失敗 |
