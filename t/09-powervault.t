@@ -1046,4 +1046,39 @@ SKIP: {
         'a wildcard anywhere else is still escaped');
 }
 
+# ---------------------------------------------------------------------------
+# An empty argument shifts every argument after it
+#
+# The ME CLI is positional. 'unmap volume initiator <host> <volume>' with an
+# empty host becomes 'unmap volume initiator <volume>', and Dell's guide is
+# explicit that omitting the initiator removes the DEFAULT mapping — from
+# every host on the array, not just this node.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_api(handler => sub { reply(ok_status()) });
+
+    for my $empty (undef, '') {
+        my $shown = defined $empty ? "''" : 'undef';
+
+        ok(!eval { $api->volume_unmap('pve-me5-100-d0', $empty); 1 },
+            "an unmap with a $shown initiator is refused")
+            or diag('this would have removed the DEFAULT mapping, which'
+                  . ' affects every host on the array');
+        like($@ // '', qr/is empty/, "... saying which argument ($shown)");
+    }
+
+    # The same protection for every other command, since it lives in the
+    # transport rather than in one caller.
+    ok(!eval { $api->volume_delete(''); 1 },
+        'and a delete with an empty name is refused too');
+
+    # An ordinary command is unaffected.
+    ok(eval { $api->volume_unmap('pve-me5-100-d0', 'pve-c1-node1'); 1 },
+        'a complete command still goes through');
+    like($ua->last_request->uri->path,
+        qr{/unmap/volume/initiator/pve-c1-node1/pve-me5-100-d0$},
+        'with the initiator in its own position');
+}
+
 done_testing();

@@ -224,6 +224,25 @@ sub _escape_token {
 sub _cmd {
     my ($self, $tokens, %opts) = @_;
 
+    # An empty argument does not produce an empty argument — it produces a
+    # command with one fewer, and every positional parameter after it shifts
+    # up. 'unmap volume initiator <host> <volume>' with an empty host becomes
+    # 'unmap volume initiator <volume>', and Dell's guide is explicit that
+    # omitting the initiator removes the DEFAULT mapping — from every host on
+    # the array, not just this node.
+    #
+    # This is the transport, so it refuses rather than trying to work out
+    # which caller was careless.
+    for my $i (0 .. $#$tokens) {
+        my $token = $tokens->[$i];
+        next if defined($token) && length($token);
+
+        die $self->_msg("refusing to send '"
+            . join(' ', map { defined($_) && length($_) ? $_ : '<EMPTY>' } @$tokens)
+            . "': argument " . ($i + 1) . " is empty, which would shift every"
+            . " argument after it into the wrong position") . "\n";
+    }
+
     my $pattern_next = 0;
     my @escaped;
     for my $token (@$tokens) {

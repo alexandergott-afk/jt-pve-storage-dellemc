@@ -2665,6 +2665,54 @@ sub volume_export_formats {
         $base_snapshot, $with_snapshots);
 }
 
+# The protocols this storage type actually speaks.
+#
+# 'dell-protocol' is declared once, in Common::Schema, for all three types —
+# PVE::SectionConfig::init dies on a duplicate property name and takes every
+# storage on the node down with it, so a per-family enum is not available.
+# The enum therefore lists every protocol any family supports, and this is
+# what narrows it.
+sub supported_protocols { return ['iscsi', 'fc'] }
+
+# Refuse a protocol this type cannot speak, at the moment it is configured.
+#
+# Without this the mistake survives: PowerFlex died on first use, with the
+# storage already added and every operation failing; the SAN families were
+# worse and simply treated an unknown protocol as iSCSI, so a node asked for
+# one data path and silently got another, permanently.
+#
+# On an update PVE passes only the properties being changed, so an update
+# that does not touch the protocol has nothing to check.
+sub _check_protocol {
+    my ($class, $storeid, $config) = @_;
+
+    my $protocol = $config->{'dell-protocol'};
+    return 1 unless defined $protocol && length $protocol;
+
+    my $allowed = $class->supported_protocols;
+    return 1 if grep { $_ eq $protocol } @$allowed;
+
+    die "Storage type '" . $class->type() . "' speaks "
+      . join(' or ', map { "'$_'" } @$allowed)
+      . "; 'dell-protocol $protocol' belongs to PowerFlex.\n";
+}
+
+sub on_add_hook {
+    my ($class, $storeid, $scfg, %param) = @_;
+
+    $class->_check_protocol($storeid, $scfg);
+
+    return undef;
+}
+
+sub on_update_hook {
+    my ($class, $storeid, $update, %param) = @_;
+
+    $class->_check_protocol($storeid, $update);
+
+    return undef;
+}
+
 sub storage_can_replicate { return 0 }
 
 # ---------------------------------------------------------------------------

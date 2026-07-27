@@ -372,4 +372,53 @@ SKIP: {
         'the transfer format matches what LVMPlugin offers for a raw volume');
 }
 
+# ---------------------------------------------------------------------------
+# A protocol a storage type cannot speak must be refused when it is configured
+#
+# 'dell-protocol' is declared once for all three types — PVE::SectionConfig
+# dies on a duplicate property name — so its enum lists every protocol any
+# family supports. Without a per-type check the mistake survived: PowerFlex
+# died on first use with the storage already added, and the SAN families were
+# worse, silently treating an unknown protocol as iSCSI.
+# ---------------------------------------------------------------------------
+
+{
+    my %speaks = (
+        'PVE::Storage::Custom::DellPowerStorePlugin' => [qw(iscsi fc)],
+        'PVE::Storage::Custom::DellPowerVaultPlugin' => [qw(iscsi fc)],
+        'PVE::Storage::Custom::DellPowerFlexPlugin'  => [qw(sdc nvme)],
+    );
+
+    for my $plugin (@PLUGINS) {
+        my %ok = map { $_ => 1 } @{ $speaks{$plugin} };
+
+        for my $protocol (qw(iscsi fc sdc nvme)) {
+            my $accepted = eval {
+                $plugin->on_add_hook('st', { 'dell-protocol' => $protocol });
+                1;
+            };
+
+            if ($ok{$protocol}) {
+                ok($accepted, "$plugin accepts '$protocol'")
+                    or diag("refused with: $@");
+            } else {
+                ok(!$accepted, "$plugin refuses '$protocol' when it is added")
+                    or diag('the storage would be created and then either fail'
+                          . ' on every operation or silently use another path');
+                like($@ // '', qr/\Q$protocol\E/,
+                    "... naming the protocol that was asked for");
+            }
+        }
+
+        # An update that does not mention the protocol has nothing to check.
+        ok(eval { $plugin->on_update_hook('st', { 'dell-portal' => '10.0.0.5' }); 1 },
+            "$plugin allows an update that does not touch the protocol");
+
+        # One that does is checked.
+        my $bad = $ok{iscsi} ? 'sdc' : 'iscsi';
+        ok(!eval { $plugin->on_update_hook('st', { 'dell-protocol' => $bad }); 1 },
+            "$plugin refuses '$bad' on an update too");
+    }
+}
+
 done_testing();

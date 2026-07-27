@@ -1,3 +1,25 @@
+jt-pve-storage-dellemc (0.7.50~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * A protocol a storage type cannot speak is refused when it is configured.
+    'dell-protocol' is declared once for all three types, because
+    PVE::SectionConfig dies on a duplicate property name and takes every
+    storage on the node with it - so its enum lists every protocol any family
+    supports. PowerStore accepted 'sdc' and PowerFlex accepted 'fc'.
+    PowerFlex then died on first use with the storage already added; the SAN
+    families were worse and treated the unknown protocol as iSCSI, silently
+    and permanently. on_add_hook and on_update_hook now check it, verified
+    through a real 'pvesm add' on this node.
+  * PowerVault: the transport refuses a command with an empty argument. The
+    ME CLI is positional, so an empty argument is not an empty argument - it
+    is a command with one fewer and everything after it shifted up. 'unmap
+    volume initiator <host> <volume>' with an empty host becomes 'unmap
+    volume initiator <volume>', which Dell documents as removing the DEFAULT
+    mapping from every host on the array.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 16:14:35 +0800
+
 jt-pve-storage-dellemc (0.7.49~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

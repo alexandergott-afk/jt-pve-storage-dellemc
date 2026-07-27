@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.50~beta1] - 2026-07-27
+
+### Fixed
+- **A protocol a storage type cannot speak is now refused when it is
+  configured.** `dell-protocol` is declared once for all three types —
+  `PVE::SectionConfig` dies on a duplicate property name and takes every
+  storage on the node with it — so its enum lists every protocol any family
+  supports. PowerStore accepted `sdc`, PowerFlex accepted `fc`. PowerFlex then
+  died on first use with the storage already added and every operation
+  failing; the SAN families were worse and simply treated the unknown protocol
+  as iSCSI, so a node asked for one data path and silently got another,
+  permanently. `on_add_hook` and `on_update_hook` check it now — the only
+  place a per-family constraint on a shared property can live — and it was
+  verified through a real `pvesm add` on this node.
+- **PowerVault: a command with an empty argument is refused by the
+  transport.** The ME CLI is positional, so an empty argument is not an empty
+  argument: it is a command with one fewer and everything after it shifted up.
+  `unmap volume initiator <host> <volume>` with an empty host becomes
+  `unmap volume initiator <volume>`, which Dell documents as removing the
+  **DEFAULT mapping** — from every host on the array, not just this node.
+
+### Changed
+- Confirmed by inspection that neither SAN plugin overrides any PVE-facing
+  destructive method: they implement only the `_array_*` methods that
+  `BlockBase` calls after its guards, so the guards do apply to them. That is
+  the difference from PowerFlex, which inherits nothing and needed each guard
+  added by hand in 0.7.48.
+
 ## [0.7.49~beta1] - 2026-07-27
 
 ### Fixed
