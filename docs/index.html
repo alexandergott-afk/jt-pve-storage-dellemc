@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.36~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.37~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.37~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerFlex NVMe/TCP could not have connected at all — the family's default data path. The host was sent to the SDS-facing port, and the subsystem NQN was read from an object that has no NQN field. Both settled by reading Dell's own Ansible module.</span>
+            <span class="lang-zh">PowerFlex 的 NVMe/TCP 根本連不上 —— 而那是這個系列的預設資料路徑。主機被送往了面向 SDS 的連接埠，而 subsystem NQN 讀的是一個根本沒有 NQN 欄位的物件。兩者都是靠閱讀 Dell 自己的 Ansible 模組才確認的。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.36~beta1</div>

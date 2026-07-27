@@ -249,7 +249,10 @@ The field names below are still **unverified**. So are the endpoints.
 | `access_token`, `refresh_token` | the 4.x login reply | **not verified** |
 | `errorCode`, `message` | the array's own error text | **not verified** |
 | `volumeIdList` | the ids a snapshot request created | **not verified** |
-| `ipList`, `storagePort`, `systemNqn`, `nqn` | the SDT endpoints for NVMe/TCP | **not verified** |
+| `ipList` (with `ip` and `role` per entry) | the SDT addresses a host may connect to | Dell's `ansible-powerflex` sdt module shows both, with roles `StorageOnly` / `HostOnly` / `StorageAndHost` |
+| `nvmePort` | the port a host connects to, 4420 in Dell's example | same source. **Not `storagePort`**, which is 12200 and carries SDS-to-SDT traffic |
+| `discoveryPort` | where the subsystem NQN is discovered, 8009 in Dell's example | same source |
+| `systemNqn`, `nqn` | a subsystem NQN, if an SDT ever carries one | **not verified, and Dell's field list for an SDT has neither** — so the NQN is discovered with `nvme discover` instead |
 
 
 A field that is missing does not fail loudly. A size reads as 0, a WWID as

@@ -5,6 +5,17 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.37~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 的 NVMe/TCP 根本連不上** —— 而 NVMe/TCP 正是這個系列的預設資料路徑。原因有兩個，都是靠閱讀 Dell 自己的 `ansible-powerflex` 模組（其中有一份真實的 SDT 物件）才確認的：
+  - **主機連到了 `storagePort`。** SDT 會公布 `nvmePort` 4420、`storagePort` 12200 與 `discoveryPort` 8009。`storagePort` 走的是 SDS 與 SDT 之間的流量，主機該連的是 `nvmePort`。原本每一次 `nvme connect` 都會被拒絕，也就永遠不會出現任何 namespace。
+  - **subsystem NQN 是從 SDT 讀的，而 SDT 根本沒有 NQN 欄位。** 少了它 `nvme_connect` 會直接 croak，於是 `activate_storage` 在連上任何東西之前就先死了。現在改用 `nvme discover` 對探索連接埠取得 —— 每個儲存一次，之後快取 —— 並跳過探索子系統自己的 NQN。
+- 主機不再連線到 role 為 `StorageOnly` 的 SDT 位址。完全沒有 role 的位址仍然會使用，這樣不熟悉的韌體才不會讓節點一條路徑都沒有。
+
+### 變更
+- `docs/TESTING.md` 記下了 SDT 的欄位名稱、三個連接埠與位址 role，並各自附上 Dell 模組實際顯示的內容。
+
 ## [0.7.36~beta1] - 2026-07-27
 
 ### 修正

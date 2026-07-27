@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.37~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerFlex NVMe/TCP could not have connected at all - the default data
+    path for this family. Two reasons, both settled by reading Dell's own
+    ansible-powerflex module, which shows a real SDT object:
+    - The host connected to storagePort. An SDT publishes nvmePort 4420,
+      storagePort 12200 and discoveryPort 8009; storagePort carries
+      SDS-to-SDT traffic and is not what a host connects to. Every
+      'nvme connect' would have been refused.
+    - The subsystem NQN was read from the SDT, which has no NQN field of any
+      kind. nvme_connect croaks without one, so activate_storage would have
+      died before connecting anything. It is discovered with 'nvme discover'
+      against the discovery port now, once per storage, and cached.
+  * A host no longer connects to an address whose role is StorageOnly.
+  * docs/TESTING.md records the SDT field names, the three ports and the
+    address roles, with what Dell's module shows for each.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:24:45 +0800
+
 jt-pve-storage-dellemc (0.7.36~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

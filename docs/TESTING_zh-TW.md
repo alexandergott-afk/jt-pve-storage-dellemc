@@ -214,7 +214,10 @@ help create host
 | `access_token`、`refresh_token` | 4.x 的登入回應 | **未驗證** |
 | `errorCode`、`message` | 陣列自己的錯誤文字 | **未驗證** |
 | `volumeIdList` | 快照請求建立出來的 id | **未驗證** |
-| `ipList`、`storagePort`、`systemNqn`、`nqn` | NVMe/TCP 的 SDT 端點 | **未驗證** |
+| `ipList`（每一筆帶 `ip` 與 `role`） | host 可以連線的 SDT 位址 | Dell 的 `ansible-powerflex` sdt 模組兩者都有列出，role 為 `StorageOnly`／`HostOnly`／`StorageAndHost` |
+| `nvmePort` | host 連線用的連接埠，Dell 範例中為 4420 | 同一來源。**不是 `storagePort`** —— 那是 12200，走的是 SDS 與 SDT 之間的流量 |
+| `discoveryPort` | 探索 subsystem NQN 的連接埠，Dell 範例中為 8009 | 同一來源 |
+| `systemNqn`、`nqn` | 萬一某個 SDT 真的帶有 subsystem NQN | **未驗證，而且 Dell 列出的 SDT 欄位裡兩者都沒有** —— 因此改用 `nvme discover` 取得 |
 
 
 欄位不存在時不會大聲失敗。容量會讀成 0、WWID 讀成 undef、可用空間讀成滿的。本外掛對其中幾種情況會拒絕動作 —— 例如一次完全讀不到 WWID 的清理，會直接放棄而不是當成「所有 volume 都被刪了」—— 但真正的解法只有一個：拿這張表跟一份真實回應比對。

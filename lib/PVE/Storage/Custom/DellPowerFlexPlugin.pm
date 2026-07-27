@@ -20,6 +20,7 @@ use PVE::Storage::Custom::DellEMC::PowerFlex::Host qw(
     sdc_available sdc_guid sdc_device_for_volume
     nvme_available nvme_host_nqn nvme_connect nvme_device_for_volume
     nvme_multipath_enabled nvme_paths nvme_connected_addresses
+    nvme_discover_nqn
     wait_for_device
 );
 
@@ -518,10 +519,23 @@ sub _ensure_nvme_sessions {
     $connect_opts{io_queues} = $scfg->{'pflex-nvme-io-queues'}
         if $scfg->{'pflex-nvme-io-queues'};
 
+    # An SDT publishes no NQN — Dell's own field list for the object has none
+    # — so for most arrays the subsystem NQN has to be discovered. One
+    # discovery answers for every SDT of the same system, so the first one
+    # that succeeds is reused rather than asking each target in turn.
+    my $nqn = $class->_nvme_subsystem_nqn($storeid, \@missing);
+
     my @failed;
     for my $target (@missing) {
-        push @failed, "$target->{ip}:" . ($target->{port} // 4420)
-            unless nvme_connect($target, %connect_opts);
+        my $address = "$target->{ip}:" . ($target->{port} // 4420);
+
+        my $use = { %$target, nqn => $target->{nqn} // $nqn };
+        unless (defined $use->{nqn} && length $use->{nqn}) {
+            push @failed, $address;
+            next;
+        }
+
+        push @failed, $address unless nvme_connect($use, %connect_opts);
     }
 
     my $now_up = scalar(@$targets) - scalar(@failed);
@@ -539,6 +553,40 @@ sub _ensure_nvme_sessions {
        . " path redundancy.\n" if @failed;
 
     return 1;
+}
+
+# The subsystem NQN to connect to, discovered once per storage.
+#
+# Cached for the life of the process: pvestatd is long-lived, and the NQN of a
+# PowerFlex system does not change while it is running. A target that already
+# carries one is believed without asking.
+my %NVME_NQN;
+
+sub _nvme_subsystem_nqn {
+    my ($class, $storeid, $targets) = @_;
+
+    for my $target (@$targets) {
+        return $target->{nqn}
+            if defined $target->{nqn} && length $target->{nqn};
+    }
+
+    return $NVME_NQN{$storeid} if defined $NVME_NQN{$storeid};
+
+    for my $target (@$targets) {
+        my $nqn = eval {
+            nvme_discover_nqn($target->{ip}, $target->{discovery_port})
+        };
+        next unless defined $nqn && length $nqn;
+
+        $NVME_NQN{$storeid} = $nqn;
+        return $nqn;
+    }
+
+    warn "Storage '$storeid': none of the array's SDT addresses answered NVMe"
+       . " discovery, so there is no subsystem NQN to connect to. Check that"
+       . " the discovery port (8009 by default) is reachable from this node.\n";
+
+    return undef;
 }
 
 # Wall clock of the last time a periodic check ran, per storage and topic.

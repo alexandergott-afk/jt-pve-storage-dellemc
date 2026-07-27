@@ -7,6 +7,30 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.37~beta1] - 2026-07-27
+
+### Fixed
+- **PowerFlex NVMe/TCP could not have connected at all** — and NVMe/TCP is this
+  family's default data path. Two reasons, both settled by reading Dell's own
+  `ansible-powerflex` module, which shows a real SDT object:
+  - **The host connected to `storagePort`.** An SDT publishes `nvmePort` 4420,
+    `storagePort` 12200 and `discoveryPort` 8009. `storagePort` carries
+    SDS-to-SDT traffic; the port a host connects to is `nvmePort`. Every
+    `nvme connect` would have been refused, and no namespace would ever have
+    appeared.
+  - **The subsystem NQN was read from the SDT, which has no NQN field.**
+    `nvme_connect` croaks without one, so `activate_storage` would have died
+    before connecting anything. It comes from `nvme discover` against the
+    discovery port now — once per storage, then cached — and the discovery
+    subsystem's own NQN is skipped.
+- A host no longer connects to an SDT address whose role is `StorageOnly`. An
+  address with no role at all is still used, so an unfamiliar firmware does not
+  leave a node with no paths.
+
+### Changed
+- `docs/TESTING.md` records the SDT field names, the three ports and the
+  address roles, each with what Dell's module actually shows.
+
 ## [0.7.36~beta1] - 2026-07-27
 
 ### Fixed

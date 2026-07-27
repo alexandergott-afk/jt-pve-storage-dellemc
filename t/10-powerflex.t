@@ -788,4 +788,166 @@ SKIP: {
         'an array with no SDT targets is reported');
 }
 
+# ---------------------------------------------------------------------------
+# SDT endpoints
+#
+# An SDT carries three ports and they are not interchangeable. Dell's own
+# ansible-powerflex module shows a real one: nvmePort 4420, storagePort 12200,
+# discoveryPort 8009. storagePort is SDS-to-SDT traffic. Sending a host there
+# means every 'nvme connect' fails and no namespace ever appears — on the data
+# path this family uses by default, so nothing works at all.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply([{
+            id            => 'sdt-1',
+            name          => 'SDT-1',
+            nvmePort      => 4420,
+            storagePort   => 12200,
+            discoveryPort => 8009,
+            ipList        => [
+                { ip => '10.0.0.1', role => 'StorageAndHost' },
+                { ip => '10.0.0.2', role => 'HostOnly' },
+                { ip => '10.0.0.9', role => 'StorageOnly' },
+            ],
+        }]) if $path eq '/api/types/Sdt/instances';
+        return reply({});
+    });
+
+    my $targets = $api->nvme_targets();
+
+    is_deeply([map { $_->{ip} } @$targets], ['10.0.0.1', '10.0.0.2'],
+        'a StorageOnly address is not offered to a host');
+    is($targets->[0]{port}, 4420, 'the NVMe port is what a host connects to')
+        or diag('storagePort is 12200 and carries SDS-to-SDT traffic;'
+              . ' connecting a host there fails every time');
+    is($targets->[0]{discovery_port}, 8009,
+        'and the discovery port is carried along, because the NQN comes from it');
+}
+
+{
+    # An SDT with no role on its addresses: an unfamiliar firmware must not
+    # leave the node with no paths at all.
+    my ($api) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply([{ id => 'sdt-1', ipList => ['10.0.0.3'] }])
+            if $path eq '/api/types/Sdt/instances';
+        return reply({});
+    });
+
+    my $targets = $api->nvme_targets();
+    is(scalar @$targets, 1, 'an address with no role is still offered');
+    is($targets->[0]{port}, 4420, 'defaulting to the standard NVMe/TCP port');
+    is($targets->[0]{discovery_port}, 8009, 'and the standard discovery port');
+    is($targets->[0]{nqn}, undef, 'with no NQN, because an SDT does not carry one');
+}
+
+{
+    # Dell's field list for an SDT has no NQN of any kind, so it has to be
+    # discovered. nvme_connect croaks without one, which would have made this
+    # a total failure of the family's default data path.
+    no warnings 'redefine', 'once';
+
+    my @discovered;
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::Host::_run = sub {
+        my ($cmd) = @_;
+        push @discovered, join(' ', @$cmd);
+        return (
+            "Discovery Log Number of Records 2\n"
+          . "subnqn:  nqn.2014-08.org.nvmexpress.discovery\n"
+          . "subnqn:  nqn.1988-11.com.dell:powerflex:00:abc\n",
+            '', 0);
+    };
+
+    # A plain function, the way the plugin calls it — not a method. Called
+    # as one, the class name would arrive as the address.
+    my $nqn = PVE::Storage::Custom::DellEMC::PowerFlex::Host::nvme_discover_nqn(
+        '10.0.0.1', 8009);
+    is($nqn, 'nqn.1988-11.com.dell:powerflex:00:abc',
+        'the subsystem NQN is read from discovery');
+    like($discovered[0], qr/--trsvcid\s+8009/,
+        'discovery goes to the discovery port, not the data port')
+        or diag("command was: $discovered[0]");
+
+    # The discovery subsystem's own NQN is not something to connect to.
+    isnt($nqn, 'nqn.2014-08.org.nvmexpress.discovery',
+        'and the discovery subsystem itself is skipped');
+}
+
+{
+    # A discovery that fails answers undef rather than dying: it is one path,
+    # and the caller has others to try.
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::Host::_run =
+        sub { return ('', 'connection refused', 1) };
+
+    is(PVE::Storage::Custom::DellEMC::PowerFlex::Host::nvme_discover_nqn(
+        '10.0.0.1', 8009), undef,
+        'a refused discovery is not fatal');
+}
+
+{
+    # End to end: the array publishes SDTs with no NQN (which is what a real
+    # one does), so activate has to discover one before it can connect. Before
+    # this, nvme_connect croaked on the missing NQN and PowerFlex's default
+    # data path never came up at all.
+    no warnings 'redefine', 'once';
+
+    my @connected;
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_connect = sub {
+        my ($target) = @_;
+        push @connected, "$target->{ip}:$target->{port}:$target->{nqn}";
+        return 1;
+    };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_connected_addresses =
+        sub { {} };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_discover_nqn =
+        sub { 'nqn.1988-11.com.dell:powerflex:00:xyz' };
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::Host::nvme_multipath_message =
+        sub { '' };
+
+    my $api = bless {}, 'PVE::Storage::Custom::DellEMC::PowerFlex::API';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::nvme_targets = sub {
+        [ { ip => '10.0.0.1', port => 4420, discovery_port => 8009 },
+          { ip => '10.0.0.2', port => 4420, discovery_port => 8009 } ]
+    };
+
+    my $PF = 'PVE::Storage::Custom::DellPowerFlexPlugin';
+    $PF->_ensure_nvme_sessions('pf-nqn', { 'dell-portal' => '10.0.0.5' }, $api);
+
+    is_deeply([sort @connected], [
+        '10.0.0.1:4420:nqn.1988-11.com.dell:powerflex:00:xyz',
+        '10.0.0.2:4420:nqn.1988-11.com.dell:powerflex:00:xyz',
+    ], 'every target is connected with the discovered subsystem NQN');
+}
+
+{
+    # Discovery that answers nowhere must fail with something that names the
+    # port to check, not croak inside nvme_connect about a missing argument.
+    no warnings 'redefine', 'once';
+
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_connected_addresses =
+        sub { {} };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::nvme_discover_nqn =
+        sub { undef };
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::Host::nvme_multipath_message =
+        sub { '' };
+
+    my $api = bless {}, 'PVE::Storage::Custom::DellEMC::PowerFlex::API';
+    local *PVE::Storage::Custom::DellEMC::PowerFlex::API::nvme_targets =
+        sub { [ { ip => '10.0.0.1', port => 4420, discovery_port => 8009 } ] };
+
+    my @warned;
+    local $SIG{__WARN__} = sub { push @warned, $_[0] };
+
+    my $PF = 'PVE::Storage::Custom::DellPowerFlexPlugin';
+    ok(!eval { $PF->_ensure_nvme_sessions('pf-nonqn',
+        { 'dell-portal' => '10.0.0.5' }, $api); 1 },
+        'no discoverable NQN is a reported failure');
+    like(join('', @warned), qr/discovery port/,
+        'and the message names the port to check');
+}
+
 done_testing();

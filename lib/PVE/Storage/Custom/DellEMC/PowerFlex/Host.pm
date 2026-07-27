@@ -23,6 +23,7 @@ our @EXPORT_OK = qw(
     nvme_available
     nvme_host_nqn
     nvme_connect
+    nvme_discover_nqn
     nvme_disconnect
     nvme_device_for_volume
     nvme_multipath_enabled
@@ -59,6 +60,10 @@ use constant {
     NVME_CLI      => '/usr/sbin/nvme',
     NVME_HOSTNQN  => '/etc/nvme/hostnqn',
     NVME_DEFAULT_PORT => 4420,
+
+    # Discovery runs on its own port, not the data port. An SDT publishes
+    # discoveryPort 8009 and nvmePort 4420, and they are different services.
+    NVME_DISCOVERY_PORT => 8009,
 
     # The NVMe equivalents of no_path_retry / fast_io_fail_tmo / dev_loss_tmo.
     # The kernel default ctrl_loss_tmo is 600s, which is indistinguishable
@@ -381,6 +386,42 @@ sub nvme_multipath_message {
 #                    is 600 seconds, which is long enough to look like a hang.
 #   reconnect-delay  seconds between reconnection attempts.
 #   keep-alive-tmo   how quickly a dead controller is noticed.
+# The subsystem NQN an SDT answers for.
+#
+# An SDT object carries no NQN of any kind — Dell's own module shows its full
+# field list and there is none — so the only place to get one is the discovery
+# service, on its own port (8009 by default, not the data port). 'nvme
+# discover' prints one record per subsystem; subnqn is the field to connect to.
+#
+# Returns undef rather than dying: a target that cannot be discovered is one
+# path, and the caller has others to try.
+sub nvme_discover_nqn {
+    my ($ip, $port, %opts) = @_;
+
+    return undef unless defined $ip && length $ip;
+    $port //= NVME_DISCOVERY_PORT;
+
+    my ($out, $err, $rc) = _run([
+        NVME_CLI, 'discover',
+        '--transport', 'tcp',
+        '--traddr', $ip,
+        '--trsvcid', $port,
+    ], timeout => $opts{timeout} // 15);
+
+    return undef unless defined $rc && $rc == 0;
+
+    # 'subnqn:  nqn.1988-11.com.dell:powerflex:00:...'. The discovery
+    # subsystem's own NQN is not something to connect to, so it is skipped.
+    for my $line (split /\n/, ($out // '')) {
+        next unless $line =~ /^\s*subnqn:\s*(\S+)/;
+        my $nqn = $1;
+        next if $nqn eq 'nqn.2014-08.org.nvmexpress.discovery';
+        return $nqn;
+    }
+
+    return undef;
+}
+
 sub nvme_connect {
     my ($target, %opts) = @_;
 

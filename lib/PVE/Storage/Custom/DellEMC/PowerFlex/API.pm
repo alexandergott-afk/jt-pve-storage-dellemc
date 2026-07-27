@@ -50,6 +50,12 @@ use constant {
     # 8 GB, and the minimum volume size as well.
     SIZE_GRANULARITY => 8 * 1024 ** 3,
 
+    # An SDT's NVMe port for host connections, and its discovery port. Dell's
+    # ansible-powerflex module shows both on a real SDT; storagePort (12200)
+    # is a different thing and is not what a host connects to.
+    NVME_PORT           => 4420,
+    NVME_DISCOVERY_PORT => 8009,
+
     # Names are limited to 31 characters.
     MAX_NAME_LENGTH => 31,
 
@@ -691,19 +697,47 @@ sub sdt_list {
     return ref($data) eq 'ARRAY' ? $data : [];
 }
 
-# [ { ip => '10.0.0.1', port => 4420, nqn => '...' }, ... ]
+# [ { ip => '10.0.0.1', port => 4420, discovery_port => 8009, nqn => undef } ]
+#
+# An SDT carries THREE ports and they are not interchangeable. Dell's own
+# ansible-powerflex module shows a real one: nvmePort 4420, storagePort 12200,
+# discoveryPort 8009. storagePort is SDS-to-SDT traffic; the port a host
+# connects to is nvmePort. Sending a host at storagePort means every
+# 'nvme connect' fails and no namespace ever appears — on the data path this
+# family uses by default.
+#
+# The same object has no NQN field of any kind, so the subsystem NQN is not
+# something the array hands over here. It comes from discovery against
+# discoveryPort, which is why that port is carried along.
+#
+# Each IP has a role: StorageOnly, HostOnly or StorageAndHost. A host has no
+# business connecting to a StorageOnly address. A row with no role at all is
+# kept — an unfamiliar firmware should not leave a node with no paths.
 sub nvme_targets {
     my ($self, %opts) = @_;
 
     my @targets;
     for my $sdt (@{ $self->sdt_list(%opts) }) {
-        my $nqn = $sdt->{systemNqn} // $sdt->{nqn};
-        my $port = $sdt->{storagePort} // 4420;
+        my $port      = $sdt->{nvmePort}      // NVME_PORT;
+        my $discovery = $sdt->{discoveryPort} // NVME_DISCOVERY_PORT;
 
-        for my $ip (@{ $sdt->{ipList} // [] }) {
+        # 'ipList' is what an SDT instance carries; 'ips' is what its create
+        # call takes, and some firmware echoes that back instead.
+        my $ips = $sdt->{ipList} // $sdt->{ips} // [];
+
+        for my $ip (ref($ips) eq 'ARRAY' ? @$ips : ()) {
             my $address = ref($ip) eq 'HASH' ? $ip->{ip} : $ip;
             next unless defined $address && length $address;
-            push @targets, { ip => $address, port => $port, nqn => $nqn };
+
+            my $role = ref($ip) eq 'HASH' ? $ip->{role} : undef;
+            next if defined($role) && length($role) && $role !~ /host/i;
+
+            push @targets, {
+                ip             => $address,
+                port           => $port,
+                discovery_port => $discovery,
+                nqn            => $sdt->{systemNqn} // $sdt->{nqn},
+            };
         }
     }
 
