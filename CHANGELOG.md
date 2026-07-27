@@ -7,6 +7,37 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.52~beta1] - 2026-07-27
+
+### Fixed
+- **A snapshot named `before-s-after` decoded as a snapshot of a volume that
+  does not exist.** PVE validates a snapshot name as `pve-configid`, which
+  permits `-`, so that name is one a user can type. On PowerVault and
+  PowerFlex, whose snapshot separator is `-s-`, the separator was matched
+  greedily and took the **last** one. The snapshot was then invisible to
+  `volume_snapshot_list` and missed by the purge that has to run before a
+  volume can be deleted — so deleting that volume would have failed with "it
+  still has snapshots" and nothing to show which.
+
+  Matching lazily is not the fix: it takes the **first** `-s-`, which breaks a
+  storage whose id sanitises to `s`, because then the volume name itself
+  contains `-s-`. The volume half is matched by its actual shape now, which is
+  the only unambiguous reading.
+- **A snapshot name the array would alter is refused rather than silently
+  renamed.** PVE keeps the name the user typed and encodes it again on every
+  later lookup, so a snapshot stored as `trailing` when `trailing-` was asked
+  for is listed under a name that does not match the VM configuration, and a
+  later `trailing` collides with it. `trailing-` is a name PVE accepts.
+
+### Changed
+- A snapshot name that merely does not **fit** is still shortened, and
+  deliberately so: PVE allows 40 characters and a whole PowerVault volume name
+  is 32, so refusing that would reject `before-upgrade` on a realistic storage
+  id. Shortening is deterministic, so every later lookup still finds it.
+- `t/01-naming.t` fuzzes every family's naming with names verified against
+  PVE's own `pve-configid` check, and asserts the volume half is always exact
+  while the snapshot half is only ever a prefix of what was asked for.
+
 ## [0.7.51~beta1] - 2026-07-27
 
 ### Fixed

@@ -53,10 +53,20 @@ is($N->encode_snapshot_name('pve-me5-100-d0', 'before'), 'pve-me5-100-d0-s-befor
 is($N->encode_base_snapshot_name('pve-me5-100-d0'), 'pve-me5-100-d0-base',
     'the template marker uses -base');
 
-# Nothing generated may contain a dot: the array rejects the create outright.
+# A SNAPSHOT name that a dot would change is refused rather than folded: PVE
+# keeps the name the user typed, so a snapshot stored as 'v1_2_3' would be
+# listed under a name that does not match the VM configuration. PVE's own
+# pve-configid rejects a dot too, so this cannot arrive from a user — the
+# check is there for whatever else might call it.
+ok(!eval { $N->encode_snapshot_name('pve-me5-100-d0', 'v1.2.3'); 1 },
+    'a snapshot name a dot would change is refused, not folded');
+
+# The others are not user-visible names: a storeid or a PVE snapshot name
+# embedded in a state or config volume is an implementation detail, and
+# folding it is right. What matters is that nothing generated carries a dot,
+# because the array rejects the create outright.
 for my $name (
     $N->encode_volume_name('st.1', 100, 0),
-    $N->encode_snapshot_name('pve-me5-100-d0', 'v1.2.3'),
     $N->encode_state_name('me5', 100, 'a.b.c'),
     $N->encode_config_volume_name('me5', 100, 'a.b'),
 ) {

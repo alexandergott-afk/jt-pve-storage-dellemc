@@ -79,8 +79,24 @@ my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-t(\d+)\z/;
 my $RE_STATE     = qr/^pve-($PFX)-(\d+)-st-(.+)\z/;
 my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vc-(.+)\z/;
 
-my $RE_SNAPSHOT  = qr/^(.+)-s-(.+)\z/;
-my $RE_BASESNAP  = qr/^(.+)-base\z/;
+# A snapshot name is <volume>-s-<snapname>, and BOTH halves can contain the
+# separator, so neither a greedy nor a lazy match is right.
+#
+#   Greedy '^(.+)-s-(.+)$' takes the LAST '-s-'. A snapshot PVE happily
+#   accepts, 'before-s-after', then decodes as a snapshot of a volume that
+#   does not exist — invisible to volume_snapshot_list, missed by the purge
+#   that has to run before a volume can be deleted.
+#
+#   Lazy '^(.+?)-s-(.+)$' takes the FIRST, which breaks a storage whose id
+#   sanitises to 's': its volumes are named 'pve-s-100-d0' and the volume name
+#   itself contains '-s-'.
+#
+# So the volume half is matched by its actual shape, and everything after the
+# separator that follows it is the snapshot name, whatever it contains.
+my $RE_VOLUME_PART = qr/pve-$PFX-\d+-(?:d\d+|ci|e\d+|t\d+|st-.+|vc-.+)/;
+
+my $RE_SNAPSHOT  = qr/^($RE_VOLUME_PART)-s-(.+)\z/;
+my $RE_BASESNAP  = qr/^($RE_VOLUME_PART)-base\z/;
 
 # ---------------------------------------------------------------------------
 # Encoding
@@ -171,6 +187,8 @@ sub encode_snapshot_name {
     $snap = substr($snap, 0, $budget);
     $snap =~ s/[-_]+$//;
     $snap = 's' unless length $snap;
+
+    $class->_assert_snapname_survives($snapname, $snap, $budget);
 
     return $prefix . $snap;
 }

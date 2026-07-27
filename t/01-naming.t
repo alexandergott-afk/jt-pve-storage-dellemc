@@ -8,6 +8,9 @@ use warnings;
 use Test::More;
 
 use PVE::Storage::Custom::DellEMC::Common::Naming;
+use PVE::Storage::Custom::DellEMC::PowerStore::Naming;
+use PVE::Storage::Custom::DellEMC::PowerVault::Naming;
+use PVE::Storage::Custom::DellEMC::PowerFlex::Naming;
 my $N = 'PVE::Storage::Custom::DellEMC::Common::Naming';
 
 # A family subclass with wider limits, used to check that the limits really
@@ -264,6 +267,134 @@ ok(!$N->is_valid_snapshot_name('.leading-dot'), 'snapshot must start alphanumeri
     ok($max, 'the largest real vmid still decodes');
     is($max->{vmid}, 999999999, '... as an integer');
     ok($max->{vmid} !~ /e/i, '... not in scientific notation');
+}
+
+# ---------------------------------------------------------------------------
+# A snapshot name must survive the round trip, whatever PVE allows in it
+#
+# PVE validates a snapshot name as 'pve-configid', which permits '-'. So
+# 'before-s-after' is a name a user can type — and on the families whose
+# snapshot separator is '-s-' it used to decode as a snapshot of a volume that
+# does not exist: invisible to volume_snapshot_list, and missed by the purge
+# that has to run before the volume can be deleted.
+#
+# Neither a greedy nor a lazy match is correct. Greedy takes the last '-s-';
+# lazy takes the first, which breaks a storage whose id sanitises to 's',
+# because then the volume name itself contains '-s-'.
+# ---------------------------------------------------------------------------
+
+{
+    my @families = (
+        'PVE::Storage::Custom::DellEMC::Common::Naming',
+        'PVE::Storage::Custom::DellEMC::PowerStore::Naming',
+        'PVE::Storage::Custom::DellEMC::PowerVault::Naming',
+        'PVE::Storage::Custom::DellEMC::PowerFlex::Naming',
+    );
+
+    # Every one of these passes PVE's own pve-configid check.
+    # Each of these passes PVE's own pve-configid check — verified with
+    # PVE::JSONSchema::check_format, not assumed.
+    my @snapnames = qw(
+        s snap1 before-s-after a-s-b s-s-s base x-base-y
+        pve-snap-x d0 SNAP snap-1 a1
+    );
+
+    # Including the storage ids that make the volume name itself ambiguous.
+    my @storeids = qw(st s ps1 base d);
+
+    for my $N (@families) {
+        (my $short = $N) =~ s/.*:://;
+        my $bad = 0;
+
+        for my $storeid (@storeids) {
+            my $vol = eval { $N->encode_volume_name($storeid, 100, 0) } or next;
+
+            for my $snap (@snapnames) {
+                # A name the array would ALTER is refused (asserted below).
+                # A name that merely does not FIT is shortened, deterministically
+                # — PVE allows 40 characters and a whole PowerVault volume name
+                # is 32, so refusing that would reject ordinary names. What this
+                # loop checks is that everything short enough to be stored
+                # unchanged comes back exactly as it went in.
+                my $enc = eval { $N->encode_snapshot_name($vol, $snap) };
+                next unless defined $enc;
+
+                my $dec = $N->decode_snapshot_name($enc);
+
+                # The volume half must always be exact — that is the half
+                # that decides which volume a snapshot belongs to, and
+                # getting it wrong hides the snapshot from its own volume.
+                #
+                # The snapshot half may be SHORTER, and only shorter: a name
+                # too long for the array is shortened deterministically, so
+                # every later lookup still finds it. Anything that is not a
+                # prefix of what was asked for is an alteration, and those
+                # are refused by encode rather than reaching here.
+                my $got = $dec ? ($dec->{snapname} // '') : '';
+
+                unless ($dec
+                        && ($dec->{volume} // '') eq $vol
+                        && length($got)
+                        && index($snap, $got) == 0) {
+                    $bad++;
+                    diag("$short: storeid='$storeid' snap='$snap' -> '$enc'"
+                       . " decoded as volume='"
+                       . ($dec->{volume} // 'undef') . "' snapname='"
+                       . ($dec->{snapname} // 'undef') . "'");
+                }
+            }
+        }
+
+        is($bad, 0, "$short: every snapshot name PVE allows survives the round trip");
+    }
+}
+
+{
+    # The template marker must not be confused with a snapshot called 'base',
+    # nor a snapshot whose name merely ends in it.
+    for my $N ('PVE::Storage::Custom::DellEMC::PowerVault::Naming',
+               'PVE::Storage::Custom::DellEMC::PowerFlex::Naming',
+               'PVE::Storage::Custom::DellEMC::PowerStore::Naming') {
+        (my $short = $N) =~ s/.*:://;
+
+        my $vol    = $N->encode_volume_name('st', 100, 0);
+        my $marker = $N->encode_base_snapshot_name($vol);
+        my $snap   = $N->encode_snapshot_name($vol, 'base');
+
+        isnt($marker, $snap, "$short: the marker and a snapshot named 'base' differ");
+
+        my $dm = $N->decode_snapshot_name($marker);
+        ok($dm && $dm->{is_base}, "$short: the marker decodes as the marker");
+        is($dm->{volume}, $vol, "$short: ... of the right volume");
+
+        my $ds = $N->decode_snapshot_name($snap);
+        ok($ds && !$ds->{is_base},
+            "$short: a snapshot named 'base' is not the marker");
+        is($ds->{snapname}, 'base', "$short: ... and keeps its name");
+    }
+}
+
+{
+    # A name PVE accepts but the array cannot hold unchanged is refused, not
+    # silently renamed. Storing 'trailing' when the user asked for
+    # 'trailing-' leaves the snapshot listed under a name that does not match
+    # the VM configuration, and lets a later 'trailing' collide with it.
+    for my $N ('PVE::Storage::Custom::DellEMC::Common::Naming',
+               'PVE::Storage::Custom::DellEMC::PowerVault::Naming',
+               'PVE::Storage::Custom::DellEMC::PowerFlex::Naming',
+               'PVE::Storage::Custom::DellEMC::PowerStore::Naming') {
+        (my $short = $N) =~ s/.*:://;
+        my $vol = $N->encode_volume_name('st', 100, 0);
+
+        ok(!eval { $N->encode_snapshot_name($vol, 'trailing-'); 1 },
+            "$short: a name the array would alter is refused");
+        like($@ // '', qr/cannot be stored on this array under that name/,
+            "$short: ... saying what would have happened");
+        like($@ // '', qr/trailing/, "$short: ... and suggesting a name");
+
+        ok(eval { $N->encode_snapshot_name($vol, 'trailing'); 1 },
+            "$short: the suggested name is accepted");
+    }
 }
 
 done_testing();

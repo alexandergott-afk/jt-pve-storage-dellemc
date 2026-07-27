@@ -1,3 +1,27 @@
+jt-pve-storage-dellemc (0.7.52~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * A snapshot named 'before-s-after' - which PVE accepts - decoded as a
+    snapshot of a volume that does not exist on PowerVault and PowerFlex,
+    whose snapshot separator is '-s-'. It was invisible to
+    volume_snapshot_list and missed by the purge that has to run before a
+    volume can be deleted, so deleting that volume would have failed with
+    "it still has snapshots" and no way to see which. The separator was
+    matched greedily, taking the last '-s-'; matching lazily would take the
+    first and break a storage whose id sanitises to 's', whose volume names
+    contain '-s-' themselves. The volume half is matched by its actual shape
+    now.
+  * A snapshot name the array would ALTER rather than shorten is refused
+    instead of being silently renamed. PVE keeps the name the user typed, so
+    a snapshot stored as 'trailing' when 'trailing-' was asked for is listed
+    under a name that does not match the VM configuration, and a later
+    'trailing' collides with it. A name that merely does not fit is still
+    shortened deterministically - PVE allows 40 characters and a whole
+    PowerVault volume name is 32.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 19:04:06 +0800
+
 jt-pve-storage-dellemc (0.7.51~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

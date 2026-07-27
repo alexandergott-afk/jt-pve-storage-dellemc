@@ -221,6 +221,49 @@ sub _fit_suffix {
 
 # Snapshot names are '{volume}.pve-snap-{snapname}'. The volume part is
 # already sanitized, so only the suffix needs work here.
+# Refuse a snapshot name the array cannot hold under that name.
+#
+# The sanitiser exists so a name always reaches the array in a form it will
+# accept, and for a storeid that is right — the operator sees the storage id
+# they chose, and the array name is an implementation detail. For a SNAPSHOT
+# name it is not: PVE keeps the name the user typed, and every later lookup
+# encodes it again. As long as encoding is deterministic that still works,
+# but the snapshot is listed under a different name than the one in the VM
+# configuration, and two names that sanitise alike collide.
+#
+# PVE validates a snapshot name as 'pve-configid', which permits a trailing
+# '-'; the sanitiser strips it. Rather than quietly storing 'trailing' when
+# the user asked for 'trailing-', say so and let them choose a name that
+# survives.
+#
+# Truncation is not covered here: a name too long for the array is a
+# different problem with a different message, and the caller checks the
+# budget before this.
+sub _assert_snapname_survives {
+    my ($class, $snapname, $encoded, $budget) = @_;
+
+    return 1 unless defined $snapname && length $snapname;
+    return 1 if $encoded eq $snapname;
+
+    # Truncation is NOT refused, and the difference matters. PVE allows a
+    # 40-character snapshot name; a whole PowerVault volume name is 32 bytes.
+    # Refusing everything that does not fit would reject 'before-upgrade' on
+    # a realistic storage id, which is not a defect to fix but a limit to
+    # live with — and the plugin already makes such names fit deterministically,
+    # so lookups, deletes and rollbacks all still find the snapshot.
+    #
+    # What is refused is the avoidable case: a name the array would ALTER
+    # rather than shorten. The operator can simply choose another.
+    return 1 if defined $budget && length($snapname) > $budget;
+
+    die "Snapshot name '$snapname' cannot be stored on this array under that"
+      . " name: it would become '$encoded'. The snapshot would then be listed"
+      . " under a name that does not match the one in the VM configuration,"
+      . " and a second snapshot whose name reduces to the same thing would"
+      . " collide with it. Use '$encoded', or a name without leading or"
+      . " trailing punctuation.\n";
+}
+
 sub encode_snapshot_name {
     my ($class, $volume, $snapname) = @_;
 
@@ -236,6 +279,8 @@ sub encode_snapshot_name {
     $snap = substr($snap, 0, $budget);
     $snap =~ s/[-_]+$//;
     $snap = 'snap' unless length($snap);
+
+    $class->_assert_snapname_survives($snapname, $snap, $budget);
 
     return "${prefix}${snap}";
 }
