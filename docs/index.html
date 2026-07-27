@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.40~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.41~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -985,6 +985,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.41~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A LUN with one path gets no multipath map on a node whose find_multipaths is strict — the Debian default, and exactly what a first hardware test looks like. The diagnostic now names it instead of leaving the operator to connect two facts.</span>
+            <span class="lang-zh">在 find_multipaths 為 strict 的節點上，只有單一路徑的 LUN 不會產生 multipath map —— 那是 Debian 的預設值，也正是第一次實機測試的樣子。診斷訊息現在會直接指名它，而不是把兩件事的關聯留給操作者自己想通。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.40~beta1</div>

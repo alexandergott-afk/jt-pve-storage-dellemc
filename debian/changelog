@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.7.41~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The "device did not appear" diagnostic now names find_multipaths when
+    that is what happened. Debian defaults it to 'strict', and with that
+    setting multipathd builds no map for a LUN it can only see one path to -
+    which is exactly a first hardware test with one iSCSI session or one HBA
+    port. The message used to report "by-id links yes, map no" and leave the
+    operator to connect the two.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 12:13:54 +0800
+
 jt-pve-storage-dellemc (0.7.40~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

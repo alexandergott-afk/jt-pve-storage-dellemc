@@ -7,6 +7,17 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.41~beta1] - 2026-07-27
+
+### Added
+- The "device did not appear" diagnostic names `find_multipaths` when that is
+  what happened. Debian defaults it to `strict`, and with that setting
+  multipathd builds no map for a LUN it can only see one path to — which is
+  exactly what a first hardware test with one iSCSI session or one HBA port
+  looks like. The message reported "by-id links yes, map no" and left the
+  operator to connect the two; it now says so, with the setting's actual value
+  read from multipathd's own merged configuration.
+
 ## [0.7.40~beta1] - 2026-07-27
 
 ### Fixed

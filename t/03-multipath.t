@@ -252,4 +252,61 @@ is_deeply(get_scsi_paths_for_wwid('not-a-wwid'), [],
         'and names the process holding the device, which fuser put on stderr');
 }
 
+# ---------------------------------------------------------------------------
+# Reading a setting out of multipathd's merged configuration
+#
+# Debian defaults find_multipaths to 'strict', and with that setting a LUN
+# with a single path never gets a map. A first hardware test with one session
+# or one HBA port is exactly that case, and the operator sees "by-id links
+# yes, map no" with no reason to connect the two.
+# ---------------------------------------------------------------------------
+
+{
+    no warnings 'redefine', 'once';
+
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd = sub {
+        return (<<'CONF', '', 0);
+defaults {
+	verbosity 2
+	user_friendly_names "yes"
+	find_multipaths "strict"
+}
+devices {
+	device {
+		vendor "DellEMC"
+		user_friendly_names "no"
+	}
+}
+CONF
+    };
+
+    is(PVE::Storage::Custom::DellEMC::Common::Multipath::_multipath_setting(
+        'find_multipaths'), 'strict', 'a global setting is read');
+
+    # The per-device override is indented further and must not win: the
+    # question being asked is what the node does by default.
+    is(PVE::Storage::Custom::DellEMC::Common::Multipath::_multipath_setting(
+        'user_friendly_names'), 'yes',
+        'the defaults section answers, not a per-device override');
+
+    is(PVE::Storage::Custom::DellEMC::Common::Multipath::_multipath_setting(
+        'not_a_real_setting'), undef, 'an absent setting reads as undef');
+}
+
+{
+    # multipathd that cannot be asked must answer undef, not die: this runs
+    # inside a diagnostic that is already reporting a failure.
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellEMC::Common::Multipath::_run_cmd =
+        sub { die "timeout\n" };
+
+    my $answer = eval {
+        PVE::Storage::Custom::DellEMC::Common::Multipath::_multipath_setting(
+            'find_multipaths');
+    };
+    ok(!$@, 'an unreachable multipathd does not take the diagnostic down')
+        or diag("died with: $@");
+    is($answer, undef, 'and the setting reads as unknown');
+}
+
 done_testing();

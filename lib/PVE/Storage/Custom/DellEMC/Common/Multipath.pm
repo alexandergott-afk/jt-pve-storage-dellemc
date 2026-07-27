@@ -1375,7 +1375,47 @@ sub describe_wwid_state {
     push @out, "  /dev/disk/by-id links for this WWID: "
         . (@links ? join(', ', map { my $b = $_; $b =~ s|.*/||; $b } @links) : 'none');
 
+    # Paths arrived and multipath did not claim them. On a node whose
+    # find_multipaths is 'strict' or 'yes' — the Debian default — a LUN with a
+    # single path never gets a map at all, which is exactly what a first
+    # hardware test with one session or one HBA port looks like. The operator
+    # sees "links yes, map no" and has no reason to connect the two, so say it.
+    if (@links) {
+        my $setting = _multipath_setting('find_multipaths');
+
+        if (defined $setting && $setting =~ /^(?:strict|yes|smart)$/i) {
+            push @out, "  find_multipaths is '$setting' on this node, and the"
+                     . " paths above exist while no map does. With that setting"
+                     . " multipathd will not build a map for a LUN it can only"
+                     . " see one path to. Check that this node has more than one"
+                     . " path to the array, or set 'find_multipaths no' in"
+                     . " /etc/multipath.conf if a single path is intended.";
+        }
+    }
+
     return join("\n", @out);
+}
+
+# One setting as multipathd itself reports it, which is the merged result of
+# every configuration file rather than whatever one of them happens to say.
+# Returns undef when multipathd cannot be asked.
+sub _multipath_setting {
+    my ($name) = @_;
+
+    my ($stdout) = eval {
+        _run_cmd([MULTIPATHD, 'show', 'config'],
+            allow_nonzero => 1, ignore_errors => 1, timeout => 10);
+    };
+    return undef unless defined $stdout;
+
+    # The defaults section comes first, and per-device overrides are indented
+    # further; the first match is the global one.
+    for my $line (split /\n/, $stdout) {
+        next unless $line =~ /^\s*\Q$name\E\s+"?([A-Za-z0-9_.-]+)"?\s*$/;
+        return $1;
+    }
+
+    return undef;
 }
 
 1;
