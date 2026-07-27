@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.7.54~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Documentation site: a value that is the same for every family now spans
+    the three columns and is centred. Left-aligned in a spanning cell it read
+    as though it belonged to PowerStore, which is the opposite of what it
+    means. Rows where the families genuinely differ keep their separate
+    cells, so the table now shows at a glance which is which.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 22:19:22 +0800
+
 jt-pve-storage-dellemc (0.7.53~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

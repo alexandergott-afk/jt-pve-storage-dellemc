@@ -7,6 +7,18 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.54~beta1] - 2026-07-27
+
+### Changed
+- **Documentation site: a value that is the same for every family spans the
+  three columns and is centred.** Left-aligned in a spanning cell it read as
+  though it belonged to PowerStore — the opposite of what it means. The five
+  rows that were three identical ticks are merged as well.
+
+  Rows where the families genuinely differ keep their separate cells, so the
+  table now says at a glance which is which: a merged row is the same
+  everywhere, a split row is not.
+
 ## [0.7.53~beta1] - 2026-07-27
 
 ### Changed

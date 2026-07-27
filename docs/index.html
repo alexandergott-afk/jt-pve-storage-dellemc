@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.53~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.54~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -880,15 +880,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                 <th>PowerFlex</th>
             </tr></thead>
             <tbody>
-                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td colspan="3" class="all-families">✓</td></tr>
+                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td colspan="3" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td>
-                    <td colspan="3"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
-                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                    <td colspan="3" class="all-families"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
+                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td colspan="3" class="all-families">✓</td></tr>
+                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td colspan="3" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
-                    <td colspan="3"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
-                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
+                    <td colspan="3" class="all-families"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
+                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td colspan="3" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td>
                     <td><span class="lang-en">✓ (optional)</span><span class="lang-zh">✓（可關閉）</span></td>
                     <td><span class="lang-en">— (volume ceiling too low)</span><span class="lang-zh">—（volume 上限太少）</span></td><td>—</td></tr>
@@ -896,7 +896,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                     <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td></tr>
                 <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td></tr>
                 <tr><td><span class="lang-en">Full clone via the array</span><span class="lang-zh">陣列端完整複製</span></td>
-                    <td colspan="3"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
+                    <td colspan="3" class="all-families"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
             </tbody>
         </table>
     </div>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.54~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">In the feature table, a value that is the same for every family now spans the three columns and is centred. A merged row means "the same everywhere"; a split row means the families differ.</span>
+            <span class="lang-zh">功能支援表中，三個系列相同的值改為跨欄置中。合併的列代表「三者相同」，分欄的列代表「有差異」。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.53~beta1</div>

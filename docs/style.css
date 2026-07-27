@@ -429,6 +429,14 @@ td {
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--indigo-subtle); }
 
+/* A value that is the same for every family spans the columns. Left-aligned
+   it reads as if it belonged to the first one, which is the opposite of what
+   it means. */
+td.all-families {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
 td code {
     background: var(--indigo-subtle);
     padding: 1px 5px; border-radius: 3px;
