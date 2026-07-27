@@ -16,6 +16,9 @@ use PVE::Storage::Custom::DellEMC::Common::Schema;
 use PVE::Storage::Custom::DellEMC::Common::Health;
 use PVE::Storage::Custom::DellEMC::PowerFlex::API;
 use PVE::Storage::Custom::DellEMC::PowerFlex::Naming;
+use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
+    is_block_device is_device_in_use
+);
 use PVE::Storage::Custom::DellEMC::PowerFlex::Host qw(
     sdc_available sdc_guid sdc_device_for_volume
     nvme_available nvme_host_nqn nvme_connect nvme_device_for_volume
@@ -730,6 +733,12 @@ sub free_image {
         return undef;
     }
 
+    $class->_assert_own_object($storeid, $array_name, 'delete volume');
+
+    # Nothing may be using it here. This unmaps before it deletes, so acting
+    # on a wrong "free" takes the disk from a guest that is still writing.
+    $class->_assert_not_in_use($scfg, $id, 'delete volume', $volname);
+
     # Unmap everywhere before deleting, for the same reason as the SAN
     # families: a volume deleted while still mapped leaves other nodes with a
     # device that answers nothing.
@@ -813,6 +822,7 @@ sub _purge_own_snapshots {
         next if $opts{keep_base} && $decoded->{is_base};
         next if $opts{base_only} && !$decoded->{is_base};
 
+        $class->_assert_own_object($storeid, $volume->{name}, 'delete snapshot');
         eval { $api->volume_delete($volume->{id}, storeid => $storeid) };
         if ($@) {
             my $err = $@;
@@ -1000,6 +1010,55 @@ sub _device_lookup {
         : sub { nvme_device_for_volume($volume_id) };
 }
 
+# The ownership gate, in front of every array-side delete.
+#
+# Same rule as BlockBase::_assert_own_object, spelled out here because this
+# plugin does not inherit it. The storeid is not optional: without it the
+# check only proves the name looks like SOME PVE plugin's, which does not
+# authorise deleting it — a second storage on the same system produces names
+# of exactly that shape.
+sub _assert_own_object {
+    my ($class, $storeid, $name, $what) = @_;
+
+    return 1 if $NAMING->is_pve_managed_volume($name, $storeid);
+
+    die "Refusing to $what '" . (defined $name ? $name : '(undef)')
+      . "': it is not an object storage '" . (defined $storeid ? $storeid : '?')
+      . "' created. This plugin only deletes objects whose names it generated"
+      . " itself; something has gone wrong upstream of here.\n";
+}
+
+# Refuse a destructive operation while this node is using the volume, and
+# refuse it just as firmly when that cannot be established.
+#
+# The SAN families get this from BlockBase. PowerFlex does not inherit it —
+# the data path is an NVMe namespace or an SDC device, not a dm-multipath map
+# — so it is spelled out here rather than being absent, which is what it was.
+#
+# is_device_in_use answers 1 / 0 / undef, and undef means the checks could not
+# prove anything: a stat that timed out, unreadable sysfs, a fuser that could
+# not run. fuser is the only one of them that sees a running QEMU, which holds
+# the device open with no mount and no holder.
+sub _assert_not_in_use {
+    my ($class, $scfg, $volume_id, $what, $volname) = @_;
+
+    my $device = eval { $class->_device_lookup($scfg, $volume_id)->() };
+    return 1 unless $device;
+
+    return 1 unless is_block_device($device);
+
+    my $in_use = is_device_in_use($device);
+
+    die "Cannot $what '$volname': whether device $device is still in use could"
+      . " not be determined. Refusing rather than assuming it is free.\n"
+        unless defined $in_use;
+
+    die "Cannot $what '$volname': device $device is still in use. Stop the VM"
+      . " first.\n" if $in_use;
+
+    return 1;
+}
+
 sub path {
     my ($class, $scfg, $volname, $storeid, $snapname) = @_;
 
@@ -1124,6 +1183,7 @@ sub volume_snapshot_delete {
         return 1;
     }
 
+    $class->_assert_own_object($storeid, $snap_name, 'delete snapshot');
     eval { $api->volume_delete($id, storeid => $storeid) };
     if ($@) {
         my $err = $@;
@@ -1194,7 +1254,28 @@ sub volume_snapshot_rollback {
     my $snap_id = $api->volume_id_by_name($snap_name, storeid => $storeid)
         or die "Cannot roll back: snapshot '$snap' is not on the array\n";
 
+    # A rollback overwrites the whole volume, and the damage is not visible
+    # until the guest next reads.
+    $class->_assert_not_in_use($scfg, $volume_id, 'roll back volume', $volname);
+
+    # Flush before, invalidate after. Dirty pages written back after the array
+    # has restored the snapshot land on top of it, and the result reads as a
+    # rollback that half worked.
+    my $device = eval { $class->_device_lookup($scfg, $volume_id)->() };
+    if ($device && is_block_device($device)) {
+        eval { PVE::Tools::run_command(['/bin/sync'], timeout => 10) };
+        eval { PVE::Tools::run_command(['/sbin/blockdev', '--flushbufs', $device],
+            timeout => 10) };
+    }
+
     $api->snapshot_rollback($volume_id, $snap_id, storeid => $storeid);
+
+    if ($device && is_block_device($device)) {
+        # Without this, reads can still be served from pages holding the
+        # post-snapshot content.
+        eval { PVE::Tools::run_command(['/sbin/blockdev', '--flushbufs', $device],
+            timeout => 10) };
+    }
 
     return 1;
 }
@@ -1259,6 +1340,12 @@ sub create_base {
 
     my $id = $api->volume_id_by_name($array_name, storeid => $storeid)
         or die "Cannot create a template from '$volname': it is not on the array\n";
+
+    # Every linked clone made later reads from this marker snapshot, so a
+    # template captured mid-write is a filesystem that was never consistent,
+    # duplicated into every clone of it.
+    $class->_assert_not_in_use($scfg, $id, 'convert volume to a template',
+        $volname);
 
     my $base = $NAMING->encode_base_snapshot_name($array_name);
     unless ($api->volume_id_by_name($base, storeid => $storeid)) {

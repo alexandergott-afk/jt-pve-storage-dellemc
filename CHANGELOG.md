@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.48~beta1] - 2026-07-27
+
+### Fixed
+- **PowerFlex had no in-use check anywhere.** It does not inherit `BlockBase`,
+  so none of the guards the SAN families have reached it: `free_image` unmapped
+  and deleted a volume, `create_base` captured a template, and
+  `volume_snapshot_rollback` overwrote a volume — none of them testing whether
+  a guest was using it. All three now refuse both when the device is in use and
+  when that cannot be established.
+- **PowerFlex rollback now flushes the host cache before** the array restores
+  the snapshot, and invalidates it after, matching the SAN families.
+- **The ownership gate runs in front of PowerFlex's deletes** — the volume, its
+  snapshots, and the purge pass.
+
+### Added
+- `CLAUDE.md` records every defect this audit found, and a data-safety
+  checklist made of the questions that found them: does "could not determine"
+  reach a destructive action as "safe"; is "the array did not answer"
+  distinguished from "the array said no"; does the guard identify the object or
+  only the storage; can an argument change what a command *means*; is the
+  operation scoped to one map; is a device confirmed by the kernel before
+  being written to; and what can a corrupt state file make an unattended pass
+  do.
+- `40a`: PowerFlex inherits nothing from `BlockBase`, so a safety rule added
+  there has to be added here too. Grep `DellPowerFlexPlugin.pm` before calling
+  such a change done.
+
 ## [0.7.47~beta1] - 2026-07-27
 
 ### Fixed

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.47~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.48~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -987,6 +987,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.48~beta1</div>
+        <div class="changelog-date">2026-07-27</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerFlex does not inherit the shared base class, and none of the safety guards the other two families have had reached it: a delete, a template and a rollback all ran without testing whether a guest was using the volume.</span>
+            <span class="lang-zh">PowerFlex 不繼承共用的基底類別，而另外兩個系列具備的安全守衛沒有任何一項套用到它：刪除、建立範本與還原，全都在未檢查「是否有 guest 正在使用」的情況下執行。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.47~beta1</div>

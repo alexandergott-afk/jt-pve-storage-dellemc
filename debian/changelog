@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.48~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerFlex had no in-use check anywhere. It does not inherit BlockBase, so
+    none of the guards the SAN families have applied to it: free_image
+    unmapped and deleted a volume, create_base captured a template, and
+    volume_snapshot_rollback overwrote a volume, none of them testing whether
+    a guest was using it. All three now refuse both when the device is in use
+    and when that cannot be established.
+  * PowerFlex rollback flushes the host cache before the array restores the
+    snapshot and invalidates it after, as the SAN families do.
+  * The ownership gate now runs in front of PowerFlex's deletes too.
+  * CLAUDE.md records every defect found in this audit, and adds a data-safety
+    checklist of the questions that found them.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 15:21:30 +0800
+
 jt-pve-storage-dellemc (0.7.47~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

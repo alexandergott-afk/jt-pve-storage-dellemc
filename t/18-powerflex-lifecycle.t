@@ -308,4 +308,83 @@ ok($P->volume_rollback_is_possible($scfg, $store, 'vm-300-disk-0', 'second', [])
         'and resizing a snapshot is refused rather than resizing the volume');
 }
 
+# ---------------------------------------------------------------------------
+# PowerFlex does not inherit BlockBase, so every guard the SAN families get
+# has to exist here too. It did not, which is the point of these.
+# ---------------------------------------------------------------------------
+
+{
+    # A delete must refuse when the in-use state cannot be established. This
+    # path unmaps before it deletes, so a wrong "free" takes the disk from a
+    # guest that is still writing to it.
+    reset_array();
+    $P->alloc_image($store, $scfg, 900, 'raw', undef, 1024);
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::_device_lookup =
+        sub { sub { '/dev/nvme0n42' } };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_block_device =
+        sub { 1 };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_device_in_use =
+        sub { undef };
+
+    ok(!eval { $P->free_image($store, $scfg, 'vm-900-disk-0', 0, 'raw'); 1 },
+        'a delete refuses when in-use cannot be established');
+    like($@ // '', qr/could not be determined/, 'and says so');
+    ok(by_name('pve-pf1-900-d0'), 'the volume is untouched');
+}
+
+{
+    # And refuses outright when something is using it.
+    reset_array();
+    $P->alloc_image($store, $scfg, 901, 'raw', undef, 1024);
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::_device_lookup =
+        sub { sub { '/dev/nvme0n43' } };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_block_device =
+        sub { 1 };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_device_in_use =
+        sub { 1 };
+
+    ok(!eval { $P->free_image($store, $scfg, 'vm-901-disk-0', 0, 'raw'); 1 },
+        'a delete refuses while the device is in use');
+    like($@ // '', qr/still in use/, 'naming the reason');
+    ok(by_name('pve-pf1-901-d0'), 'and the volume survives');
+}
+
+{
+    # A rollback overwrites the whole volume; the damage is not visible until
+    # the guest next reads.
+    reset_array();
+    $P->alloc_image($store, $scfg, 902, 'raw', undef, 1024);
+    $P->volume_snapshot($scfg, $store, 'vm-902-disk-0', 'before');
+
+    no warnings 'redefine', 'once';
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::_device_lookup =
+        sub { sub { '/dev/nvme0n44' } };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_block_device =
+        sub { 1 };
+    local *PVE::Storage::Custom::DellPowerFlexPlugin::is_device_in_use =
+        sub { undef };
+
+    ok(!eval { $P->volume_snapshot_rollback($scfg, $store, 'vm-902-disk-0',
+            'before'); 1 },
+        'a rollback refuses when in-use cannot be established');
+    like($@ // '', qr/could not be determined/, 'and says so');
+}
+
+{
+    # The ownership gate refuses a name this storage did not generate.
+    reset_array();
+    ok(!eval { $P->_assert_own_object('pf1', 'someone-elses-volume',
+            'delete volume'); 1 },
+        'the ownership gate refuses a foreign name');
+    like($@ // '', qr/not an object storage/, 'and says whose it is not');
+
+    ok(eval { $P->_assert_own_object('pf1', 'pve-pf1-100-d0',
+            'delete volume'); 1 },
+        'and accepts one of this storage\'s own');
+}
+
 done_testing();
