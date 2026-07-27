@@ -1,3 +1,19 @@
+jt-pve-storage-dellemc (0.7.40~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerStore snapshot dates could have been hours out. A creation_timestamp
+    carries an explicit zone offset - Dell's own sample response ends
+    '+00:00' - and the offset was ignored rather than applied. On an array
+    that reports local time, a node in UTC+8 would have seen every snapshot
+    dated eight hours wrong, which looks like a bug in PVE and is not one.
+  * docs/TESTING.md marks the PowerStore response fields that Dell's sample
+    payloads corroborate, and leaves the rest marked unverified. The volume
+    sample confirms id, name, size in bytes, wwn in naa. form, state, type,
+    appliance_id, logical_used and protection_data with source_id.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 08:40:00 +0800
+
 jt-pve-storage-dellemc (0.7.39~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

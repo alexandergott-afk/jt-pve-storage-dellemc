@@ -221,20 +221,24 @@ volume vanish from PVE while the array still holds them, so a name-prefix
 listing that comes back empty is retried without the filter and matched
 locally — with a warning naming the cause. Report that warning if you see it.
 
-The field names below are still **unverified**. So are the endpoints.
+The **response** field names below are what is still open — what the array
+actually puts in a row, which differs between 3.x and 4.x. Several are now
+corroborated by the sample payloads in Dell's `ansible-powerstore` collection,
+which is noted per row; the rest are still inferred.
 
-| Field | Read for |
-|---|---|
-| `id`, `name`, `size`, `logical_used` | volumes |
-| `wwn` | the WWID the host will see — check this first |
-| `protection_data.source_id` | which snapshot a thin clone came from |
-| `creation_timestamp` | snapshot date, an ISO 8601 string |
-| `physical_total`, `physical_used`, `total_physical`, `total_used` | capacity |
-| `host_id`, `logical_unit_number` | mappings |
-| `address`, `target_iqn`, `appliance_id` | iSCSI portals |
-| `purposes` | which addresses publish an iSCSI target — a list, but accepted as a bare string too |
-| `host_group_id`, `volume_id` | mapping rows |
-| `messages[].message_l10n`, `messages[].code` | the array's own error text |
+| Field | Read for | State |
+|---|---|---|
+| `id`, `name`, `size`, `logical_used` | volumes | all four appear in Dell's `ansible-powerstore` volume sample; `size` is in bytes |
+| `wwn` | the WWID the host will see | the sample shows `naa.68ccf09800ac8ab0e2506d99bee29e40` — the `naa.` form this plugin converts. Still **not verified against a host's own `scsi_id`**, which is the thing to check |
+| `state`, `type` | usable / Primary vs Snapshot | the sample shows `Ready` and `Primary`, which is what the filters here send |
+| `protection_data.source_id` | which snapshot a thin clone came from | `protection_data` in the sample carries `source_id`, `parent_id`, `family_id` |
+| `creation_timestamp` | snapshot date | the sample shows `2022-01-06T05:41:59.381459+00:00` — fractional seconds and an explicit offset, both handled |
+| `appliance_id` | which appliance a volume is on | in the sample |
+| `physical_total`, `physical_used`, `total_physical`, `total_used` | capacity, from a metrics record | **not verified** |
+| `host_id`, `host_group_id`, `logical_unit_number`, `volume_id` | mapping rows | the same names the attach/detach request bodies use, which Dell's SDK confirms |
+| `address`, `target_iqn` | iSCSI portals | **not verified** |
+| `purposes` | which addresses publish an iSCSI target — a list, but a bare string is accepted too | **not verified** |
+| `messages[].message_l10n`, `messages[].code` | the array's own error text | **not verified** |
 
 ### PowerFlex (from the REST documentation)
 

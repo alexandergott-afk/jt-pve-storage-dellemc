@@ -182,6 +182,22 @@ is($P->_volume_row(undef), undef, 'undef row');
 # PVE renders a snapshot date from ctime; handing it the raw string or
 # milliseconds puts the date tens of thousands of years out.
 is($P->_to_epoch('2026-07-26T09:00:00.000Z'), 1785056400, 'ISO 8601 in UTC');
+
+# The exact shape Dell's own module shows for creation_timestamp: fractional
+# seconds and an explicit zone offset.
+is($P->_to_epoch('2026-07-26T09:00:00.381459+00:00'), 1785056400,
+    "the form Dell's sample response uses");
+is($P->_to_epoch('2026-07-26T09:00:00'), 1785056400,
+    'no zone at all is read as UTC');
+
+# An offset that is not zero must move the answer. A snapshot list eight hours
+# out looks like a bug in PVE, and these nodes are in UTC+8.
+is($P->_to_epoch('2026-07-26T17:00:00+08:00'), 1785056400,
+    'a positive offset is subtracted, not ignored');
+is($P->_to_epoch('2026-07-26T01:00:00-08:00'), 1785056400,
+    'and a negative one is added');
+is($P->_to_epoch('2026-07-26T17:00:00+0800'), 1785056400,
+    'with or without the colon');
 is($P->_to_epoch('1785056400'), 1785056400, 'an epoch value passes through');
 is($P->_to_epoch('nonsense'), 0, 'garbage becomes 0, meaning unknown');
 is($P->_to_epoch(undef), 0, 'undef becomes 0');

@@ -189,17 +189,29 @@ sub _api {
 
 # PowerStore timestamps are ISO 8601 in UTC. PVE wants epoch seconds; handing
 # the string through renders snapshot dates in the GUI as nonsense.
+# PowerStore timestamps look like '2022-01-06T05:41:59.381459+00:00' — Dell's
+# own module shows exactly that. The fractional seconds are dropped and the
+# zone offset is applied, rather than assumed to be zero: a snapshot list eight
+# hours out is the kind of wrong that looks like a bug in PVE, and this plugin
+# is written for nodes in UTC+8.
 sub _to_epoch {
     my ($class, $value) = @_;
 
     return 0 unless defined $value && length $value;
     return $value + 0 if $value =~ /^\d+$/;
 
-    if ($value =~ /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/) {
-        return eval { Time::Local::timegm($6, $5, $4, $3, $2 - 1, $1) } // 0;
+    return 0 unless $value =~ /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/;
+
+    my $epoch = eval { Time::Local::timegm($6, $5, $4, $3, $2 - 1, $1) };
+    return 0 unless defined $epoch;
+
+    # 'Z' and a missing offset both mean UTC, which is what timegm gave.
+    if ($value =~ /([+-])(\d{2}):?(\d{2})\z/) {
+        my $shift = ($2 * 3600) + ($3 * 60);
+        $epoch += ($1 eq '+') ? -$shift : $shift;
     }
 
-    return 0;
+    return $epoch;
 }
 
 # ---------------------------------------------------------------------------

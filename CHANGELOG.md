@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.40~beta1] - 2026-07-27
+
+### Fixed
+- **PowerStore snapshot dates could have been hours out.** A
+  `creation_timestamp` carries an explicit zone offset — Dell's own sample
+  response ends `+00:00` — and the offset was parsed off and discarded rather
+  than applied. On an array reporting anything other than UTC, a node in UTC+8
+  would have seen every snapshot dated eight hours wrong: the kind of wrong
+  that looks like a bug in PVE and is not one. Fractional seconds, `Z`, a bare
+  timestamp and both offset spellings are all handled now.
+
+### Changed
+- `docs/TESTING.md` marks which PowerStore **response** fields Dell's own
+  sample payloads corroborate, and leaves the rest explicitly unverified. The
+  volume sample settles `id`, `name`, `size` (bytes), `wwn` (in `naa.` form),
+  `state`, `type`, `appliance_id`, `logical_used`, and `protection_data` with
+  its `source_id`. The WWN still needs comparing against a host's own
+  `scsi_id`, which is the one thing a sample payload cannot answer.
+
 ## [0.7.39~beta1] - 2026-07-27
 
 ### Changed

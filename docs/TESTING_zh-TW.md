@@ -186,20 +186,21 @@ help create host
 
 如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前綴列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
 
-以下欄位仍**未驗證**，端點也是。
+以下是仍未確定的**回應**欄位名稱 —— 也就是陣列實際放進每一列的內容，這部分在 3.x 與 4.x 之間有差異。其中數項現在已由 Dell `ansible-powerstore` collection 裡的範例回應佐證，逐列註明；其餘仍屬推測。
 
-| 欄位 | 用途 |
-|---|---|
-| `id`、`name`、`size`、`logical_used` | volume |
-| `wwn` | 主機將看到的 WWID —— 請優先確認這個 |
-| `protection_data.source_id` | 精簡複製是從哪個快照來的 |
-| `creation_timestamp` | 快照時間，ISO 8601 字串 |
-| `physical_total`、`physical_used`、`total_physical`、`total_used` | 容量 |
-| `host_id`、`logical_unit_number` | 對應 |
-| `address`、`target_iqn`、`appliance_id` | iSCSI portal |
-| `purposes` | 哪些位址對外提供 iSCSI target —— 是一個清單，但單一字串也一併接受 |
-| `host_group_id`、`volume_id` | 對應資料列 |
-| `messages[].message_l10n`、`messages[].code` | 陣列自己的錯誤文字 |
+| 欄位 | 用途 | 狀態 |
+|---|---|---|
+| `id`、`name`、`size`、`logical_used` | volume | 四者都出現在 Dell `ansible-powerstore` 的 volume 範例中；`size` 的單位是位元組 |
+| `wwn` | 主機將看到的 WWID | 範例中是 `naa.68ccf09800ac8ab0e2506d99bee29e40` —— 正是本外掛會轉換的 `naa.` 形式。但仍**未與主機自己的 `scsi_id` 比對過**，那才是該確認的事 |
+| `state`、`type` | 是否可用、Primary 或 Snapshot | 範例中是 `Ready` 與 `Primary`，正是本外掛送出的過濾值 |
+| `protection_data.source_id` | 精簡複製是從哪個快照來的 | 範例的 `protection_data` 帶有 `source_id`、`parent_id`、`family_id` |
+| `creation_timestamp` | 快照時間 | 範例是 `2022-01-06T05:41:59.381459+00:00` —— 小數秒與明確的時區位移，兩者都已處理 |
+| `appliance_id` | volume 位於哪一台 appliance | 範例中有 |
+| `physical_total`、`physical_used`、`total_physical`、`total_used` | 容量，取自指標記錄 | **未驗證** |
+| `host_id`、`host_group_id`、`logical_unit_number`、`volume_id` | 對應資料列 | 與 attach／detach 請求內容所用的名稱相同，Dell 的 SDK 已確認 |
+| `address`、`target_iqn` | iSCSI portal | **未驗證** |
+| `purposes` | 哪些位址對外提供 iSCSI target —— 是一個清單，但單一字串也一併接受 | **未驗證** |
+| `messages[].message_l10n`、`messages[].code` | 陣列自己的錯誤文字 | **未驗證** |
 
 ### PowerFlex（出自 REST 文件）
 
