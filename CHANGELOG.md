@@ -7,6 +7,35 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.51~beta1] - 2026-07-27
+
+### Fixed
+- **Two storage ids that differ only in punctuation produced the same volume
+  names.** The storeid is folded into the prefix with `-` becoming `_`, because
+  `-` is the separator inside a volume name and an id containing one would make
+  decoding ambiguous. That folding is lossy: `ps-1`, `ps.1`, `ps+1`, `ps@1` and
+  `ps__1` all become `ps_1`, and `ps1_`, `_ps1`, `ps1!` all become `ps1`.
+
+  Two such storages on one array shared **every** volume name. Each listed the
+  other's disks, the ownership gate passed for both, and a `qm destroy` on one
+  deleted a volume PVE believed belonged to the other — with nothing visible
+  until it happened. `docs/NAMING_CONVENTIONS.md` had described this as
+  protection against a related case while this one went unmentioned.
+
+  It cannot be fixed inside the name: a whole PowerVault volume name is 32
+  characters and PowerFlex's is 31, and there is nothing to spend. So
+  `on_add_hook` refuses to create a storage whose prefix matches one that
+  already exists, naming the other storage and what to change — the storage id
+  is free at that moment, and a storage that already holds volumes is not.
+  Verified through a real `pvesm add` on this node.
+
+### Added
+- `t/13-hostile.t` asserts the colliding pairs really do collide, and that one
+  storage's ownership gate really does accept the other's volume — so the
+  reason for the hook cannot be forgotten and quietly removed.
+- `CLAUDE.md` lesson 43: a guard that cannot be expressed in the data can still
+  be expressed at the moment the data is created.
+
 ## [0.7.50~beta1] - 2026-07-27
 
 ### Fixed

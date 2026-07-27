@@ -421,4 +421,32 @@ SKIP: {
     }
 }
 
+# Two storage ids that fold to one prefix must be refused at creation. Volume
+# names are built from the prefix, so on one array the two storages would list
+# each other's disks and either could delete the other's.
+{
+    no warnings 'redefine', 'once';
+
+    local *PVE::Storage::config = sub {
+        return { ids => {
+            'dell-1' => { type => 'dellpowerstore' },
+            'other'  => { type => 'dir', path => '/tmp' },
+        } };
+    };
+
+    for my $plugin (@PLUGINS) {
+        ok(!eval { $plugin->_check_prefix_collision('dell_1', {}); 1 },
+            "$plugin refuses a storage id that folds onto an existing prefix");
+        like($@ // '', qr/same volume-name prefix/, '... saying why');
+        like($@ // '', qr/dell-1/, '... and naming the storage it collides with');
+
+        ok(eval { $plugin->_check_prefix_collision('dell2', {}); 1 },
+            "$plugin allows one that does not collide");
+
+        # Re-adding the same id is an update, not a collision with itself.
+        ok(eval { $plugin->_check_prefix_collision('dell-1', {}); 1 },
+            "$plugin does not collide a storage with itself");
+    }
+}
+
 done_testing();

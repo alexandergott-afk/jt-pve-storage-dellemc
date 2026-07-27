@@ -2697,10 +2697,70 @@ sub _check_protocol {
       . "; 'dell-protocol $protocol' belongs to PowerFlex.\n";
 }
 
+# The naming class, exposed under a stable name so one family's hook can ask
+# another family's plugin the same question.
+sub naming_class_for_check { return $_[0]->naming }
+
+# Two different storage ids must not produce the same volume names.
+#
+# The prefix is the storage id sanitised and with '-' folded to '_', because
+# '-' is the separator inside a volume name and a storage id containing one
+# would make decode_volume_name ambiguous. The folding is lossy: 'ps-1',
+# 'ps.1', 'ps+1', 'ps@1' and 'ps__1' all become 'ps_1'.
+#
+# Two such storages on one array share a namespace completely. They list each
+# other's disks, and the ownership gate passes for both — so a `qm destroy` on
+# one deletes a volume PVE believes belongs to the other. Nothing about that
+# is visible until it happens.
+#
+# It cannot be fixed in the name without spending characters this plugin does
+# not have: PowerVault allows 32 and PowerFlex 31 for a whole volume name. So
+# it is refused here instead, where the storage id is still free to change.
+#
+# The portal is deliberately not part of the comparison. Two arrays today can
+# be one array tomorrow — a portal is an editable property — and renaming a
+# storage that has volumes on it is not.
+sub _check_prefix_collision {
+    my ($class, $storeid, $scfg) = @_;
+
+    return 1 unless defined $storeid && length $storeid;
+
+    my $mine = eval { $class->naming_class_for_check->volume_prefix($storeid) };
+    return 1 unless defined $mine;
+
+    my $cfg = eval { PVE::Storage::config() } or return 1;
+    my $ids = $cfg->{ids} || {};
+
+    for my $other (sort keys %$ids) {
+        next if $other eq $storeid;
+
+        my $type = $ids->{$other}{type} // '';
+        next unless $type =~ /^dell/;
+
+        my $plugin = eval { PVE::Storage::Plugin->lookup($type) } or next;
+        next unless $plugin->can('naming_class_for_check');
+
+        my $theirs = eval { $plugin->naming_class_for_check->volume_prefix($other) };
+        next unless defined $theirs && $theirs eq $mine;
+
+        die "Storage '$storeid' would use the same volume-name prefix as the"
+          . " existing storage '$other' ('$mine'). Volume names are built from"
+          . " it, so on one array the two storages would share every name:"
+          . " each would list the other's disks, and deleting a disk from one"
+          . " would delete it from the other. The prefix folds '-', '.', '+'"
+          . " and other punctuation to '_', which is why two ids that look"
+          . " different can produce one. Choose a storage id that differs by"
+          . " more than punctuation.\n";
+    }
+
+    return 1;
+}
+
 sub on_add_hook {
     my ($class, $storeid, $scfg, %param) = @_;
 
     $class->_check_protocol($storeid, $scfg);
+    $class->_check_prefix_collision($storeid, $scfg);
 
     return undef;
 }

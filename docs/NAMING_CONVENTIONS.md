@@ -35,5 +35,18 @@ keeps one storage's prefix from containing another's — `ps` and `ps-1` would
 otherwise yield `pve-ps-` and `pve-ps-1-`, and storage `ps` would claim
 `ps-1`'s volumes.
 
+**That folding is lossy, and the plugin refuses the consequence rather than
+living with it.** `ps-1`, `ps.1`, `ps+1`, `ps@1` and `ps__1` all become
+`ps_1`; so do `ps1_`, `_ps1` and `ps1!` become `ps1`. Two such storages on one
+array would share every volume name: each would list the other's disks, and
+deleting a disk from one would delete it from the other, with the ownership
+gate passing for both.
+
+It cannot be fixed inside the name — PowerVault allows 32 characters for a
+whole volume name and PowerFlex 31, and there is nothing to spend. So
+`on_add_hook` refuses to create a storage whose prefix matches one that
+already exists, naming the other storage and what to change. The storage id is
+free at that moment; a storage that already holds volumes is not.
+
 PowerStore's own name length and character limits are still to be confirmed
 against hardware; see [TESTING.md](TESTING.md).

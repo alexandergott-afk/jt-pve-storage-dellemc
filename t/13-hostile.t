@@ -161,12 +161,29 @@ my $TMP = tempdir(CLEANUP => 1);
             "ownership gate accepts our own '$name'");
     }
 
-    # Two storage ids that differ only in a character the sanitiser folds are
-    # the documented residual risk. Assert it is still only that pairing.
     isnt($N->volume_prefix('ps-1'), $N->volume_prefix('ps'),
         "a storage id that is a prefix of another does not share its namespace");
     isnt($N->volume_prefix('ps1'), $N->volume_prefix('ps10'),
         'nor does one that is a numeric prefix of another');
+
+    # The folding IS lossy, and these pairs really do collide. That is not a
+    # bug in the prefix — '-' is the separator inside a volume name, so a
+    # storage id containing one has to be folded — it is why on_add_hook
+    # refuses a second storage that would land on an existing prefix.
+    for my $pair (['ps-1', 'ps_1'], ['ps.1', 'ps_1'], ['ps+1', 'ps_1'],
+                  ['ps1_', 'ps1'],  ['_ps1', 'ps1']) {
+        my ($a, $b) = @$pair;
+        is($N->volume_prefix($a), $N->volume_prefix($b),
+            "'$a' and '$b' fold to one prefix, which is what the hook catches");
+    }
+
+    # And the consequence, stated once so it cannot be forgotten: the two
+    # produce the same volume name, and each passes the other's ownership gate.
+    is($N->encode_volume_name('ps-1', 100, 0),
+       $N->encode_volume_name('ps_1', 100, 0),
+       'two colliding ids name the same volume');
+    is($N->is_pve_managed_volume($N->encode_volume_name('ps_1', 100, 0), 'ps-1'), 1,
+        "... and one storage's gate accepts the other's volume");
 }
 
 # ---------------------------------------------------------------------------

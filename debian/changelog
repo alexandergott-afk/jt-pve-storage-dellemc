@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.51~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * Two storage ids that differ only in punctuation produced the same volume
+    names. The storeid is folded into the prefix with '-' becoming '_',
+    because '-' is the separator inside a volume name; that folding is lossy,
+    and 'ps-1', 'ps.1', 'ps+1', 'ps@1' and 'ps__1' all become 'ps_1'. Two such
+    storages on one array shared every volume name: each listed the other's
+    disks, the ownership gate passed for both, and deleting a disk from one
+    deleted it from the other. It cannot be fixed inside the name - a whole
+    PowerVault volume name is 32 characters - so on_add_hook refuses to create
+    a storage whose prefix matches an existing one, naming the other storage
+    and what to change. Verified through a real 'pvesm add' on this node.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 18:48:37 +0800
+
 jt-pve-storage-dellemc (0.7.50~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
