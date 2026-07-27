@@ -7,6 +7,28 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.46~beta1] - 2026-07-27
+
+### Fixed
+The three remaining callers of the in-use check now refuse on "could not tell",
+finishing what 0.7.45 started:
+
+- **`deactivate_storage`** removed the local devices *and* unmapped the volume.
+  A wrong "free" there takes the disk away from a guest still writing to it,
+  and disabling a storage is something an operator does while VMs are running.
+- **`create_base`**: every linked clone made later reads from the marker
+  snapshot taken there. A template captured mid-write is a filesystem that was
+  never consistent, copied into every clone of it.
+- **The orphan reaper** leaves a device alone rather than removing one it could
+  not clear. It runs unattended in the background of a poll: leaving one for a
+  human is free, removing one that was in use is not.
+
+### Added
+- `t/11-imports.t` fails on `is_device_in_use` used as a bare boolean, because
+  `undef` reads as false there and that is the whole bug. The one place where
+  the fail-open is harmless — deciding whether to flush before a snapshot —
+  now says why at the call site, which is what the guard is for.
+
 ## [0.7.45~beta1] - 2026-07-27
 
 ### Fixed

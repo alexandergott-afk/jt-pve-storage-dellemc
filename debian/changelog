@@ -1,3 +1,25 @@
+jt-pve-storage-dellemc (0.7.46~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The three remaining callers of the in-use check now refuse on "could not
+    tell" as well:
+    - deactivate_storage removed the local devices AND unmapped the volume,
+      so a wrong "free" took the disk away from a guest still writing to it.
+      Disabling a storage is a thing an operator does while VMs run.
+    - create_base: every linked clone reads from the marker snapshot taken
+      there, so a template captured mid-write is a filesystem that was never
+      consistent, copied into every clone of it.
+    - The orphan reaper leaves a device alone rather than removing one it
+      could not clear. It runs unattended in the background of a poll;
+      leaving one for a human is free, removing one that was in use is not.
+  * t/11-imports.t fails on is_device_in_use used as a bare boolean. undef
+    reads as false there, which is the whole bug. The one place that is
+    harmless - deciding whether to flush before a snapshot - now says why at
+    the call site.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 14:17:16 +0800
+
 jt-pve-storage-dellemc (0.7.45~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

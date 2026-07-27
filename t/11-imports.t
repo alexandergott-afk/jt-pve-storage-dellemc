@@ -160,4 +160,48 @@ for my $file (sort @files) {
               . " becomes dead code that still looks live: @duplicates");
 }
 
+# is_device_in_use returns 1 / 0 / undef, and undef means "the checks could
+# not prove anything". Writing it as a bare boolean throws that away:
+#
+#     if (is_device_in_use($d)) { refuse }        # undef falls through
+#
+# On a destructive path that reads as "nothing is using it", which is how a
+# volume gets unmapped and deleted under a running VM. Every call has to
+# either check defined() or be somewhere a wrong "no" is harmless — and the
+# harmless ones say so at the call site.
+for my $file (sort @files) {
+    open(my $fh, '<', $file) or next;
+    my $source = do { local $/; <$fh> };
+    close($fh);
+
+    $source =~ s/^__END__.*//ms;
+    next unless $source =~ /is_device_in_use\s*\(/;
+
+    my @bare;
+    my @lines = split /\n/, $source;
+    for my $i (0 .. $#lines) {
+        my $line = $lines[$i];
+        next if $line =~ /^\s*#/;
+        next if $line =~ /^\s*(?:sub|our|use)\s/;
+        next unless $line =~ /is_device_in_use\s*\(/;
+
+        # Assigned to a variable: the caller can then check defined().
+        next if $line =~ /=\s*(?:eval\s*\{\s*)?is_device_in_use/;
+
+        # A nearby comment saying the fail-open is deliberate.
+        # Wide enough for the comment block that has to justify it, tight
+        # enough that the justification is still at the call site.
+        my $from = $i - 14 < 0 ? 0 : $i - 14;
+        my $context = join "\n", @lines[$from .. $i];
+        next if $context =~ /harmless|deliberate|best-effort|only decides/i;
+
+        push @bare, ($i + 1) . ": " . ($line =~ s/^\s+//r);
+    }
+
+    is_deeply(\@bare, [],
+        "$file: is_device_in_use is never used as a bare boolean")
+        or diag(join("\n  ", '',
+            'undef means "could not tell" and reads as false here:', @bare));
+}
+
 done_testing();

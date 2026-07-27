@@ -823,11 +823,18 @@ sub deactivate_storage {
         my $wwid = $vol->{wwid} // eval { $class->_array_get_wwid($scfg, $vol->{name}) };
         next unless $wwid;
 
-        # Never tear down a device a running VM is still using.
+        # Never tear down a device a running VM is still using — and treat
+        # "could not tell" the same way. This unmaps the volume as well as
+        # removing the local devices, so a wrong "free" takes the disk away
+        # from a guest that is still writing to it.
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && is_block_device($device) && is_device_in_use($device)) {
-            push @in_use, $vol->{name};
-            next;
+        if ($device && is_block_device($device)) {
+            my $in_use = is_device_in_use($device);
+            if (!defined($in_use) || $in_use) {
+                push @in_use, $vol->{name}
+                    . (defined($in_use) ? '' : ' (in-use state unknown)');
+                next;
+            }
         }
 
         eval { cleanup_lun_devices($wwid) };
@@ -1001,7 +1008,19 @@ sub _cleanup_orphaned_devices {
 
         my $mpath = eval { get_multipath_device($wwid) };
         if ($mpath && is_block_device($mpath)) {
-            if (eval { is_device_in_use($mpath) }) {
+            my $in_use = eval { is_device_in_use($mpath) };
+
+            # Undef is "the checks could not prove anything", which is not a
+            # licence to remove a device. This pass runs unattended in the
+            # background of a poll; leaving one device for a human is free,
+            # removing one that was in use is not.
+            unless (defined $in_use) {
+                warn "orphan cleanup: could not establish whether $mpath"
+                   . " (WWID $wwid) is in use; leaving it alone\n";
+                next;
+            }
+
+            if ($in_use) {
                 warn "orphan cleanup: $mpath (WWID $wwid) is still in use,"
                    . " leaving it for manual review\n";
                 next;
@@ -2150,6 +2169,13 @@ sub volume_snapshot {
     # freeze handles filesystem consistency; this only covers writes made
     # outside QEMU. Skipped when the device is busy so it cannot block a live
     # migration.
+    #
+    # is_device_in_use as a bare boolean is deliberate and harmless here, and
+    # this is the only place that is true. Undef reads as "not busy", so an
+    # undetermined device gets flushed rather than skipped — flushing is safe
+    # in itself, both commands carry their own timeout inside an eval, and the
+    # worst case is work that was not needed. Everywhere else undef decides
+    # whether to destroy something, and there it has to mean "do not".
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
@@ -2426,9 +2452,20 @@ sub create_base {
     my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
     if ($wwid) {
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && is_block_device($device) && is_device_in_use($device)) {
+        if ($device && is_block_device($device)) {
+            my $in_use = is_device_in_use($device);
+
+            # Every linked clone made later reads from the marker snapshot
+            # taken here. A template captured mid-write is a filesystem that
+            # was never consistent, copied into every clone of it.
+            die "Cannot convert volume '$volname' to a template: whether"
+              . " device $device is in use could not be determined, and a"
+              . " template captured while it is being written to is"
+              . " inconsistent in every clone made from it.\n"
+                unless defined $in_use;
+
             die "Cannot convert volume '$volname' to a template: device $device"
-              . " is still in use. Stop the VM first.\n";
+              . " is still in use. Stop the VM first.\n" if $in_use;
         }
     }
 
