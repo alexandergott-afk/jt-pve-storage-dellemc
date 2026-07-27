@@ -2044,6 +2044,18 @@ sub _remove_temp_clone {
 
     return 0 unless defined $name && length $name;
 
+    # Checked here as well as in the reaper, because this is also reached from
+    # the snapshot-access path and it deletes an array volume either way. The
+    # infix is what makes a temporary clone identifiable as one; a VM disk
+    # shares the prefix and nothing else.
+    my $infix = $class->naming->temp_clone_infix;
+    unless (index($name, $class->naming->volume_prefix($storeid)) == 0
+            && index($name, $infix) > 0) {
+        warn "Refusing to remove '$name' as a temporary clone: the name is not"
+           . " one this storage would have given to one.\n";
+        return 0;
+    }
+
     # Drop any in-process reference first, so nothing hands out a path to a
     # clone that is being torn down.
     for my $key (keys %SNAPSHOT_ACCESS) {
@@ -2124,11 +2136,24 @@ sub _reap_temp_clones {
     return 0 unless @$stale;
 
     my $removed = 0;
+    my $prefix = $class->naming->volume_prefix($storeid);
+    my $infix  = $class->naming->temp_clone_infix;
+
     for my $name (@$stale) {
-        # Ownership gate, as on every destructive path: only an object whose
-        # name this storage would have produced.
-        my $prefix = $class->naming->volume_prefix($storeid);
-        unless (index($name, $prefix) == 0) {
+        # This runs unattended, in the background of a poll, and it deletes
+        # volumes. So the gate is not "does the name start with our prefix" —
+        # every VM disk on this storage does that too, and a temp-clone record
+        # naming a real disk would be enough to delete it with nobody
+        # watching.
+        #
+        # A temporary clone is the only object whose name carries the temp
+        # clone infix. Requiring it means the worst a corrupt record can do is
+        # name something that is not there.
+        unless (index($name, $prefix) == 0 && index($name, $infix) > 0) {
+            warn "Ignoring temporary-clone record '$name': it is not a name"
+               . " this storage would have given a temporary clone. Removing"
+               . " the record; the object itself is left alone.\n"
+                if index($name, $prefix) == 0;
             eval { $WWID_STATE->untrack_temp_clone($storeid, $name) };
             next;
         }

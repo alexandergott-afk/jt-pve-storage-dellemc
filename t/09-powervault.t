@@ -1001,4 +1001,49 @@ SKIP: {
         '... listing the pools that do');
 }
 
+# ---------------------------------------------------------------------------
+# A name must never be able to act as a wildcard
+#
+# `show volumes` documents pattern as taking *, ? and [], so those characters
+# have to survive escaping in that one argument. They were surviving in EVERY
+# argument — and `delete volumes` takes the name positionally, so a name of
+# 'pve-me5-*' would have asked the array to delete every volume of the
+# storage. Nothing generates such a name and the ownership gate would refuse
+# it; the transport still should not be able to express it.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_api(handler => sub { reply(ok_status()) });
+
+    $api->volume_delete('pve-me5-*');
+    my $path = $ua->last_request->uri->path;
+    unlike($path, qr/\*/, 'a wildcard in a delete target is escaped')
+        or diag("the array would have been asked to delete: $path");
+    like($path, qr/%2A/i, 'and sent as a literal character');
+
+    $api->volume_delete('pve-me5-100-d0');
+    like($ua->last_request->uri->path, qr{/delete/volumes/pve-me5-100-d0$},
+        'an ordinary name is untouched');
+}
+
+{
+    # The pattern argument still gets its wildcards, or listing by prefix
+    # stops working.
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() }, volumes => [] })
+            if $path =~ m{/show/volumes};
+        return reply(ok_status());
+    });
+
+    $api->volume_list('pve-me5-*');
+    my $path = $ua->last_request->uri->path;
+    like($path, qr{/pattern/pve-me5-\*}, 'the pattern argument keeps its wildcard');
+
+    # And only the argument that follows the literal 'pattern' token.
+    $api->volume_list('pve-me5-*', pool => 'A*B');
+    unlike($ua->last_request->uri->path, qr/A\*B/,
+        'a wildcard anywhere else is still escaped');
+}
+
 done_testing();

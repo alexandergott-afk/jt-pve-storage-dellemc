@@ -543,4 +543,36 @@ for my $file (qw(
     }
 }
 
+# ---------------------------------------------------------------------------
+# A corrupt temporary-clone record must not delete a real disk
+#
+# The reaper runs unattended in the background of a poll and deletes array
+# volumes. Its gate used to be "does the name start with this storage's
+# prefix" — which every VM disk on the storage also satisfies. A record
+# naming a real disk was therefore enough to delete it with nobody watching.
+# ---------------------------------------------------------------------------
+
+{
+    require PVE::Storage::Custom::DellEMC::Common::Naming;
+    my $N = 'PVE::Storage::Custom::DellEMC::Common::Naming';
+
+    my $prefix = $N->volume_prefix('ps1');
+    my $infix  = $N->temp_clone_infix;
+
+    # What the reaper is for.
+    my $temp = $N->encode_temp_clone_name($prefix . '100-disk0', 'abc');
+    ok(index($temp, $prefix) == 0, 'a temporary clone carries the prefix');
+    ok(index($temp, $infix) > 0, 'and the infix that identifies it as one');
+
+    # What must never be mistaken for one, however the record got there.
+    for my $real ("${prefix}100-disk0", "${prefix}101-disk3",
+                  "${prefix}100-cloudinit") {
+        ok(index($real, $prefix) == 0,
+            "'$real' shares the prefix, which is why the prefix is not enough");
+        is(index($real, $infix), -1,
+            "'$real' carries no temp-clone infix, so the reaper leaves it")
+            or diag('this name would be deleted unattended');
+    }
+}
+
 done_testing();

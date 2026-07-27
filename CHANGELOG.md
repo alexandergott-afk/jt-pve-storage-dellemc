@@ -7,6 +7,24 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.47~beta1] - 2026-07-27
+
+### Fixed
+- **A PowerVault volume name could act as a shell wildcard.** The URL escaping
+  left `*`, `?` and `[]` unescaped in *every* argument, because
+  `show volumes pattern` legitimately needs them in one. `delete volumes` takes
+  its target positionally — so a name of `pve-me5-*` would have asked the array
+  to delete every volume of the storage. Only the argument following the
+  literal `pattern` token keeps its wildcards now. Nothing generates such a
+  name and the ownership gate would refuse it, but the transport should not be
+  able to express it either.
+- **The temporary-clone reaper could have deleted a real disk.** Its gate was
+  "does the name start with this storage's prefix", which every VM disk on the
+  storage also satisfies. A corrupt record naming a real disk was enough to
+  delete it — unattended, in the background of a poll, with nobody watching.
+  A temporary clone is now identified by the infix its name carries, which no
+  VM disk has, and the check is applied at both places that remove one.
+
 ## [0.7.46~beta1] - 2026-07-27
 
 ### Fixed

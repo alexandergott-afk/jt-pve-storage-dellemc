@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.47~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * PowerVault: a volume name can no longer act as a shell wildcard. The URL
+    escaping left *, ? and [] unescaped in EVERY argument because 'show
+    volumes pattern' needs them in one. 'delete volumes' takes its target
+    positionally, so a name of 'pve-me5-*' would have asked the array to
+    delete every volume of the storage. Only the argument after the literal
+    'pattern' token keeps its wildcards now.
+  * The temporary-clone reaper required only that a name start with this
+    storage's prefix - which every VM disk on the storage also does. A record
+    naming a real disk was enough to delete it, unattended, in the background
+    of a poll. A temporary clone is now identified by the infix its name
+    carries, which no VM disk has.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 27 Jul 2026 15:11:15 +0800
+
 jt-pve-storage-dellemc (0.7.46~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

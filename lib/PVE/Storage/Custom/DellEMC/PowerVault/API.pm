@@ -204,10 +204,34 @@ sub _status_is_auth_failure {
 #
 # Tokens are escaped individually: a volume name never contains anything
 # exotic, but a pool name or a host name comes from the operator and may.
+# Shell wildcards are legal in exactly one argument: the one after the
+# literal token 'pattern', which `show volumes` documents as taking `*`, `?`
+# and `[]`. Everywhere else they are ordinary characters that must be escaped.
+#
+# Leaving them unescaped in every token means a NAME could act as a wildcard,
+# and `delete volumes` takes a name positionally — so 'pve-ps1-*' would ask
+# the array to delete every volume of the storage. Nothing generates such a
+# name, and the ownership gate would refuse it, but neither of those is a
+# reason for the transport to be able to express it.
+sub _escape_token {
+    my ($token, $is_pattern) = @_;
+
+    my $safe = $is_pattern ? '^A-Za-z0-9\-_.~*?\[\]' : '^A-Za-z0-9\-_.~';
+
+    return uri_escape($token, $safe);
+}
+
 sub _cmd {
     my ($self, $tokens, %opts) = @_;
 
-    my $path = '/' . join('/', map { uri_escape($_, '^A-Za-z0-9\-_.~*?\[\]') } @$tokens);
+    my $pattern_next = 0;
+    my @escaped;
+    for my $token (@$tokens) {
+        push @escaped, _escape_token($token, $pattern_next);
+        $pattern_next = (defined $token && $token eq 'pattern') ? 1 : 0;
+    }
+
+    my $path = '/' . join('/', @escaped);
 
     my $data = $self->get($path, undef, %opts);
     my $status = $self->_status_of($data);
