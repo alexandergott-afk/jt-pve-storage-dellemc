@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.57~beta1
+VERSION = 0.7.58~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -67,6 +67,17 @@ syntax:
 				echo "  skipped $$f (needs Proxmox VE)"; \
 				skipped=1; \
 				continue; \
+			fi; \
+			missing=$$(echo "$$out" | sed -n "s/.*Can't locate \([A-Za-z0-9_\/]*\)\.pm.*/\1/p" | head -1); \
+			if [ -n "$$missing" ]; then \
+				echo "$$out"; \
+				echo ""; \
+				echo "  $$(echo $$missing | tr / ::) is a RUNTIME DEPENDENCY of this"; \
+				echo "  plugin, not an optional extra. The syntax check cannot"; \
+				echo "  compile anything without it, so this is a failure and not"; \
+				echo "  a skip. On Debian/Ubuntu:"; \
+				echo "    apt install libwww-perl libjson-perl liburi-perl"; \
+				exit 1; \
 			fi; \
 			echo "$$out"; \
 			exit 1; \

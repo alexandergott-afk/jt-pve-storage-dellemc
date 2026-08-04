@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.58~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * build-deb.yml ran its checks with no dependency install step at all, so
+    `perl -c` failed at "Can't locate JSON.pm" - which is not "Can't locate
+    PVE/", the only failure the syntax target tolerates - and the job failed
+    on every run. It installs the plugin's runtime Perl modules now, as the
+    release workflow already did.
+  * make syntax says what is missing when a runtime dependency is absent,
+    and that this is a failure rather than a skip, instead of printing a
+    compile error and exiting.
+  * release.yml runs one check per step. A job's step list is readable
+    through the public API while its logs are not, so a combined "Run checks"
+    told nobody outside which check had failed - and that was the state for
+    twenty releases.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 08:51:25 +0800
+
 jt-pve-storage-dellemc (0.7.57~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

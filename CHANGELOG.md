@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.58~beta1] - 2026-08-04
+
+### Fixed
+- **`build-deb.yml` ran its checks with no dependency install step at all.**
+  `perl -c` then failed at `Can't locate JSON.pm` — which is not
+  `Can't locate PVE/`, the only failure the syntax target tolerates — so the
+  job failed on every run, for months. It now installs the plugin's runtime
+  Perl modules, as the release workflow already did.
+- **`make syntax` names the missing module** when a runtime dependency is
+  absent, and says that this is a failure rather than a skip, instead of
+  printing a raw compile error and exiting.
+
+### Added
+- **`release.yml` runs one check per step.** A job's step list is readable
+  through the public API while its logs are not, so a combined *Run checks*
+  told nobody outside which of the three had failed — and that was the state
+  for twenty releases. It also prints the Perl version and the versions of the
+  modules it depends on, so an environment difference is visible without logs.
+
 ## [0.7.57~beta1] - 2026-08-04
 
 ### Fixed

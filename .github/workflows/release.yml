@@ -41,16 +41,28 @@ jobs:
             build-essential debhelper fakeroot \
             libwww-perl libjson-perl liburi-perl
 
-      - name: Run checks
+      # One step per check, deliberately. The step list of a job is readable
+      # through the public API while the logs are not, so a split like this
+      # is the difference between "Run checks failed" and knowing which one.
+      # That mattered: this job failed at a combined "Run checks" for twenty
+      # releases, publishing nothing, and the reason was not visible from
+      # outside.
+      - name: Environment
         run: |
-          # A runner has no Proxmox VE, so every test that reaches into a
-          # plugin must skip rather than die. `make unit` alone did not catch
-          # a test that forgot to, and this job then failed at exactly this
-          # step for twenty releases while the suite stayed green on the
-          # developer's node — publishing nothing, silently.
-          make check-multipath-flush
-          make syntax
-          make unit
+          perl -v | head -2
+          for m in LWP::UserAgent JSON URI HTTP::Response Test::More; do
+            printf '%-18s ' "$m"
+            perl -M$m -e "print \$${m}::VERSION // 'loaded', qq{\n}" 2>&1 | tail -1
+          done
+
+      - name: Check for node-wide multipath operations
+        run: make check-multipath-flush
+
+      - name: Perl syntax
+        run: make syntax
+
+      - name: Unit tests
+        run: make unit
 
       - name: Read the package version
         id: version

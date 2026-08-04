@@ -20,6 +20,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Without these, `perl -c` on any module fails at 'Can't locate
+      # JSON.pm' — not at 'Can't locate PVE/', which is the only failure the
+      # syntax target tolerates. This job had no install step at all and so
+      # failed on every run, for months, at the syntax check.
+      - name: Install the plugin's runtime Perl modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwww-perl libjson-perl liburi-perl
+
       # Guarded separately from `make test` so a failure here is obvious in
       # the job list: the capital-F flush wipes every unused map on the node.
       - name: Forbid system-wide multipath flush
