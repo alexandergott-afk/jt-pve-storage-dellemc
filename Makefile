@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.59~beta1
+VERSION = 0.7.60~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -21,7 +21,7 @@ UNIT_TESTS   = $(wildcard t/*.t)
 GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
-.PHONY: all install uninstall test syntax unit unit-nopve check-multipath-flush \
+.PHONY: all install uninstall test syntax unit unit-nopve nopve-stub check-multipath-flush \
         release-check deb deb-clean clean
 
 all:
@@ -63,7 +63,7 @@ syntax:
 	fi
 	@set -e; skipped=0; for f in $(PERL_MODULES) $(BIN_SCRIPTS); do \
 		out=$$(perl -Ilib -c $$f 2>&1) || { \
-			if echo "$$out" | grep -q "Can't locate PVE/"; then \
+			if echo "$$out" | grep -qE "Can't locate PVE/|Base class package \"PVE::"; then \
 				echo "  skipped $$f (needs Proxmox VE)"; \
 				skipped=1; \
 				continue; \
@@ -104,10 +104,38 @@ unit:
 # and published nothing, and nothing local noticed.
 NOPVE_STUB = $(CURDIR)/.nopve-stub
 
-unit-nopve:
+# The die must NOT end in a newline. base.pm treats a require failure as
+# "module not installed" only when the message carries perl's own
+# " at (eval N)" suffix, and it then reports the base class as EMPTY rather
+# than as missing — which is the message a real runner produces and the one
+# `syntax` has to tolerate. An earlier stub appended "\n", produced a
+# different message that `syntax` already tolerated, and so masked the very
+# failure it existed to reproduce. CI stayed red for twenty releases while
+# this target stayed green.
+define NOPVE_STUB_SRC
+package nopve;
+BEGIN {
+    unshift @INC, sub {
+        my (undef, $$f) = @_;
+        return unless $$f =~ m{^PVE/} && $$f !~ m{^PVE/Storage/Custom/};
+        (my $$mod = $$f) =~ s{/}{::}g; $$mod =~ s/\.pm$$//;
+        die "Can't locate $$f in \@INC (you may need to install the $$mod module)";
+    };
+}
+1;
+endef
+export NOPVE_STUB_SRC
+
+nopve-stub:
 	@mkdir -p $(NOPVE_STUB)
-	@printf 'package nopve;\nBEGIN { unshift @INC, sub {\n    my (undef, $$f) = @_;\n    die "Can'"'"'t locate $$f in \\@INC (simulated: no Proxmox VE)\\n"\n        if $$f =~ m{^PVE/} && $$f !~ m{^PVE/Storage/Custom/};\n    return;\n}; }\n1;\n' > $(NOPVE_STUB)/nopve.pm
-	@echo "Running unit tests as they run without Proxmox VE (as in CI)..."
+	@printf '%s\n' "$$NOPVE_STUB_SRC" > $(NOPVE_STUB)/nopve.pm
+
+# Both checks as they run on a machine with no Proxmox VE, which is what CI
+# is. `syntax` belongs here as much as `unit` does: the failure that blocked
+# every release was a syntax failure, not a test failure.
+unit-nopve: nopve-stub
+	@echo "Running checks as they run without Proxmox VE (as in CI)..."
+	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" $(MAKE) --no-print-directory syntax
 	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" prove -Ilib $(UNIT_TESTS)
 	@rm -rf $(NOPVE_STUB)
 

@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.7.60~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * THE RELEASE PIPELINE IS FIXED. Every release since v0.7.36 failed at the
+    syntax check and published nothing; half those tags have no release at
+    all. On perl 5.38, which is what an ubuntu-24.04 runner has, `use base`
+    on an absent class reports 'Base class package "PVE::Storage::Plugin" is
+    empty' rather than "Can't locate PVE/..." - and the latter was the only
+    failure `make syntax` tolerated. It tolerates both now.
+  * make unit-nopve runs syntax AND the tests as they run without Proxmox VE,
+    with a stub that reproduces the real message. The earlier stub appended a
+    newline, which changed base.pm's behaviour into a form the check already
+    tolerated - so the simulation masked the failure it existed to reproduce.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 09:03:04 +0800
+
 jt-pve-storage-dellemc (0.7.59~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

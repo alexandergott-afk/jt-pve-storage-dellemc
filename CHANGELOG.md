@@ -7,6 +7,24 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.60~beta1] - 2026-08-04
+
+### Fixed
+- **The release pipeline works again.** Every release since v0.7.36 failed at
+  the syntax check and published nothing; half those tags have no release at
+  all, and v0.7.53 to v0.7.59 were never created.
+
+  On perl 5.38 — what an `ubuntu-24.04` runner has — `use base` on an absent
+  class reports `Base class package "PVE::Storage::Plugin" is empty`, not
+  `Can't locate PVE/...`. The latter was the only failure `make syntax`
+  tolerated, so the check failed on every module. It tolerates both forms now.
+
+- **`make unit-nopve` runs the syntax check as well as the tests**, with a stub
+  that reproduces the real message. The earlier stub appended a newline, which
+  changed `base.pm`'s behaviour into a form the check already tolerated — so
+  the simulation masked the failure it existed to reproduce, and reported
+  success on the exact code CI was rejecting.
+
 ## [0.7.59~beta1] - 2026-08-04
 
 ### Added
