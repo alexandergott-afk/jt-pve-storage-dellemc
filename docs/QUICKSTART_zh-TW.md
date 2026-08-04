@@ -27,7 +27,7 @@ sha256sum -c SHA256SUMS       # 必須顯示 OK
 apt install ./jt-pve-storage-dellemc_*_all.deb
 ```
 
-GitHub 會把附件檔名裡的 `~` 換成 `.`，所以檔案叫 `..._0.7.52.beta1-1_all.deb`，而版本是 `0.7.52~beta1-1`。請從 release 頁面複製檔名。
+檔名中的版本是用點分隔的（`..._0.7.60.beta1-1_all.deb`），因為 GitHub 不會提供檔名含 `~` 的附件。套件內部的版本不變，而 `SHA256SUMS` 記錄的就是實際提供的檔名。
 
 請使用 `apt install ./file.deb` 而非 `dpkg -i`：`dpkg -i` 不會安裝相依套件，缺少的執行檔要等到很後面才會以外掛內部的錯誤形式浮現。
 

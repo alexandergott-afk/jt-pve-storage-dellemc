@@ -33,9 +33,9 @@ sha256sum -c SHA256SUMS       # must say OK
 apt install ./jt-pve-storage-dellemc_*_all.deb
 ```
 
-GitHub replaces `~` with `.` in asset names, so the file is named
-`..._0.7.52.beta1-1_all.deb` while the version is `0.7.52~beta1-1`. Copy the
-name from the release page.
+The file name spells the version with a dot (`..._0.7.60.beta1-1_all.deb`)
+because GitHub will not serve an asset name containing `~`. The version inside
+the package is unchanged, and `SHA256SUMS` names the file as served.
 
 Use `apt install ./file.deb` rather than `dpkg -i`: `dpkg -i` does not install
 dependencies, and the missing binaries only surface much later as failures

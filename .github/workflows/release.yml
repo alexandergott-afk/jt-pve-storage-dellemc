@@ -102,8 +102,18 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          cp ../jt-pve-storage-dellemc_*_all.deb artifacts/
           cd artifacts
+
+          # GitHub will not serve an asset whose name contains '~': it
+          # rewrites it to '.'. Renaming here rather than letting GitHub do it
+          # keeps SHA256SUMS honest — hashing the Debian name and serving the
+          # rewritten one makes `sha256sum -c` fail on a file it cannot find,
+          # which is what a person following the install instructions would
+          # hit. The name is cosmetic; apt reads the control file, not it.
+          for f in ../../jt-pve-storage-dellemc_*_all.deb; do
+            cp "$f" "$(basename "$f" | tr '~' '.')"
+          done
+
           sha256sum *.deb > SHA256SUMS
           ls -la
 

@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.7.61~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * SHA256SUMS now names the file as it is actually served. GitHub will not
+    serve an asset whose name contains '~' and rewrites it to '.', so a
+    SHA256SUMS generated from the Debian file name listed a file that does
+    not exist after download and 'sha256sum -c' failed on it - which is
+    exactly what someone following the install instructions would hit. The
+    rename happens before hashing now, so the two agree.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 09:11:15 +0800
+
 jt-pve-storage-dellemc (0.7.60~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

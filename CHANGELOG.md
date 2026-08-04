@@ -7,6 +7,17 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.61~beta1] - 2026-08-04
+
+### Fixed
+- **`SHA256SUMS` now names the file as it is actually served.** GitHub will not
+  serve an asset whose name contains `~` and rewrites it to `.`, so a
+  `SHA256SUMS` generated from the Debian file name listed a file that does not
+  exist after download — `sha256sum -c` answered *"No such file or directory"*.
+  That is precisely what someone following the install instructions would hit,
+  and it was found by following them rather than by reading them. The rename
+  happens before hashing now, so the asset and the checksum file agree.
+
 ## [0.7.60~beta1] - 2026-08-04
 
 ### Fixed

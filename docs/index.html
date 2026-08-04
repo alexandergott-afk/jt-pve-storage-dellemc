@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.60~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.61~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -478,8 +478,8 @@
                 <span class="lang-zh">安裝前先核對雜湊值：這個套件會寫入 <code>/etc/multipath/conf.d</code>，也會與你的陣列通訊。</span>
             </p>
             <p>
-                <span class="lang-en">GitHub replaces <code>~</code> with <code>.</code> in an asset name, so the file is <code>..._0.7.52.beta1-1_all.deb</code> while the package version is <code>0.7.52~beta1-1</code>. Copy the name from the release page rather than building it from the version.</span>
-                <span class="lang-zh">GitHub 會把附件檔名裡的 <code>~</code> 換成 <code>.</code>，因此檔案是 <code>..._0.7.52.beta1-1_all.deb</code>，而套件版本是 <code>0.7.52~beta1-1</code>。請直接從 release 頁面複製檔名，不要自己用版本號拼。</span>
+                <span class="lang-en">The file name spells the version with a dot (<code>..._0.7.60.beta1-1_all.deb</code>) because GitHub will not serve an asset name containing <code>~</code>. The version inside the package is unchanged &mdash; <code>apt</code> reads the control file, not the name &mdash; and <code>SHA256SUMS</code> names the file as served, so the check works on what you downloaded.</span>
+                <span class="lang-zh">檔名中的版本是用點分隔的（<code>..._0.7.60.beta1-1_all.deb</code>），因為 GitHub 不會提供檔名含 <code>~</code> 的附件。套件內部的版本不變 &mdash; <code>apt</code> 讀的是控制檔而不是檔名 &mdash; 而 <code>SHA256SUMS</code> 記錄的就是實際提供的檔名，因此校驗可以直接對下載下來的檔案運作。</span>
             </p>
         </div>
     </div>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.61~beta1</div>
+        <div class="changelog-date">2026-08-04</div>
+        <div class="changelog-summary">
+            <span class="lang-en">SHA256SUMS named a file that does not exist after download, because GitHub rewrites "~" in an asset name. Found by following the install instructions rather than reading them.</span>
+            <span class="lang-zh">SHA256SUMS 記錄的檔名在下載後根本不存在，因為 GitHub 會改寫附件名稱中的「~」。這是靠實際照著安裝說明做一次才發現的，不是靠閱讀。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.60~beta1</div>
