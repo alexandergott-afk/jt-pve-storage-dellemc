@@ -1,0 +1,30 @@
+{
+  "pools": [
+    {
+      "object-name": "pools",
+      "name": "A",
+      "blocksize": 512,
+      "total-size": "15.3TB",
+      "total-size-numeric": 29913776128,
+      "total-avail": "7022.7GB",
+      "total-avail-numeric": 13716258816,
+      "snap-size": "0B",
+      "snap-size-numeric": 0,
+      "allocated-pages": 1977291,
+      "available-pages": 1674293,
+      "overcommit": "Enabled",
+      "over-committed": "True"
+    },
+    {
+      "object-name": "pools",
+      "name": "B",
+      "total-size": "2843.0GB",
+      "total-size-numeric": 5552865280,
+      "total-avail": "40.9GB",
+      "total-avail-numeric": 79929344
+    }
+  ],
+  "status": [
+    { "object-name": "status", "response-type": "Success", "response": "Command completed successfully. (2026-08-04 10:00:00)", "return-code": 0 }
+  ]
+}

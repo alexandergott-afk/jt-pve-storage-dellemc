@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.63~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.64~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.64~beta1</div>
+        <div class="changelog-date">2026-08-04</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The ME4024 payloads behind the previous release are now on file and read by the test suite verbatim, confirming both fixes against what the array actually sends. A host belonging to no host group is now identified by the type the array gives it, not by the key it arrived under.</span>
+            <span class="lang-zh">上一版兩項修正背後的 ME4024 實機回應已經歸檔，測試套件直接逐字讀取，確認兩項修正與陣列實際送出的內容相符。不屬於任何 host group 的 host，現在改以陣列自己標示的型別辨識，而不是靠它掛在哪個鍵底下。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.63~beta1</div>

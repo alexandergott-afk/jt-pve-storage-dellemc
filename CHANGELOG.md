@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.64~beta1] - 2026-08-04
+
+### Verified
+- **The ME4024 payloads behind 0.7.63 are now on file.** A customer supplied
+  the array's actual `show host-groups` and `show pools` responses
+  (PowerVault ME4024, `MIL-ME4024`, firmware `GT280R011-01`, Fibre Channel).
+  Both fixes released in 0.7.63 were written from Dell's documentation and
+  match what the array sends: the top level carries only `host-group`, hosts
+  nest under `host` (singular) and initiators under `initiator`; free space
+  is `total-avail` and there is no `avail`.
+
+  The responses are kept verbatim in `t/fixtures/powervault/` and the suite
+  now reads them from disk, including the customer's measured 98.56% for the
+  pool that previously read as 100% full. `docs/TESTING.md` gained a section
+  recording what that array established and what it did not.
+
+### Fixed
+- **A host belonging to no host group might still not have been found.** The
+  one shape nobody has captured: the ME CLI prints ungrouped hosts in a
+  separate block, and which key that becomes in JSON is unknown — which for a
+  single-node install is the default case, not an edge case. So the list of
+  keys is no longer what decides. Every object in an ME answer names its own
+  type in `object-name`, and a row saying `"object-name": "host"` is now
+  collected whichever key it arrived under. The converse holds too: a row
+  reached through a host key that names itself something else is that other
+  thing, never a host.
+
 ## [0.7.63~beta1] - 2026-08-04
 
 ### Fixed

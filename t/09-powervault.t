@@ -1070,6 +1070,108 @@ SKIP: {
 }
 
 # ---------------------------------------------------------------------------
+# The array's own answers, kept verbatim
+#
+# Captured from a customer's PowerVault ME4024 running GT280R011-01. Every
+# other field name in these clients came from Dell's documentation; these two
+# came from hardware, so they are stored as they arrived and read from disk
+# rather than retyped. If a future change breaks against the shape a real
+# array sends, that is what should fail.
+# ---------------------------------------------------------------------------
+
+sub fixture {
+    my ($name) = @_;
+
+    my $path = "t/fixtures/powervault/$name.json";
+    open(my $fh, '<', $path) or die "cannot read $path: $!\n";
+    my $raw = do { local $/; <$fh> };
+    close($fh);
+
+    return decode_json($raw);
+}
+
+{
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(fixture('me4024-show-host-groups')) if $path =~ m{/show/host-groups};
+        return reply(fixture('me4024-show-pools'))       if $path =~ m{/show/pools};
+        return reply(ok_status());
+    });
+
+    my $hosts = $api->host_list();
+    is(scalar(@$hosts), 1, 'the ME4024 answer yields its one host');
+    is($hosts->[0]{name}, 'pve16', '... by its host name, not its group name');
+    is($hosts->[0]{'durable-id'}, 'H2', '... and it is the host object');
+
+    my $host = $api->host_get_by_name('pve16');
+    ok($host, 'the host is found by name');
+    ok($api->host_has_initiator($host, '100000109b643c08'),
+        '... with its FC initiator nested two levels down');
+
+    ok(!$api->host_get_by_name('pvegroup01'),
+        'the enclosing group is not reachable as a host');
+
+    # The numbers the customer measured, from the payload they measured them
+    # from. 512-byte blocks throughout.
+    my ($total, $used, $avail) = $api->get_managed_capacity();
+    is($total, (29913776128 + 5552865280) * 512, 'both pools are summed');
+    is($avail, (13716258816 + 79929344) * 512, 'available comes from total-avail');
+
+    ($total, $used, $avail) = $api->get_managed_capacity(pool => 'B');
+    is($total, 5552865280 * 512, "pool B's total matches the array");
+    is($avail, 79929344 * 512, "... and its 40.9GB free is not 0");
+    cmp_ok($used / $total, '>', 0.98, '... which is 98.56% used, as measured');
+    cmp_ok($used / $total, '<', 0.99, '... and not the 100% that blocked it');
+}
+
+# ---------------------------------------------------------------------------
+# A host belonging to no group
+#
+# The one shape nobody has captured. The ME CLI prints ungrouped hosts in a
+# separate block, and which key they arrive under in JSON is unknown — so the
+# key list must not be what decides. Every object in an ME answer names its
+# own type in 'object-name', and a row that says it is a host is a host
+# whichever key it came under.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() },
+            # A key this plugin has never heard of.
+            'unattached-hosts' => [{
+                'object-name' => 'host',
+                'durable-id'  => 'H9',
+                name          => 'pve-pve-host15',
+                initiator     => [{ 'object-name' => 'initiator',
+                                    id => '100000109b643bca' }],
+            }],
+        }) if $path =~ m{/show/host-groups};
+        return reply(ok_status());
+    });
+
+    my $host = $api->host_get_by_name('pve-pve-host15');
+    ok($host, 'a host under an unknown key is still found, because it says it is one');
+    ok($api->host_has_initiator($host, '100000109b643bca'),
+        '... with its initiators intact');
+}
+
+{
+    # And the converse: a row reached through a host key that names itself
+    # something else is that other thing, never a host.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() },
+            host => [{ 'object-name' => 'host-group', name => 'pvegroup01' }],
+        }) if $path =~ m{/show/host-groups};
+        return reply(ok_status());
+    });
+
+    is_deeply($api->host_list(), [],
+        'a group under the host key is still not a host');
+}
+
+# ---------------------------------------------------------------------------
 # A refusal recognised by its return code
 #
 # When the lookup cannot see the host, the array's own refusal is the only

@@ -2,9 +2,34 @@
 
 繁體中文：[TESTING_zh-TW.md](TESTING_zh-TW.md)
 
+## What HAS been observed on hardware
+
+One array has run this plugin: a **PowerVault ME4024, system name MIL-ME4024,
+firmware `GT280R011-01`, Fibre Channel**. Everything in this section was read
+off that array rather than out of a document, and the payloads are kept
+verbatim in `t/fixtures/powervault/` so the suite is checked against what a
+real array sends.
+
+| Observed | Result | Fixed in |
+|---|---|---|
+| `GET /show/system` returns `text/*` with a non-ASCII byte | `pvesm add` failed outright with `Wide character in subroutine entry`. `decoded_content` returns characters where `decode_json` wants bytes | 0.7.62 |
+| `GET /show/host-groups` carries only `host-group` at the top level; hosts nest under `host` (singular), initiators under `initiator` | the host lookup found nothing, so the plugin recreated the host on every poll and the array refused with `-10389`; the storage stayed inactive | 0.7.63 |
+| `GET /show/pools` reports free space as `total-avail` / `total-avail-numeric`; there is no `avail` | every pool read as 100% used and PVE refuses to allocate into a full pool. Pool B measured 98.56% used, which is real | 0.7.63 |
+| `-10389` is the return code for "The specified host name is already in use" | now read as proof the host exists, from the code and never from the wording | 0.7.63 |
+
+Still not captured from that array, and therefore still inferred:
+
+| Open question | Why it matters | How it is covered meanwhile |
+|---|---|---|
+| How a host belonging to **no** host group appears in the JSON. The CLI prints ungrouped hosts in a separate block; which key that becomes is unknown | a node whose host is not in a group is the default case for a single-node install | the key list is no longer what decides. Every object in an ME answer names its own type in `object-name`, and a row saying `"object-name": "host"` is collected whichever key it arrived under |
+| Which field the host's multipath WWID actually derives from (`wwn` vs `serial-number`) | device discovery does not work at all if this is wrong | both are read, in that order |
+| The WWPN spelling the array wants in a host object (bare hex vs colon-separated) | a wrong spelling creates a host no initiator matches | the bare-hex form the CLI prints is sent; the array accepted `100000109b643bca,100000109b643c04` |
+
 ## Hardware verification status
 
 **Nothing in this project has been run against a physical PowerStore.**
+One PowerVault ME4024 has run it; see the section above for what that
+established and what it did not.
 
 Everything below is `NOT VERIFIED ON HARDWARE` until it has been executed on a
 real array and the result recorded here together with the PowerStore OS

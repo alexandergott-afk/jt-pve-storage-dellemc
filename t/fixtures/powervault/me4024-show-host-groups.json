@@ -1,0 +1,33 @@
+{
+  "host-group": [
+    {
+      "object-name": "host-group",
+      "durable-id": "HG5",
+      "name": "pvegroup01",
+      "member-count": 2,
+      "host": [
+        {
+          "object-name": "host",
+          "durable-id": "H2",
+          "name": "pve16",
+          "member-count": 2,
+          "host-group": "00c0ff446d15000080912a6a01010000",
+          "group-key": "HG5",
+          "initiator": [
+            {
+              "object-name": "initiator",
+              "durable-id": "I1",
+              "nickname": "pve16-fc2",
+              "host-bus-type": "FC",
+              "id": "100000109b643c08",
+              "host-key": "H2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": [
+    { "object-name": "status", "response-type": "Success", "response": "Command completed successfully. (2026-08-04 10:00:00)", "return-code": 0 }
+  ]
+}

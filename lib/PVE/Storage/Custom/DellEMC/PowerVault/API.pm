@@ -748,9 +748,21 @@ sub initiator_list {
 # then answered "no", the plugin asked for the host it had just created, and
 # the array refused with -10389 while the storage went inactive.
 #
-# So collect from every key a host row is known to arrive under, at any depth,
-# and keep only the rows that actually look like a host.
+# Confirmed on an ME4024 running GT280R011-01: the top level carries only
+# 'host-group', and each group carries its hosts under 'host' (singular),
+# each host its initiators under 'initiator'.
+#
+# So collect from every key a host row is known to arrive under, at any depth
+# — but do not let that list be what decides. Every object in an ME answer
+# names its own type in 'object-name', and a row that says it is a host is a
+# host whichever key it arrived under. That is what covers the shape nobody
+# has captured yet: a host belonging to no group at all, which the CLI prints
+# in a separate block and which may well not sit under 'host'.
 my @HOST_KEYS = qw(hosts host host-view);
+
+# What the array calls a host row, in its own words about its own type. Not a
+# message and not a heading: 'object-name' is a basetype name.
+my %HOST_OBJECT_NAME = map { $_ => 1 } qw(host hosts host-view);
 
 # The host basetype documents 'name'; the host-view basetype spells it
 # 'host-name'. Both are read, and a row carrying neither is not a host.
@@ -796,6 +808,11 @@ sub _collect_hosts {
         }
         next unless ref($node) eq 'HASH';
 
+        # The row saying what it is outranks the key it arrived under.
+        my $type = $node->{'object-name'};
+        push @found, $node
+            if defined $type && !ref($type) && $HOST_OBJECT_NAME{lc $type};
+
         for my $key (@HOST_KEYS) {
             my $rows = $node->{$key};
             next unless defined $rows;
@@ -812,6 +829,14 @@ sub _collect_hosts {
     my @hosts;
     for my $row (@found) {
         next unless defined _host_name_of($row);
+
+        # A row reached through one of the keys above, but which names itself
+        # something else, is that other thing. This is what keeps a group from
+        # being handed back as a host: returning nothing is always better than
+        # returning a neighbouring object type.
+        my $type = $row->{'object-name'};
+        next if defined $type && !ref($type) && !$HOST_OBJECT_NAME{lc $type};
+
         my $id = $row->{'durable-id'} // $row->{'serial-number'};
         next if defined $id && !ref($id) && $seen_id{$id}++;
         push @hosts, $row;

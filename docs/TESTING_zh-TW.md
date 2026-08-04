@@ -2,6 +2,28 @@
 
 English: [TESTING.md](TESTING.md)
 
+## 已經在實機上觀察到的部分
+
+已經有一台陣列跑過這個外掛：**PowerVault ME4024，系統名稱 MIL-ME4024，韌體
+`GT280R011-01`，走 Fibre Channel**。本節所有內容都是從那台陣列上讀出來的，而
+不是從文件推出來的；原始回應逐字保留在 `t/fixtures/powervault/`，讓測試套件
+是拿真實陣列送出的東西在驗。
+
+| 觀察到的事實 | 造成的結果 | 修正版本 |
+|---|---|---|
+| `GET /show/system` 回的是 `text/*`，且內含非 ASCII 位元組 | `pvesm add` 直接失敗，訊息是 `Wide character in subroutine entry`。`decoded_content` 回傳的是字元，而 `decode_json` 要的是位元組 | 0.7.62 |
+| `GET /show/host-groups` 最上層只有 `host-group`；host 巢狀在 `host`（單數）底下，initiator 再巢狀在 `initiator` 底下 | host 查詢完全落空，外掛每次輪詢都重建 host，陣列以 `-10389` 拒絕，儲存一直停在 inactive | 0.7.63 |
+| `GET /show/pools` 的可用空間欄位是 `total-avail` / `total-avail-numeric`，沒有 `avail` | 每個儲存池都讀成 100% 已用，而 PVE 不會配置到已滿的儲存池裡。儲存池 B 實測 98.56% 已用，那是真實數字 | 0.7.63 |
+| `-10389` 是「The specified host name is already in use」的回傳碼 | 現在把它當成「host 確實存在」的證據，只讀代碼、絕不讀訊息文字 | 0.7.63 |
+
+以下仍未從該陣列上抓到，因此仍屬推測：
+
+| 未解的問題 | 為什麼重要 | 目前如何因應 |
+|---|---|---|
+| **不屬於任何 host group** 的 host 在 JSON 中長什麼樣。CLI 會把 ungrouped host 印在另一個區塊，但對應的鍵名不明 | 單節點安裝時，host 不在任何 group 裡才是常態 | 鍵名清單已經不是決定因素。ME 回應裡的每個物件都會在 `object-name` 說出自己的型別，只要那一列寫著 `"object-name": "host"`，不論它掛在哪個鍵底下都會被收進來 |
+| host 的 multipath WWID 究竟衍生自哪個欄位（`wwn` 或 `serial-number`） | 這一項錯了，裝置探索會完全無法運作 | 兩個都讀，依此順序 |
+| 陣列在 host 物件裡要的 WWPN 寫法（純十六進位或以冒號分隔） | 寫法錯了會建立出一個沒有任何 initiator 對得上的 host | 送出 CLI 印出來的純十六進位形式；該陣列接受了 `100000109b643bca,100000109b643c04` |
+
 ## 實機驗證狀態
 
 **本專案的任何部分都尚未在實體 PowerStore 上執行過。**

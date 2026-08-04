@@ -1,3 +1,30 @@
+jt-pve-storage-dellemc (0.7.64~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * VERIFIED: the ME4024 payloads behind 0.7.63 are now on file. A customer
+    supplied the array's actual 'show host-groups' and 'show pools'
+    responses (PowerVault ME4024, MIL-ME4024, firmware GT280R011-01, Fibre
+    Channel). Both fixes released in 0.7.63 were written from Dell's
+    documentation and match what the array sends: the top level carries only
+    'host-group', hosts nest under 'host' (singular) and initiators under
+    'initiator'; free space is 'total-avail' and there is no 'avail'. The
+    responses are kept verbatim in t/fixtures/powervault/ and the suite now
+    reads them from disk, including the customer's measured 98.56% for the
+    pool that previously read as 100% full.
+  * POWERVAULT: a host belonging to no host group might still not have been
+    found. The ME CLI prints ungrouped hosts in a separate block and which
+    key that becomes in JSON is unknown - which for a single-node install is
+    the default case, not an edge case. The list of keys is no longer what
+    decides: every object in an ME answer names its own type in
+    'object-name', and a row saying "object-name": "host" is collected
+    whichever key it arrived under. The converse holds too - a row reached
+    through a host key that names itself something else is that other thing,
+    never a host.
+  * docs/TESTING.md gained a section recording what that array established
+    and what it did not.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 21:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.63~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.
