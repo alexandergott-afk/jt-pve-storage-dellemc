@@ -58,8 +58,18 @@ jobs:
       - name: Check for node-wide multipath operations
         run: make check-multipath-flush
 
+      # The output is echoed as an annotation as well as to the log, because
+      # a job's annotations are readable through the public API and its logs
+      # are not. Without this, a syntax failure here is a red step with no
+      # visible reason to anyone who cannot sign in.
       - name: Perl syntax
-        run: make syntax
+        run: |
+          if ! out=$(make syntax 2>&1); then
+            echo "$out"
+            echo "::error title=make syntax failed::$(echo "$out" | tail -12 | tr '\n' '~')"
+            exit 1
+          fi
+          echo "$out"
 
       - name: Unit tests
         run: make unit

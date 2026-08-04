@@ -7,6 +7,15 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.59~beta1] - 2026-08-04
+
+### Added
+- **The release workflow echoes a failing syntax check as a GitHub
+  annotation.** A job's annotations are readable through the public API while
+  its logs are not, so a red step was a red step with no visible reason to
+  anyone who could not sign in. That is why a CI failure blocking every
+  release since v0.7.36 took a customer report to surface.
+
 ## [0.7.58~beta1] - 2026-08-04
 
 ### Fixed

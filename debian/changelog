@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.7.59~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The release workflow echoes a failing syntax check as a GitHub
+    annotation. A job's annotations are readable through the public API and
+    its logs are not, so a red step was previously a red step with no visible
+    reason to anyone who could not sign in - which is why a CI failure that
+    had blocked every release since v0.7.36 took a customer report to find.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 08:56:37 +0800
+
 jt-pve-storage-dellemc (0.7.58~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run
