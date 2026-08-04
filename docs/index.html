@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.56~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.57~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.57~beta1</div>
+        <div class="changelog-date">2026-08-04</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The release workflow had been failing and publishing nothing since v0.7.36: a test that needs Proxmox VE did not skip on a runner that has none, so the suite was green here and red in CI. SHA256SUMS is a checksum file and does not affect installing the package.</span>
+            <span class="lang-zh">自 v0.7.36 起 release workflow 一直失敗、什麼都沒發佈：一個需要 Proxmox VE 的測試在沒有 PVE 的 runner 上沒有 skip，於是本機是綠的、CI 是紅的。SHA256SUMS 只是雜湊校驗檔，不影響套件安裝。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.56~beta1</div>

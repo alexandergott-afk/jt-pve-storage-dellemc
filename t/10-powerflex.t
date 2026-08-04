@@ -888,7 +888,11 @@ SKIP: {
         'a refused discovery is not fatal');
 }
 
-{
+SKIP: {
+    # Reaches into the plugin, which cannot be loaded without PVE.
+    skip 'PVE::Storage::Plugin is not available', 1
+        unless eval { require PVE::Storage::Custom::DellPowerFlexPlugin; 1 };
+
     # End to end: the array publishes SDTs with no NQN (which is what a real
     # one does), so activate has to discover one before it can connect. Before
     # this, nvme_connect croaked on the missing NQN and PowerFlex's default
@@ -923,7 +927,10 @@ SKIP: {
     ], 'every target is connected with the discovered subsystem NQN');
 }
 
-{
+SKIP: {
+    skip 'PVE::Storage::Plugin is not available', 2
+        unless eval { require PVE::Storage::Custom::DellPowerFlexPlugin; 1 };
+
     # Discovery that answers nowhere must fail with something that names the
     # port to check, not croak inside nvme_connect about a missing argument.
     no warnings 'redefine', 'once';

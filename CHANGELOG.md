@@ -7,6 +7,29 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.57~beta1] - 2026-08-04
+
+### Fixed
+- **The release workflow has been failing and publishing nothing.** Half the
+  tags from v0.7.36 onward have no release at all, and v0.7.53 to v0.7.56 were
+  never created — the workflow failed at *Run checks* and every later step was
+  skipped.
+
+  A CI runner has no Proxmox VE, so a test that reaches into a plugin has to
+  skip rather than die. A block added in 0.7.37 did not, so `make unit` failed
+  there while staying green on a PVE node. Nothing local noticed, because
+  nothing local ran the suite the way CI runs it.
+
+### Added
+- **`make unit-nopve`** runs the whole suite as it runs on a machine without
+  Proxmox VE, and `make release-check` now includes it. A green suite that only
+  proves the developer's machine works is worth very little.
+
+### Note
+`SHA256SUMS` is still absent from published releases. It is a checksum file and
+nothing else: **it does not affect installing or running the package.** Its
+absence is tracked separately.
+
 ## [0.7.56~beta1] - 2026-07-27
 
 ### Changed

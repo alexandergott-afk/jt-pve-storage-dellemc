@@ -43,6 +43,11 @@ jobs:
 
       - name: Run checks
         run: |
+          # A runner has no Proxmox VE, so every test that reaches into a
+          # plugin must skip rather than die. `make unit` alone did not catch
+          # a test that forgot to, and this job then failed at exactly this
+          # step for twenty releases while the suite stayed green on the
+          # developer's node — publishing nothing, silently.
           make check-multipath-flush
           make syntax
           make unit

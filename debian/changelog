@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.57~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use. No storage type has been run
+    against physical hardware.
+  * The release workflow has been failing at "Run checks" and publishing
+    nothing. Half the tags from v0.7.36 onward have no release at all, and
+    v0.7.53 to v0.7.56 were never created. A CI runner has no Proxmox VE, so
+    a test that reaches into a plugin has to skip rather than die; a block
+    added in 0.7.37 did not, so `make unit` failed there while staying green
+    on a PVE node. Nothing local noticed because nothing local ran the suite
+    the way CI does.
+  * `make unit-nopve` runs the suite as it runs without Proxmox VE, and
+    release-check now includes it. This is the check that was missing.
+  * SHA256SUMS remains absent from published releases; that is a separate
+    matter and affects nothing about installing or running the package.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 08:45:09 +0800
+
 jt-pve-storage-dellemc (0.7.56~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.56~beta1
+VERSION = 0.7.57~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -21,7 +21,7 @@ UNIT_TESTS   = $(wildcard t/*.t)
 GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
-.PHONY: all install uninstall test syntax unit check-multipath-flush \
+.PHONY: all install uninstall test syntax unit unit-nopve check-multipath-flush \
         release-check deb deb-clean clean
 
 all:
@@ -86,6 +86,20 @@ unit:
 		echo "No unit tests yet (t/*.t)."; \
 	fi
 
+# The same suite as it runs on a machine with no Proxmox VE — which is what
+# CI is, and where every test that reaches into a plugin has to skip rather
+# than die. This is the target that would have caught a suite green here and
+# red in CI for twenty releases: the release workflow failed at "Run checks"
+# and published nothing, and nothing local noticed.
+NOPVE_STUB = $(CURDIR)/.nopve-stub
+
+unit-nopve:
+	@mkdir -p $(NOPVE_STUB)
+	@printf 'package nopve;\nBEGIN { unshift @INC, sub {\n    my (undef, $$f) = @_;\n    die "Can'"'"'t locate $$f in \\@INC (simulated: no Proxmox VE)\\n"\n        if $$f =~ m{^PVE/} && $$f !~ m{^PVE/Storage/Custom/};\n    return;\n}; }\n1;\n' > $(NOPVE_STUB)/nopve.pm
+	@echo "Running unit tests as they run without Proxmox VE (as in CI)..."
+	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" prove -Ilib $(UNIT_TESTS)
+	@rm -rf $(NOPVE_STUB)
+
 # `multipath -F` (capital F) must NEVER be used: it flushes EVERY unused
 # multipath map on the node, including maps belonging to other storages and
 # other vendors. Only ever flush one map at a time, with lowercase
@@ -111,7 +125,7 @@ check-multipath-flush:
 # Everything that must pass before a release, including the checks that catch
 # a half-finished version bump. See docs/RELEASE_TESTING.md; this target is
 # stage 1 of that plan.
-release-check: check-multipath-flush syntax unit
+release-check: check-multipath-flush syntax unit unit-nopve
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \
