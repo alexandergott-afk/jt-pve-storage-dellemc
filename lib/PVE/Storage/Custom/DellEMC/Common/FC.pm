@@ -21,6 +21,7 @@ our @EXPORT_OK = qw(
     get_fc_wwpns_raw
     get_fc_wwnns
     get_fc_targets
+    rport_name
     rescan_fc_hosts
     format_wwn
     parse_wwn
@@ -215,17 +216,34 @@ sub get_fc_wwnns {
 
 # Remote ports the fabric has presented to this host. The array's ports are
 # the entries with is_target set.
+# The kernel names a remote port rport-<host>:<channel>-<remote>, with a
+# COLON after the host number: 'rport-5:0-3'. This filter once asked for three
+# hyphen-separated numbers, which matches no entry the kernel has ever
+# created, so get_fc_targets always came back empty — and every FC node was
+# told on every poll that no target ports were visible, however well the
+# fabric was zoned. Reported from an ME4024 that was working.
+#
+# It doubles as the taint check: the name that comes back is the one matched,
+# never the one read from the directory.
+sub rport_name {
+    my ($entry) = @_;
+
+    return undef unless defined $entry;
+    my ($name) = $entry =~ /^(rport-\d+:\d+-\d+)\z/;
+
+    return $name;
+}
+
 sub get_fc_targets {
     return [] unless -d FC_REMOTE_PATH;
 
     opendir(my $dh, FC_REMOTE_PATH) or return [];
-    my @entries = grep { /^rport-\d+-\d+-\d+$/ } readdir($dh);
+    my @entries = grep { defined rport_name($_) } readdir($dh);
     closedir($dh);
 
     my @targets;
     for my $entry (@entries) {
-        ($entry) = $entry =~ /^(rport-\d+-\d+-\d+)$/;
-        next unless $entry;
+        $entry = rport_name($entry) // next;
 
         my $base = FC_REMOTE_PATH . "/$entry";
         my $roles = _read_attr("$base/roles") // '';

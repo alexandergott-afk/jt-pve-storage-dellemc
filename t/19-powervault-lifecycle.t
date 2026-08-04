@@ -338,4 +338,55 @@ $P->volume_snapshot_delete($scfg, $store, 'vm-300-disk-0', 'vzdump');
 ok(!$OBJ{$temp}, 'deleting the snapshot removes that clone');
 is_deeply(names_on_array(), ['pve-me5-300-d0'], 'leaving only the disk');
 
+# ---------------------------------------------------------------------------
+# The host exists, but this plugin cannot see it
+#
+# Reported from an ME4024. The host was created; the lookup that runs on every
+# activation never found it again, so the plugin asked for it once more and
+# the array refused with -10389. activate_storage failed and the storage sat
+# inactive.
+#
+# The lookup itself is fixed elsewhere. What is checked here is the second
+# line of defence, for the next firmware that answers in a shape nobody has
+# seen: the array's refusal is proof the host exists, and the question that
+# actually matters for data safety — are THIS node's initiators on it? — is
+# settled by asking the array rather than by assuming.
+# ---------------------------------------------------------------------------
+
+{
+    my @added;
+    my $blind = 1;
+
+    no warnings 'redefine', 'once';
+    local *Test::MeApi::host_get_by_name = sub { $blind ? undef : { name => $_[1] } };
+    local *Test::MeApi::host_create_or_exists = sub { return 0 };   # -10389
+    local *Test::MeApi::host_add_initiators =
+        sub { push @added, @{ $_[2] }; return 1 };
+
+    my $name = eval { $P->_array_ensure_host($scfg, $store) };
+    my $err = $@;
+
+    is($err, '', 'activation is not failed by a host the plugin cannot read');
+    ok($name, '... and a host name is still returned to map with');
+    ok(scalar(@added),
+        "... after proving this node's initiators are on that host");
+}
+
+{
+    # And when even that cannot be proved, it refuses. Mapping a volume to a
+    # host that might belong to another node is how two nodes end up writing
+    # to one disk; going inactive is the safe answer, not the timid one.
+    no warnings 'redefine', 'once';
+    local *Test::MeApi::host_get_by_name = sub { undef };
+    local *Test::MeApi::host_create_or_exists = sub { return 0 };
+    local *Test::MeApi::host_add_initiators = sub { die "refused by the array\n" };
+
+    my $name = eval { $P->_array_ensure_host($scfg, $store) };
+    my $err = $@;
+
+    ok(!$name, 'a host whose ownership cannot be established is not used');
+    like($err, qr/cannot read it back|belongs to another node/,
+        '... and the operator is told what to look at');
+}
+
 done_testing();

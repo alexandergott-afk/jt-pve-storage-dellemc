@@ -158,7 +158,7 @@ help create host
 
 Two of the worst defects found before the first hardware run were field names
 that did not exist: PowerVault's pool capacity read `avail-size` where the
-array reports `Avail`, so every pool looked full; and the mapping check
+pools basetype documents `total-avail`, so every pool looked full; and the mapping check
 compared against a host name in a listing that has no host-name column. Both
 were invisible except as behaviour that made no sense.
 
@@ -172,7 +172,8 @@ SSH, for PowerFlex through the API directly.
 | Field | Read for | State |
 |---|---|---|
 | `total-size-numeric` | pool capacity, in 512-byte blocks | documented as **Total Size** |
-| `avail-numeric` | pool free space | documented as **Avail** |
+| `total-avail-numeric` | pool free space | the pools basetype documents `total-avail`; **Avail** is the printed column heading. Confirmed on an ME4024, where the heading spelling was absent and every pool read as 100% full |
+| `avail-numeric`, `avail-size-numeric`, `available-size-numeric` | tried after `total-avail` | older spellings; none is the documented one |
 | `size-numeric` (volume) | volume size | the volumes basetype documents `size` as the volume's capacity |
 | `allocated-size-numeric` | volume space in use | the volumes basetype documents `allocated-size` |
 | `total-size-numeric`, `alloc-size-numeric` | tried after the properties above; **Total Size** and **Alloc Size** are the printed column headings, which are not the same thing as the property names | — |
@@ -189,6 +190,10 @@ SSH, for PowerFlex through the API directly.
 | `name-numeric`, `status-numeric` | fallback spellings tried when the plain field is absent | — |
 | `port-type`, `primary-ip-address` | older spellings of Media and IP Address | — |
 | `host-id`, `host`, `name` | further spellings a mapping row may use for who it belongs to | — |
+| `host` (nested), `hosts`, `host-view` | the keys a `show host-groups` answer carries its host rows under | the answer is a tree: groups at the top, hosts NESTED inside them, initiators nested again. Confirmed on an ME4024, where reading a top-level `hosts` array found none and the plugin could not see the host it had just created |
+| `name`, `host-name` | a host's own name | the host basetype documents `name`; `host-name` is the host-view spelling |
+| `durable-id` | telling two host rows apart when the tree reaches one twice | documented |
+| `return-code` | whether a command was refused, and why | documented per command; `-10389` is "host name already in use". The code is read, never the wording |
 
 `-numeric` fields are counted in 512-byte blocks; the plain field is a
 formatted string like `1996.7GB` and is only parsed when the numeric one is

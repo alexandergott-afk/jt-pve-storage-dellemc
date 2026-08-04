@@ -465,9 +465,9 @@ sub _array_ensure_host {
     my $host = eval { $api->host_get_by_name($name, %opts) };
 
     unless ($host) {
-        eval { $api->host_create($name, $want, %opts) };
-        if ($@) {
-            my $err = $@;
+        my $existed = eval { $api->host_create_or_exists($name, $want, %opts) };
+        my $err = $@;
+        if ($err) {
             die "Failed to create host '$name' on the array. This node's"
               . " initiator is most likely already attached to a different"
               . " host object; remove that one in PowerVault Manager, or set"
@@ -476,7 +476,36 @@ sub _array_ensure_host {
                 if $err =~ /already|exists|in use|duplicate/i;
             die "Failed to create host '$name' on the array: $err\n";
         }
-        return $name;
+
+        return $name if $existed;
+
+        # The array refused because it already has this host, but the lookup
+        # above did not find it. Whatever shape that firmware's answer has,
+        # the host is there — so look once more, and if it is still invisible,
+        # settle the only question that matters for data safety by asking the
+        # array: are THIS node's initiators on that host? Mapping a volume to
+        # a host belonging to another node is how two nodes end up writing to
+        # one disk, so a plugin that cannot answer that must not carry on.
+        $host = eval { $api->host_get_by_name($name, %opts) };
+        unless ($host) {
+            eval { $api->host_add_initiators($name, $want, %opts) };
+            my $add_err = $@;
+            die "The array already has a host named '$name', but this plugin"
+              . " cannot read it back from 'show host-groups' and could not"
+              . " attach this node's initiator(s) to it either. Check in"
+              . " PowerVault Manager whether '$name' belongs to another node,"
+              . " and please report this array's firmware version.\n"
+              . "  Array error: $add_err"
+                if $add_err;
+
+            $class->_warn_once($storeid, 'host-unreadable',
+                "Storage '$storeid': the array has host '$name' but does not"
+              . " report it in 'show host-groups'. This node's initiator(s)"
+              . " were attached to it, so mapping will work; please report"
+              . " this array's firmware version.");
+
+            return $name;
+        }
     }
 
     # The host exists. A reinstalled node, or one that gained an HBA port, has
@@ -504,11 +533,14 @@ sub _array_ensure_host {
 sub _array_list_hosts {
     my ($class, $scfg, $prefix, %opts) = @_;
 
-    my $hosts = eval { $class->_api($scfg, %opts)->host_list(%opts) } // [];
+    my $api   = $class->_api($scfg, %opts);
+    my $hosts = eval { $api->host_list(%opts) } // [];
 
     my @out;
     for my $host (@$hosts) {
-        my $name = $host->{name} // $host->{'host-name'} // next;
+        # One place decides what a host row calls itself; a second list of
+        # spellings here would drift from it.
+        my $name = $api->host_name($host) // next;
         next if defined $prefix && length $prefix && index($name, $prefix) != 0;
         push @out, { name => $name };
     }

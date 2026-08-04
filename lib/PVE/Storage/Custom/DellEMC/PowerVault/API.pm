@@ -67,6 +67,11 @@ use constant {
     # several volumes are mapped at once.
     MIN_LUN_ID => 1,
     MAX_LUN_ID => 255,
+
+    # "The specified host name is already in use." Recognised by its code and
+    # never by its wording — the wording is localised and the rendered message
+    # also carries the command this plugin sent.
+    RC_HOST_NAME_IN_USE => -10389,
 };
 
 sub base_path { BASE_PATH }
@@ -267,13 +272,24 @@ sub _cmd {
         my $command = join(' ', @$tokens);
         my $message = $status->{response} // 'the array reported a failure';
 
-        # A refusal the caller expects and can live with. Matched against the
-        # array's own words ONLY: the rendered message also carries the
-        # command, and a command named 'add host-members' would match a
-        # pattern looking for the word 'member'.
+        my $code = $status->{'return-code'};
+
+        # A refusal the caller expects, recognised by the array's own return
+        # code. This is the form to reach for: a code is a fact, where the
+        # words around it are localised, reworded between firmware revisions,
+        # and — as this project has twice paid for — sometimes text this
+        # plugin composed itself.
+        if (defined $code && ref($opts{allow_codes}) eq 'ARRAY') {
+            return undef if grep { $_ == $code } @{ $opts{allow_codes} };
+        }
+
+        # The same thing recognised by the array's words, for the refusals
+        # whose code is not documented. Matched against the array's own text
+        # ONLY: the rendered message also carries the command, and a command
+        # named 'add host-members' would match a pattern looking for the word
+        # 'member'.
         return undef
             if $opts{tolerate} && $message =~ $opts{tolerate};
-        my $code    = $status->{'return-code'};
         $message .= " (return code $code)" if defined $code;
 
         die $self->_msg("command '$command' failed: $message"
@@ -391,13 +407,15 @@ sub get_managed_capacity {
         next if defined $want && length $want && lc($name) ne lc($want);
         $matched++;
 
-        # 'show pools' reports Total Size, Avail and Snap Size. The JSON
-        # spelling of Avail is 'avail', not 'avail-size': reading the wrong
-        # one leaves available at 0, which makes every pool look full — PVE
-        # then refuses to allocate and the capacity alert fires immediately.
+        # The pools basetype documents 'total-avail'. 'Avail' is the heading
+        # 'show pools' PRINTS, and reading a printed heading as a property
+        # name is a mistake this file has now made twice. An ME4024 carries no
+        # such field: available came out 0, every pool looked 100% full, and
+        # PVE refuses to allocate into a full pool.
         $total     += $self->_blocks_to_bytes($pool, 'total-size', 'total');
-        $available += $self->_blocks_to_bytes($pool, 'avail', 'avail-size',
-                                              'available-size', 'available');
+        $available += $self->_blocks_to_bytes($pool, 'total-avail', 'avail',
+                                              'avail-size', 'available-size',
+                                              'available');
     }
 
     if (defined $want && length $want && !$matched) {
@@ -720,28 +738,122 @@ sub initiator_list {
 # The output nests: host groups contain hosts, and each host contains its
 # initiators, reported with Nickname, Discovered, Mapped, Profile, Host Type
 # and ID (a WWPN for FC and SAS, an IQN for iSCSI).
+# Host rows out of a 'show host-groups' answer, wherever the firmware put
+# them.
+#
+# The reply is a tree: host groups at the top, the hosts NESTED inside them
+# under their own key, and each host's initiators nested again. Reading only a
+# top-level 'hosts' array found nothing on an ME4024, so the fallback returned
+# the GROUPS instead — whose names are group names. Every lookup for a host
+# then answered "no", the plugin asked for the host it had just created, and
+# the array refused with -10389 while the storage went inactive.
+#
+# So collect from every key a host row is known to arrive under, at any depth,
+# and keep only the rows that actually look like a host.
+my @HOST_KEYS = qw(hosts host host-view);
+
+# The host basetype documents 'name'; the host-view basetype spells it
+# 'host-name'. Both are read, and a row carrying neither is not a host.
+sub _host_name_of {
+    my ($row) = @_;
+
+    return undef unless ref($row) eq 'HASH';
+    for my $field (qw(name host-name)) {
+        my $value = $row->{$field};
+        next if ref($value);
+        return $value if defined $value && length $value;
+    }
+
+    return undef;
+}
+
+# The public form, so callers read a host's name the one way rather than
+# each keeping its own list of spellings.
+sub host_name {
+    my ($self, $row) = @_;
+
+    return _host_name_of($row);
+}
+
+sub _collect_hosts {
+    my ($self, $data) = @_;
+
+    my @found;
+    my @queue = ($data);
+    my $seen  = 0;
+
+    while (@queue) {
+        my $node = shift @queue;
+        next unless ref($node);
+
+        # A structure deep or circular enough to spin here is not an answer
+        # from an array.
+        last if ++$seen > 10_000;
+
+        if (ref($node) eq 'ARRAY') {
+            push @queue, @$node;
+            next;
+        }
+        next unless ref($node) eq 'HASH';
+
+        for my $key (@HOST_KEYS) {
+            my $rows = $node->{$key};
+            next unless defined $rows;
+            for my $row (ref($rows) eq 'ARRAY' ? @$rows : ($rows)) {
+                push @found, $row if ref($row) eq 'HASH';
+            }
+        }
+
+        push @queue, values %$node;
+    }
+
+    # The same host reached down two branches of the tree is still one host.
+    my %seen_id;
+    my @hosts;
+    for my $row (@found) {
+        next unless defined _host_name_of($row);
+        my $id = $row->{'durable-id'} // $row->{'serial-number'};
+        next if defined $id && !ref($id) && $seen_id{$id}++;
+        push @hosts, $row;
+    }
+
+    return \@hosts;
+}
+
 sub host_list {
     my ($self, %opts) = @_;
 
-    my $data = $self->_cmd(['show', 'host-groups'], %opts);
+    my $data  = $self->_cmd(['show', 'host-groups'], %opts);
+    my $hosts = $self->_collect_hosts($data);
 
-    # `show host-groups` reports groups, the hosts in them and their
-    # initiators; the host rows are what this plugin works with.
-    my $hosts = $self->_objects($data, 'hosts');
     return $hosts if @$hosts;
 
-    return $self->_objects($data, 'host-group');
+    # No host anywhere in the tree. Returning the groups instead would be
+    # worse than returning nothing: a group name is not a host name, and a
+    # caller comparing against one either misses its host or matches an
+    # object it must not map a volume to.
+    return [];
 }
 
 sub host_get_by_name {
     my ($self, $name, %opts) = @_;
 
-    # Both spellings are matched, not just whichever is defined first: a row
-    # that carries both would otherwise be judged on one of them alone.
-    for my $host (@{ $self->host_list(%opts) }) {
-        my @names = grep { defined && length }
-            $host->{name}, $host->{'host-name'};
-        return $host if grep { $_ eq $name } @names;
+    return undef unless defined $name && length $name;
+
+    my $hosts = $self->host_list(%opts);
+
+    for my $host (@$hosts) {
+        my $have = _host_name_of($host) // next;
+        return $host if $have eq $name;
+    }
+
+    # The array's own uniqueness check on a host name ignores case, so a name
+    # differing only in case is the same host to it and a different one to an
+    # exact comparison. Answering "no" there is how the plugin ends up asking
+    # for a host the array already has.
+    for my $host (@$hosts) {
+        my $have = _host_name_of($host) // next;
+        return $host if lc($have) eq lc($name);
     }
 
     return undef;
@@ -797,10 +909,30 @@ sub host_create {
     die $self->_msg("creating a host needs at least one initiator") . "\n"
         unless ref($initiators) eq 'ARRAY' && @$initiators;
 
-    $self->_cmd(['create', 'host', 'initiators', join(',', @$initiators), $name],
+    my $data = $self->_cmd(
+        ['create', 'host', 'initiators', join(',', @$initiators), $name],
         %opts);
 
+    # An expected refusal the caller listed in allow_codes.
+    return undef unless defined $data;
+
     return $name;
+}
+
+# Create the host, or report that the array already has one under that name.
+#
+# Returns 1 when it created it and 0 when the array refused because the name
+# is taken; anything else dies. The array's refusal is the one piece of
+# evidence that does not depend on this plugin being able to read the host
+# back, which is exactly what failed on the ME4024 — so a caller that cannot
+# find a host still learns whether it exists.
+sub host_create_or_exists {
+    my ($self, $name, $initiators, %opts) = @_;
+
+    my $created = $self->host_create($name, $initiators, %opts,
+        allow_codes => [ RC_HOST_NAME_IN_USE ]);
+
+    return defined $created ? 1 : 0;
 }
 
 # From the CLI Reference:

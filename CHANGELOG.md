@@ -7,6 +7,65 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.63~beta1] - 2026-08-04
+
+### Fixed
+- **PowerVault: the plugin could not find the host it had just created.**
+  Reported from an ME4024. Every activation created the host object, failed
+  to find it, asked for it again, and the array refused:
+
+  ```
+  command 'create host initiators ... ' failed:
+  The specified host name is already in use. (return code -10389)
+  ```
+
+  The storage went inactive and stayed there. `show host-groups` answers with
+  a tree — host groups at the top, the hosts nested inside them, initiators
+  nested again — and this plugin read a top-level `hosts` array that is not
+  there. The fallback then returned the host *groups*, whose names are group
+  names, so no lookup could ever match.
+
+  The answer is now walked rather than indexed, a group is never handed back
+  as a host, and a name differing only in case resolves to the same host the
+  array's own uniqueness check would find.
+
+  Because another firmware may answer in a shape nobody has seen yet, there
+  is now a second line of defence: the array's own `-10389` is taken as proof
+  that the host exists — read from the return code, never from the wording —
+  and the question that actually matters for data safety, *are this node's
+  initiators on that host*, is settled by asking the array to attach them
+  rather than by assuming. If that cannot be established either, the storage
+  still refuses: mapping a volume to a host that might belong to another node
+  is how two nodes come to write to one disk.
+
+- **PowerVault: every pool reported itself 100% full.** Reported from the
+  same array. `pvesm status` showed the storage fully used with nothing
+  available, and PVE refuses to allocate into a full pool. The free-space
+  field was read as `avail`, which is the column heading `show pools`
+  *prints*; the pools basetype documents **`total-avail`**, and the ME4024
+  carries no field by the printed name. A field the array does not have reads
+  as zero, which is indistinguishable from a genuinely full pool. Older
+  spellings are still read, after the documented one.
+
+- **FC: "No FC target ports are visible from this node" on a healthy fabric.**
+  Reported from the same node, on every `pvesm status`. The kernel names a
+  remote port `rport-<host>:<channel>-<remote>` — a colon after the host
+  number, `rport-5:0-3`. The scan asked for three hyphen-separated numbers,
+  which matches no entry the kernel has ever created, so the target list was
+  always empty and every FC node was told its zoning was wrong.
+
+  The warning also went through a bare `warn` on a path that runs every ten
+  seconds per storage per node. It now goes through the once-an-hour path and
+  says what was seen, not only what was missing: no remote ports at all
+  points at zoning, ports visible but none an online target points somewhere
+  else entirely.
+
+### Changed
+- `_cmd` gained `allow_codes`: an expected refusal is recognised by the
+  array's own return code rather than by its wording. The wording is
+  localised, is reworded between firmware revisions, and — twice in this
+  project's history — has been text the plugin composed itself.
+
 ## [0.7.62~beta1] - 2026-08-04
 
 ### Fixed

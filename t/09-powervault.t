@@ -589,8 +589,8 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
     my ($api) = make_api(handler => sub {
         my ($req, $path) = @_;
         return reply({ %{ ok_status() }, pools => [
-            { name => 'A', 'total-size-numeric' => 2000000000, 'avail-size-numeric' => 500000000 },
-            { name => 'B', 'total-size-numeric' => 1000000000, 'avail-size-numeric' => 400000000 },
+            { name => 'A', 'total-size-numeric' => 2000000000, 'total-avail-numeric' => 500000000 },
+            { name => 'B', 'total-size-numeric' => 1000000000, 'total-avail-numeric' => 400000000 },
         ]}) if $path =~ m{/show/pools};
         return reply(ok_status());
     });
@@ -618,6 +618,46 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
     });
     eval { $api->get_managed_capacity() };
     like($@, qr/no pools/, 'an array without pools is an error, not zero capacity');
+}
+
+{
+    # Reported from an ME4024: 'pvesm status' showed the storage 100.00% used
+    # with nothing available, and PVE refuses to allocate into a full pool.
+    #
+    # The pools basetype documents 'total-avail'. 'Avail' is the heading
+    # 'show pools' PRINTS, and this file had read the heading — the second
+    # time that has cost a release. A field the array does not carry reads as
+    # 0, which is indistinguishable from a genuinely full pool.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() }, pools => [{
+            name                  => 'A',
+            'total-size'          => '2000.0GB',
+            'total-size-numeric'  => 4000000000,
+            'total-avail'         => '1500.0GB',
+            'total-avail-numeric' => 3000000000,
+        }]}) if $path =~ m{/show/pools};
+        return reply(ok_status());
+    });
+
+    my ($total, $used, $avail) = $api->get_managed_capacity();
+    is($total, 4000000000 * 512, 'total comes from total-size');
+    is($avail, 3000000000 * 512, 'available comes from total-avail, not a heading');
+    isnt($avail, 0, 'a real pool never reports itself full');
+    is($used, $total - $avail, 'used is what is left over');
+}
+
+{
+    # Older firmware spelling it 'avail' keeps working: this is a widening.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() }, pools => [
+            { name => 'A', 'total-size-numeric' => 1000, 'avail-numeric' => 400 },
+        ]}) if $path =~ m{/show/pools};
+        return reply(ok_status());
+    });
+    my (undef, undef, $avail) = $api->get_managed_capacity();
+    is($avail, 400 * 512, "the older 'avail' spelling is still read");
 }
 
 # ---------------------------------------------------------------------------
@@ -931,6 +971,146 @@ SKIP: {
     $loop->{self} = $loop;
     my $done = eval { $api->host_has_initiator($loop, $iqn); 1 };
     ok($done, 'a self-referential structure terminates');
+}
+
+# ---------------------------------------------------------------------------
+# Finding a host the array already has
+#
+# Reported from an ME4024: the plugin created the host, then could never find
+# it again, so every activation asked for it once more and the array refused
+# with -10389. The storage went inactive and stayed there.
+#
+# The cause is the shape of the answer. 'show host-groups' does not carry a
+# top-level list of hosts: the hosts are NESTED inside the groups, under their
+# own key. Reading only a top-level 'hosts' array found nothing, and the
+# fallback then returned the GROUPS — whose names are group names, so no
+# lookup could ever match.
+# ---------------------------------------------------------------------------
+
+{
+    # The shape an ME4 actually sends: groups at the top, hosts inside them.
+    my $nested = sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() },
+            'host-group' => [{
+                'durable-id' => 'HGU',
+                name         => 'UNGROUPED',
+                host         => [
+                    { 'durable-id' => 'HV0', name => 'pve-pve-node1',
+                      initiator => [{ id => 'iqn.1993-08.org.debian:01:n1' }] },
+                    { 'durable-id' => 'HV1', name => 'other-node' },
+                ],
+            }],
+        }) if $path =~ m{/show/host-groups};
+        return reply(ok_status());
+    };
+
+    my ($api) = make_api(handler => $nested);
+
+    my $hosts = $api->host_list();
+    is(scalar(@$hosts), 2, 'hosts nested inside a host group are found');
+    is_deeply([sort map { $_->{name} } @$hosts],
+        ['other-node', 'pve-pve-node1'], '... and they are hosts, not groups');
+
+    ok(!grep({ ($_->{name} // '') eq 'UNGROUPED' } @$hosts),
+        'the group itself is never returned as a host');
+
+    my $host = $api->host_get_by_name('pve-pve-node1');
+    ok($host, 'the host this node created is found again');
+    is($host->{'durable-id'}, 'HV0', '... and it is the right object');
+
+    # The array's uniqueness check on a host name ignores case, so an exact
+    # comparison answering "no" is how the plugin asks for a host that is
+    # already there.
+    ok($api->host_get_by_name('PVE-PVE-NODE1'),
+        'a name differing only in case is the same host to the array');
+
+    ok(!$api->host_get_by_name('pve-pve-node2'), 'a host that is absent is absent');
+    ok(!$api->host_get_by_name(''), 'an empty name matches nothing');
+}
+
+{
+    # A flat answer, and the host-view spelling of the name field, both still
+    # work: this is a widening, not a replacement.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() },
+            hosts => [{ 'host-name' => 'pve-pve-node1', 'durable-id' => 'HV0' }],
+        }) if $path =~ m{/show/host-groups};
+        return reply(ok_status());
+    });
+
+    my $host = $api->host_get_by_name('pve-pve-node1');
+    ok($host, "a flat 'hosts' array with the host-view spelling still resolves");
+}
+
+{
+    # An array with groups but no hosts must answer "no hosts". Handing back
+    # the groups is what made a group name look like a host name.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ %{ ok_status() },
+            'host-group' => [{ name => 'UNGROUPED', 'durable-id' => 'HGU' }],
+        }) if $path =~ m{/show/host-groups};
+        return reply(ok_status());
+    });
+
+    is_deeply($api->host_list(), [], 'a group is never mistaken for a host');
+    ok(!$api->host_get_by_name('UNGROUPED'),
+        'and a group name does not resolve to a host object');
+}
+
+{
+    # An answer that refers to itself must terminate rather than spin.
+    my ($api) = make_api();
+    my $loop = { 'host-group' => [] };
+    push @{ $loop->{'host-group'} }, { name => 'g', host => [ $loop ] };
+    my $done = eval { $api->_collect_hosts($loop); 1 };
+    ok($done, 'a self-referential answer terminates');
+}
+
+# ---------------------------------------------------------------------------
+# A refusal recognised by its return code
+#
+# When the lookup cannot see the host, the array's own refusal is the only
+# evidence left that it exists. It is read from the return code and never from
+# the wording: the wording is localised, and the rendered message also carries
+# the command this plugin sent.
+# ---------------------------------------------------------------------------
+
+{
+    my $refuse = sub {
+        my ($req, $path) = @_;
+        return reply({ status => [{
+            'response-type' => 'Error',
+            'return-code'   => -10389,
+            response        => 'The specified host name is already in use.',
+        }]}) if $path =~ m{/create/host};
+        return reply(ok_status());
+    };
+
+    my ($api) = make_api(handler => $refuse);
+
+    is($api->host_create_or_exists('pve-pve-node1', ['iqn.x']), 0,
+        'the array refusing -10389 is reported as "it already exists"');
+
+    ($api) = make_api(handler => $refuse);
+    ok(!eval { $api->host_create('pve-pve-node1', ['iqn.x']); 1 },
+        'without allow_codes the same refusal still dies');
+    like($@, qr/-10389/, '... naming the code');
+
+    # A different failure is still a failure.
+    ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ status => [{
+            'response-type' => 'Error',
+            'return-code'   => -10058,
+            response        => 'The specified initiator does not exist.',
+        }]}) if $path =~ m{/create/host};
+        return reply(ok_status());
+    });
+    ok(!eval { $api->host_create_or_exists('pve-pve-node1', ['iqn.x']); 1 },
+        'a refusal for any other reason is not swallowed');
 }
 
 {

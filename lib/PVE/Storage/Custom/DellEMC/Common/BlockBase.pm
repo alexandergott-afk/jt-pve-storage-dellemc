@@ -697,11 +697,28 @@ sub _activate_fc {
         udev_refresh();
     }
 
+    # activate_storage runs every ~10s per node per storage, so an
+    # unconditional warn on a condition that persists is a line every ten
+    # seconds in the journal — which buries whatever else is being logged.
+    # Once an hour says the same thing and can still be found.
     my $targets = eval { get_fc_targets() } // [];
     my @online = grep { $_->{is_target} && ($_->{port_state} // '') =~ /online/i } @$targets;
-    warn "No FC target ports are visible from this node for storage"
-       . " '$storeid'. Check fabric zoning between this host and the array.\n"
-        unless @online;
+
+    unless (@online) {
+        # Say what was seen, not just what was not. "No target ports" with
+        # nothing visible at all points at zoning; the same words with ports
+        # visible but offline or in the wrong role point somewhere else
+        # entirely, and an operator should not have to guess which they have.
+        my $seen = scalar(@$targets)
+            ? scalar(@$targets) . " remote port(s) are visible but none is an"
+              . " online target"
+            : "no remote ports are visible at all";
+
+        $class->_warn_once($storeid, 'fc-no-targets',
+            "No FC target ports are visible from this node for storage"
+          . " '$storeid': $seen. Check fabric zoning between this host and"
+          . " the array, and 'cat /sys/class/fc_host/host*/port_state'.");
+    }
 
     return 1;
 }

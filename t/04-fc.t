@@ -20,6 +20,7 @@ use PVE::Storage::Custom::DellEMC::Common::FC qw(
     get_fc_wwpns_raw
     get_fc_wwnns
     get_fc_targets
+    rport_name
     get_fc_host_info
 );
 
@@ -77,6 +78,37 @@ is(ref(get_fc_wwpns()), 'ARRAY', 'get_fc_wwpns returns an arrayref');
 is(ref(get_fc_wwpns_raw()), 'ARRAY', 'get_fc_wwpns_raw returns an arrayref');
 is(ref(get_fc_wwnns()), 'ARRAY', 'get_fc_wwnns returns an arrayref');
 is(ref(get_fc_targets()), 'ARRAY', 'get_fc_targets returns an arrayref');
+
+# ---------------------------------------------------------------------------
+# The kernel's own name for a remote port
+#
+# 'rport-<host>:<channel>-<remote>' — a COLON after the host number. This
+# filter once asked for three hyphen-separated numbers, which matches no entry
+# the kernel has ever created, so get_fc_targets always came back empty and
+# every FC node was told on every poll that no targets were visible. Reported
+# from an ME4024 whose fabric was fine.
+#
+# The names below are the shapes /sys/class/fc_remote_ports actually holds.
+# ---------------------------------------------------------------------------
+
+for my $name (qw(rport-0:0-0 rport-5:0-3 rport-11:0-12 rport-7:0-345)) {
+    is(rport_name($name), $name, "'$name' is a remote port");
+}
+
+for my $name (qw(rport-5-0-3 rport-5:0 rport rport-a:0-1 rport-5:0-3x
+                 . .. fc_remote_ports)) {
+    is(rport_name($name), undef, "'$name' is not");
+}
+is(rport_name(undef), undef, 'and neither is nothing');
+
+# What comes back is what was matched, not what was read: the name is used to
+# build a path under /sys.
+{
+    my $tainted = "rport-5:0-3";
+    my $clean = rport_name($tainted);
+    is($clean, 'rport-5:0-3', 'the returned name is the matched one');
+    unlike($clean, qr{[/.]}, 'and carries nothing that could leave the directory');
+}
 is(ref(get_fc_host_info()), 'ARRAY', 'get_fc_host_info returns an arrayref');
 
 unless ($available) {

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.62~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.63~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.63~beta1</div>
+        <div class="changelog-date">2026-08-04</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Three defects reported from a PowerVault ME4024: the plugin could not find the host it had just created, so the storage went inactive; every pool read as 100% full, so PVE would refuse every allocation; and a healthy FC fabric was reported as unzoned on every poll.</span>
+            <span class="lang-zh">一台 PowerVault ME4024 回報的三個缺陷：外掛找不到自己剛建立的 host，儲存因此進入 inactive；每個儲存池都讀成 100% 已用，PVE 於是拒絕所有配置；以及一組正常的 FC fabric，每次輪詢都被回報成沒有 zoning。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.62~beta1</div>

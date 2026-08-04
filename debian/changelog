@@ -1,3 +1,42 @@
+jt-pve-storage-dellemc (0.7.63~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * POWERVAULT: the plugin could not find the host it had just created.
+    Reported from an ME4024. Every activation created the host, failed to
+    find it, asked again, and the array refused with "The specified host
+    name is already in use. (return code -10389)"; the storage went inactive
+    and stayed there. 'show host-groups' answers with a TREE - groups at the
+    top, hosts nested inside them - and this plugin read a top-level 'hosts'
+    array that is not there. The fallback then returned the host GROUPS,
+    whose names are group names, so no lookup could ever match. The answer
+    is now walked rather than indexed, a group is never handed back as a
+    host, and a name differing only in case resolves as the array's own
+    uniqueness check would resolve it.
+  * POWERVAULT: a second line of defence for the same failure, since another
+    firmware may answer in a shape nobody has seen. The array's own -10389
+    is now taken as proof the host exists - read from the return code, never
+    from the wording - and the question that matters for data safety, are
+    THIS node's initiators on that host, is settled by asking the array to
+    attach them rather than by assuming. If that cannot be established the
+    storage still refuses: mapping a volume to a host that might belong to
+    another node is how two nodes come to write to one disk.
+  * POWERVAULT: every pool reported itself 100% full, so PVE would refuse
+    every allocation. Free space was read as 'avail', the column heading
+    'show pools' PRINTS; the pools basetype documents 'total-avail', and the
+    ME4024 carries no field by the printed name. A field the array does not
+    have reads as zero, which is indistinguishable from a full pool.
+  * FC: "No FC target ports are visible from this node" on a healthy fabric,
+    on every 'pvesm status'. The kernel names a remote port
+    rport-<host>:<channel>-<remote>, with a COLON after the host number. The
+    scan asked for three hyphen-separated numbers, which matches no entry
+    the kernel has ever created, so the target list was always empty. The
+    warning now goes through the once-an-hour path instead of a bare warn on
+    a ten-second poll, and says what was seen rather than only what was not.
+  * _cmd gained allow_codes: an expected refusal is recognised by the
+    array's own return code rather than by its wording.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.62~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

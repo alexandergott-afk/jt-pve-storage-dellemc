@@ -135,7 +135,7 @@ help create host
 
 ## 欄位名稱：哪些已經查證、哪些還沒
 
-在第一次上實機之前找到的缺陷中，最嚴重的兩個都是「欄位名稱根本不存在」：PowerVault 的儲存池容量讀的是 `avail-size`，而陣列回報的是 `Avail`，於是每個儲存池看起來都是滿的；而對應狀態的檢查，是拿 host 名稱去比對一份根本沒有 host 名稱欄位的清單。這兩者除了「行為說不通」之外都不會有任何徵兆。
+在第一次上實機之前找到的缺陷中，最嚴重的兩個都是「欄位名稱根本不存在」：PowerVault 的儲存池容量讀的是 `avail-size`，而 pools basetype 記載的是 `total-avail`，於是每個儲存池看起來都是滿的；而對應狀態的檢查，是拿 host 名稱去比對一份根本沒有 host 名稱欄位的清單。這兩者除了「行為說不通」之外都不會有任何徵兆。
 
 因此以下列出 API 客戶端讀取的每一個欄位。第一次上機時，請拿它跟陣列實際回傳的內容比對 —— PowerStore 用 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，PowerVault 用 SSH 直接下指令，PowerFlex 直接打 API。
 
@@ -144,7 +144,8 @@ help create host
 | 欄位 | 用途 | 狀態 |
 |---|---|---|
 | `total-size-numeric` | 儲存池容量，單位為 512 位元組區塊 | 文件記載為 **Total Size** |
-| `avail-numeric` | 儲存池可用空間 | 文件記載為 **Avail** |
+| `total-avail-numeric` | 儲存池可用空間 | pools basetype 記載的是 `total-avail`；**Avail** 是 `show pools` 印出來的欄位標題。已在 ME4024 上確認：該陣列沒有標題那個拼法的欄位，於是每個儲存池都讀成 100% 已用 |
+| `avail-numeric`、`avail-size-numeric`、`available-size-numeric` | 在 `total-avail` 之後才嘗試 | 舊拼法，都不是文件記載的那一個 |
 | `size-numeric`（volume） | volume 大小 | volumes basetype 記載 `size` 就是該 volume 的容量 |
 | `allocated-size-numeric` | volume 已使用空間 | volumes basetype 記載為 `allocated-size` |
 | `total-size-numeric`、`alloc-size-numeric` | 排在上面兩者之後；**Total Size** 與 **Alloc Size** 是列印出來的欄位標題，與屬性名稱並不是同一回事 | — |
@@ -161,6 +162,10 @@ help create host
 | `name-numeric`、`status-numeric` | 主要欄位不存在時嘗試的替代拼法 | — |
 | `port-type`、`primary-ip-address` | Media 與 IP Address 的舊拼法 | — |
 | `host-id`、`host`、`name` | 對應資料列可能用來表示「屬於誰」的其他拼法 | — |
+| `host`（巢狀）、`hosts`、`host-view` | `show host-groups` 回應中放置 host 資料列的鍵 | 回應是一棵樹：host group 在最上層，host **巢狀**在其中，initiator 再巢狀一層。已在 ME4024 上確認：只讀最上層的 `hosts` 陣列會什麼都找不到，外掛因此看不見自己剛建立的 host |
+| `name`、`host-name` | host 自己的名稱 | host basetype 記載為 `name`；`host-name` 是 host-view 的拼法 |
+| `durable-id` | 在樹中重複走到同一列時用來辨識是同一個 host | 文件記載 |
+| `return-code` | 指令是否被拒絕，以及原因 | 各指令頁面均有記載；`-10389` 是「host 名稱已被使用」。判斷只讀這個代碼，絕不讀訊息文字 |
 
 `-numeric` 欄位以 512 位元組區塊計；不帶後綴的欄位是像 `1996.7GB` 這樣的格式化字串，只有在數值欄位不存在時才會被解析。
 
