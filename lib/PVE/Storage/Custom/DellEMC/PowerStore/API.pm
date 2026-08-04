@@ -213,7 +213,8 @@ sub _collection {
         # that reports itself broken.
         last if $resp->code == 416;
 
-        my $body  = $resp->decoded_content // '';
+        # Bytes, not characters: see REST::_decode_success.
+        my $body  = $self->_response_bytes($resp) // '';
         my $batch = length($body) ? eval { decode_json($body) } : [];
         if ($@) {
             die $self->_msg("GET $endpoint returned a body that is not JSON:"

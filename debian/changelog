@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.62~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * FIRST DEFECT FOUND ON REAL HARDWARE. A PowerVault ME4024 could not be
+    added at all: `pvesm add` failed with "GET /show/system returned a body
+    that is not JSON: Wide character in subroutine entry". JSON expects
+    bytes, and HTTP::Response::decoded_content returns characters - it
+    decodes by the Content-Type charset, and for any text/* without one it
+    falls back to ISO-8859-1, so every byte above 0x7F becomes a wide
+    character. The ME CLI answers text/*, and this array's /show/system
+    carried one non-ASCII character. Every body is read as bytes now, in all
+    three families.
+  * A body that is not JSON is quoted in the error, up to 200 printable
+    characters. On a first hardware run the difference between an HTML error
+    page, an empty body and a CLI banner is the whole diagnosis, and "not
+    JSON" alone gives none of it.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 04 Aug 2026 09:46:51 +0800
+
 jt-pve-storage-dellemc (0.7.61~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use. No storage type has been run

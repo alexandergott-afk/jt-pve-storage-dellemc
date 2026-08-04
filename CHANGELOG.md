@@ -7,6 +7,37 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.62~beta1] - 2026-08-04
+
+### Fixed
+- **The first defect found on real hardware.** A PowerVault ME4024 could not
+  be added at all:
+
+  ```
+  GET /show/system returned a body that is not JSON:
+  Wide character in subroutine entry at .../Common/REST.pm line 483
+  ```
+
+  JSON expects **bytes**; `HTTP::Response::decoded_content` returns
+  **characters**. It decodes the body by the Content-Type charset, and for any
+  `text/*` without one `HTTP::Message` falls back to ISO-8859-1 — so every byte
+  above 0x7F becomes a wide character and `decode_json` dies. The ME CLI
+  answers `text/*`, and this array's `/show/system` carried one non-ASCII
+  character, which was enough to make the storage impossible to create.
+
+  Every response body is read as bytes now — `decoded_content(charset =>
+  'none')`, which undoes gzip but not the charset — in all three families, not
+  only the one that failed.
+
+### Added
+- **A body that is not JSON is quoted in the error**, up to 200 printable
+  characters. On a first hardware run the difference between an HTML error
+  page, an empty body and a CLI banner is the whole diagnosis, and "not JSON"
+  alone gives none of it.
+- `t/02-rest.t` drives every Content-Type these arrays have been seen to
+  answer with, including the `text/*` that caused this, and fails on the old
+  pairing.
+
 ## [0.7.61~beta1] - 2026-08-04
 
 ### Fixed

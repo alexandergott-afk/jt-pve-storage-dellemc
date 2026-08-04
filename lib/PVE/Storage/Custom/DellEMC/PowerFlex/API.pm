@@ -152,7 +152,8 @@ sub _login_v3 {
         headers => { Authorization => "Basic $auth" },
     );
 
-    my $body = $resp->decoded_content // '';
+    # Bytes, not characters: see REST::_decode_success.
+    my $body = $self->_response_bytes($resp) // '';
     # The token comes back as a JSON string, quotes included.
     $body =~ s/^\s*"//;
     $body =~ s/"\s*$//;
@@ -540,7 +541,7 @@ sub _create_volume_with_size {
     }
 
     # Nothing left to try: report the array's own refusal.
-    my $body_text = $resp->decoded_content // '';
+    my $body_text = $self->_response_bytes($resp) // '';
     die $self->_msg("POST $endpoint failed: HTTP " . $resp->code
         . ($body_text =~ /\S/ ? " - $body_text" : '')) . "\n";
 }

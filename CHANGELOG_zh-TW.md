@@ -5,6 +5,24 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.62~beta1] - 2026-08-04
+
+### 修正
+- **第一個在實體硬體上找到的缺陷。** 一台 PowerVault ME4024 完全無法建立儲存：
+
+  ```
+  GET /show/system returned a body that is not JSON:
+  Wide character in subroutine entry at .../Common/REST.pm line 483
+  ```
+
+  JSON 需要的是**位元組**，而 `HTTP::Response::decoded_content` 回傳的是**字元**。它會依 Content-Type 的 charset 解碼，而任何沒有標明 charset 的 `text/*`，`HTTP::Message` 會退回 ISO-8859-1 —— 於是每一個大於 0x7F 的位元組都變成 wide character，`decode_json` 隨即死掉。ME 的 CLI 回應的正是 `text/*`，而這台陣列的 `/show/system` 裡帶了一個非 ASCII 字元，這樣就足以讓儲存根本建立不起來。
+
+  現在所有回應內容一律以位元組讀取 —— `decoded_content(charset => 'none')`，它會還原 gzip 但不做 charset 解碼 —— 三個系列全部套用，不只出問題的那一個。
+
+### 新增
+- **不是 JSON 的內容會被引用在錯誤訊息裡**，最多 200 個可列印字元。在第一次實機執行時，「HTML 錯誤頁」「空的回應」與「CLI 橫幅」之間的差別就是整個診斷本身，而只說「不是 JSON」什麼線索都沒有。
+- `t/02-rest.t` 會用這些陣列已知會回應的每一種 Content-Type 做測試，包含造成這次問題的 `text/*`，並且會在舊寫法下失敗。
+
 ## [0.7.61~beta1] - 2026-08-04
 
 ### 修正

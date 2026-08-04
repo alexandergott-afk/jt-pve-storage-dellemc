@@ -422,4 +422,74 @@ like($@, qr/password is required/, 'password is mandatory');
     }
 }
 
+# ---------------------------------------------------------------------------
+# A body with a non-ASCII character in it
+#
+# JSON wants bytes; HTTP::Response::decoded_content returns characters. For
+# any text/* Content-Type without a charset, HTTP::Message falls back to
+# ISO-8859-1, so every byte above 0x7F becomes a wide character and
+# decode_json dies with "Wide character in subroutine entry".
+#
+# A PowerVault ME4 did exactly that on the first call of the first hardware
+# run this project has ever had: `pvesm add` failed on GET /show/system,
+# because the response carried one non-ASCII character. The storage could not
+# be created at all.
+# ---------------------------------------------------------------------------
+
+{
+    require Encode;
+
+    # A real client: the error path uses the object's own storeid and type to
+    # build its message, so a class-method call would not exercise it.
+    my $api = TestAPI->new(portal => '10.0.0.1', username => 'u',
+        password => 'p', storeid => 'me4', type => 'dellpowervault');
+
+    my $json = qq({"system":[{"system-name":"ME4-\x{6a5f}\x{623f}","health":"OK"}]});
+    my $bytes = Encode::encode_utf8($json);
+
+    # Every Content-Type the three families have been seen to answer with,
+    # including the text/* the ME CLI uses.
+    for my $ct ('text/plain', 'text/html', 'application/json',
+                'text/plain; charset=utf-8', 'application/json; charset=utf-8') {
+
+        my $resp = HTTP::Response->new(200, undef,
+            HTTP::Headers->new('Content-Type' => $ct), $bytes);
+
+        my $out = eval { $api->_decode_success($resp, 'GET', '/show/system') };
+
+        ok($out, "a non-ASCII body parses with Content-Type '$ct'")
+            or diag("died with: $@");
+        is(eval { $out->{system}[0]{health} }, 'OK',
+            "... and the data survives ('$ct')");
+    }
+}
+
+{
+    # A body that really is not JSON must say what it was, not only that it
+    # was not JSON. On a first hardware run the difference between an HTML
+    # error page, an empty body and a CLI banner is the whole diagnosis.
+    my $api = TestAPI->new(portal => '10.0.0.1', username => 'u',
+        password => 'p', storeid => 'me4', type => 'dellpowervault');
+
+    my $resp = HTTP::Response->new(200, undef,
+        HTTP::Headers->new('Content-Type' => 'text/html'),
+        '<html><head><title>401 Unauthorized</title></head>');
+
+    eval { $api->_decode_success($resp, 'GET', '/show/system') };
+
+    like($@, qr/not JSON/, 'a non-JSON body is reported as such');
+    like($@, qr/401 Unauthorized/, '... quoting enough of it to identify it');
+}
+
+{
+    # And an empty body is still an empty result, not an error: a DELETE
+    # answers 204 with nothing.
+    my $api = TestAPI->new(portal => '10.0.0.1', username => 'u',
+        password => 'p', storeid => 'me4', type => 'dellpowervault');
+
+    my $resp = HTTP::Response->new(204, undef, HTTP::Headers->new(), '');
+    is_deeply($api->_decode_success($resp, 'DELETE', '/volume/x'),
+        {}, 'an empty body is an empty result');
+}
+
 done_testing();

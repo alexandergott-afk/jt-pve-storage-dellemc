@@ -429,7 +429,8 @@ sub _request {
             return $resp;
         }
 
-        my $body = $resp->decoded_content // '';
+        # Bytes, not characters: see _decode_success.
+        my $body = $self->_response_bytes($resp) // '';
         my $parsed = eval { decode_json($body) };
 
         $last_error = $self->translate_error($code, $body, $parsed);
@@ -473,20 +474,66 @@ sub _request {
     die $self->_msg("$method $endpoint failed: $last_error") . "\n";
 }
 
+# JSON wants BYTES, and decoded_content returns CHARACTERS.
+#
+# HTTP::Message decodes the body according to the Content-Type charset, and
+# for any text/* type with no charset it falls back to ISO-8859-1 — so every
+# byte above 0x7F becomes a wide character. decode_json is then handed a
+# character string and dies with "Wide character in subroutine entry", which
+# is what a PowerVault ME4 did on the very first call of the first hardware
+# run: /show/system carried one non-ASCII character and the storage could not
+# be added at all.
+#
+# charset => 'none' undoes the Content-Encoding (gzip) but not the charset,
+# which is exactly the pairing decode_json expects. It is correct for every
+# Content-Type the three families send, including the text/* the ME CLI uses.
 sub _decode_success {
     my ($self, $resp, $method, $endpoint) = @_;
 
-    my $content = $resp->decoded_content;
+    my $content = $self->_response_bytes($resp);
     # 204 No Content, and DELETE bodies in general, are legitimately empty.
     return {} unless defined $content && length($content);
 
     my $decoded = eval { decode_json($content) };
     if ($@) {
-        die $self->_msg(
-            "$method $endpoint returned a body that is not JSON: $@") . "\n";
+        my $why = $@;
+        chomp $why;
+        die $self->_msg("$method $endpoint returned a body that is not JSON:"
+            . " $why\n  The first bytes of it were: "
+            . $self->_body_excerpt($content)) . "\n";
     }
 
     return $decoded;
+}
+
+# The body as bytes, whatever the array said its Content-Type was.
+sub _response_bytes {
+    my ($self, $resp) = @_;
+
+    return undef unless $resp;
+
+    my $bytes = eval { $resp->decoded_content(charset => 'none') };
+    # An LWP too old for the option, or a response it cannot decode at all.
+    $bytes = $resp->content unless defined $bytes;
+
+    return $bytes;
+}
+
+# A short, printable piece of a body for an error message. A first hardware
+# run fails on bodies nobody here has ever seen, and "not JSON" without a
+# sample says nothing about whether it was HTML, an empty string, or a CLI
+# error page.
+sub _body_excerpt {
+    my ($self, $bytes, $limit) = @_;
+
+    return '(empty)' unless defined $bytes && length $bytes;
+
+    $limit //= 200;
+    my $excerpt = substr($bytes, 0, $limit);
+    $excerpt =~ s/[^\x20-\x7e]/./g;
+
+    return "'" . $excerpt . "'"
+         . (length($bytes) > $limit ? ' (truncated)' : '');
 }
 
 # ---------------------------------------------------------------------------

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.61~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.62~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.62~beta1</div>
+        <div class="changelog-date">2026-08-04</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The first defect found on real hardware: a PowerVault ME4024 could not be added at all, because one non-ASCII character in its /show/system response met a JSON decoder being handed characters where it wanted bytes.</span>
+            <span class="lang-zh">第一個在實體硬體上找到的缺陷：一台 PowerVault ME4024 完全無法建立儲存 —— 它 /show/system 回應裡的一個非 ASCII 字元，遇上了一個「被餵入字元、卻期待位元組」的 JSON 解析器。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.61~beta1</div>
