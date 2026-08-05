@@ -243,7 +243,7 @@ help create host
 
 | 未解的問題 | 為什麼重要 |
 |---|---|
-| SCSI 的 vendor 與 product 字串。`DGC` / `VRAID` 是承襲自 CLARiiON 的寫法，也是本外掛用來過濾的依據；若是錯的，任何裝置都不會被辨識 | 這道閘門決定外掛會去碰哪些裝置 —— 請以 `sg_inq /dev/sdX` 確認 |
+| SCSI 的 vendor 與 product 字串。`DGC` / `VRAID` 是承襲自 CLARiiON 的寫法 | **已從「前置條件」降級為「第一項確認」。** 裝置探索以 WWID 為準、完全不看 vendor，而 multipath-tools 自己的內建表就帶著 `vendor "^DGC"`，所以即使本外掛的字串是錯的，map 仍會建立、裝置仍找得到。字串錯的代價是調校用的 drop-in 不生效（改用核心的 DGC 預設）以及 vendor 過濾的殘留路徑清掃 —— 是降級，不是故障。第一次接觸時仍請以 `sg_inq /dev/sdX` 確認並回報結果 |
 | WWN 轉 WWID 的換算 | 這一項錯了，裝置探索會完全無法運作 |
 | `POST /instances/snap/<id>/action/restore` | 唯一**不在** Dell 客戶端裡的破壞性呼叫，因為 CSI driver 從來不需要倒回 |
 | 陣列對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |

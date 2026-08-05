@@ -281,7 +281,7 @@ rather than ABSENT, and those are different answers.
 
 | Open question | Why it matters |
 |---|---|
-| The SCSI vendor and product strings. `DGC` / `VRAID` is the CLARiiON inheritance and is what this plugin gates on; if it is wrong, no device is ever recognised | this gate decides which devices the plugin will touch — confirm with `sg_inq /dev/sdX` |
+| The SCSI vendor and product strings. `DGC` / `VRAID` is the CLARiiON inheritance | **downgraded from a blocker to a first check.** Device discovery is WWID-keyed and does not consult the vendor at all, and multipath-tools' own built-in table carries `vendor "^DGC"`, so maps appear and devices are found even if this plugin's strings are wrong. A wrong string costs the tuning drop-in (the kernel's DGC defaults apply instead) and the vendor-gated residual-path sweep — degraded, not broken. Still confirm with `sg_inq /dev/sdX` on first contact and report what it prints |
 | The WWN to WWID conversion | device discovery does not work at all if it is wrong |
 | `POST /instances/snap/<id>/action/restore` | the one destructive call that is **not** in Dell's client, because a CSI driver never rolls back |
 | Whether the array rounds a LUN size up or down | this plugin rounds up to 8 KiB first, which makes the question harmless either way |
