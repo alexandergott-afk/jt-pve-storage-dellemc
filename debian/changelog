@@ -1,3 +1,29 @@
+jt-pve-storage-dellemc (0.7.70~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: a 302 would have been followed, and on this API it is not a
+    redirect. Dell's own status table gives 302 as Unauthorized - the
+    X-EMC-REST-CLIENT header missing or not true. LWP follows up to seven
+    redirects by default, so the client would have fetched the array's web
+    UI, got HTML and reported "the body is not JSON", naming the symptom and
+    hiding the cause. Redirects are now refused outright; every request
+    carries an Authorization header, and following one is also how a
+    credential reaches a host nobody chose. 401 is the same error with the
+    header present, so it is now explained as bad credentials.
+  * UNITY: paging rested on a guess. A collection was walked until a page
+    came back shorter than requested, and the array is free to return fewer
+    rows than asked for. with_entrycount=true makes it report how many are in
+    the complete list; the short-page rule is now only the fallback for a
+    firmware that reports no count. A silently truncated listing is how the
+    orphan reaper comes to treat live volumes as deleted.
+  * UNITY: an error body is {error: {errorCode, httpStatusCode, messages}}
+    and errorCode is a number - the stable thing to key on, as PowerVault's
+    return code is. It is now read out; the messages beside it are localised
+    into nine languages and are for a human to read. 409 and 422 gained an
+    explanation of what the array meant.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 00:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.69~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

@@ -96,6 +96,24 @@ sub _init_ua {
     my $ua = $self->SUPER::_init_ua();
     $ua->cookie_jar(HTTP::Cookies->new) if $ua->can('cookie_jar');
 
+    # Never follow a redirect on this API.
+    #
+    # Unity documents 302 as UNAUTHORIZED - "authorization error or timeout
+    # when the X-EMC-REST-CLIENT header field is missing or not set to true" -
+    # not as "the resource moved". LWP's default is to follow up to seven,
+    # which would fetch the array's web UI and hand back HTML; this client
+    # would then report "the body is not JSON" and the real cause, a header
+    # that did not arrive, would never be named.
+    #
+    # It is also the safer default on its own terms: every request here
+    # carries an Authorization header, and following a redirect is how that
+    # reaches a host nobody chose.
+    #
+    # Not done in the shared REST layer, where it would change behaviour for
+    # three families this cannot be tested against - but the same question is
+    # worth asking of them.
+    $ua->max_redirect(0) if $ua->can('max_redirect');
+
     return $ua;
 }
 
@@ -167,17 +185,58 @@ sub _note_response {
     return;
 }
 
+# The codes, from the manual's own table rather than from HTTP convention.
+# Two of them do not mean here what they mean elsewhere.
 sub error_hint {
     my ($self, $code, $body) = @_;
 
-    return "\n  Unity needs 'X-EMC-REST-CLIENT: true' on every request."
-        if defined $code && $code == 401;
+    return '' unless defined $code;
+
+    # 302 is not a redirect on this API. Dell documents it as "authorization
+    # error or timeout when the X-EMC-REST-CLIENT header field is missing or
+    # not set to true", which is also what a proxy stripping headers looks
+    # like.
+    return "\n  On Unity a 302 is an AUTHORIZATION error, not a redirect: the"
+         . " 'X-EMC-REST-CLIENT: true' header did not arrive. Check for a"
+         . " proxy between this node and the array."
+        if $code == 302;
+
+    # 401 is the same error with the header present, which makes it the
+    # ordinary bad-credentials case.
+    return "\n  The array received the REST-client header and refused the"
+         . " credentials. Check dell-username and dell-password."
+        if $code == 401;
 
     return "\n  A POST or DELETE needs the EMC-CSRF-TOKEN header, which comes"
          . " from a preceding GET."
-        if defined $code && $code == 403;
+        if $code == 403;
+
+    return "\n  The request conflicts with the current state of the object;"
+         . " it may already be in the state asked for."
+        if $code == 409;
+
+    return "\n  The array understood the request and rejected its contents."
+         . " A size, a name or a reference is out of range."
+        if $code == 422;
 
     return '';
+}
+
+# An error body is { error: { errorCode, httpStatusCode, messages: [...] } },
+# and errorCode is a NUMBER - the stable thing to key a decision on, the way
+# PowerVault's return-code is. The messages are localised (the manual lists
+# nine locales), so they are for a human to read and never for this plugin to
+# match on.
+sub error_code_of {
+    my ($self, $body) = @_;
+
+    return undef unless ref($body) eq 'HASH';
+    my $error = $body->{error};
+    return undef unless ref($error) eq 'HASH';
+
+    my $code = $error->{errorCode};
+
+    return (defined $code && !ref($code) && $code =~ /^-?\d+\z/) ? $code : undef;
 }
 
 # ---------------------------------------------------------------------------
@@ -238,12 +297,17 @@ sub _collection {
     my $filter = delete $opts{filter};
 
     my @rows;
+    my $expected;
+
     for my $page (1 .. MAX_PAGES) {
         my %query = (
             fields   => $fields,
             compact  => 'true',
             page     => $page,
             per_page => PAGE_SIZE,
+            # Without this the answer carries no total at all. With it,
+            # entryCount is the number of instances in the complete list.
+            with_entrycount => 'true',
         );
         $query{filter} = $filter if defined $filter && length $filter;
 
@@ -252,10 +316,23 @@ sub _collection {
 
         push @rows, @$batch;
 
-        # A short page ends it. Unity reports no total the way PowerStore's
-        # Content-Range does, which is why the page size is asked for
-        # explicitly rather than left to the array's default — a page shorter
-        # than a size this client did not choose proves nothing.
+        my $count = ref($data) eq 'HASH' ? $data->{entryCount} : undef;
+        $expected = $count
+            if defined $count && !ref($count) && $count =~ /^\d+\z/;
+
+        # An empty page always ends it, whatever anything else said.
+        last unless @$batch;
+
+        # The array said how many there are in the COMPLETE list, so stop
+        # when they have all arrived. Stopping on a short page instead is a
+        # guess - the array is free to return fewer rows than asked for - and
+        # a silently truncated listing is how the orphan reaper comes to
+        # treat live volumes as deleted.
+        if (defined $expected) {
+            last if scalar(@rows) >= $expected;
+            next;
+        }
+
         last if scalar(@$batch) < PAGE_SIZE;
     }
 

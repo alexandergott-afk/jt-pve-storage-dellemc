@@ -7,6 +7,39 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.70~beta1] - 2026-08-05
+
+### Fixed
+- **Unity: a 302 would have been followed, and it is not a redirect.** Dell's
+  own status-code table gives 302 as *Unauthorized* — "authorization error or
+  timeout when the `X-EMC-REST-CLIENT` header field is missing or not set to
+  true". LWP follows up to seven redirects by default, so the client would
+  have fetched the array's web UI, got HTML, and reported *"the body is not
+  JSON"* — naming the symptom and hiding the cause, which is a header that
+  did not arrive.
+
+  Redirects are now refused outright on this API. That is also the safer
+  default on its own terms: every request carries an `Authorization` header,
+  and following a redirect is how one reaches a host nobody chose.
+
+  401 is the same error with the header present, so it is now explained as
+  the ordinary bad-credentials case rather than as a missing header.
+
+- **Unity: paging rested on a guess.** A collection was walked until a page
+  came back shorter than the size asked for. The manual documents
+  `with_entrycount=true`, which makes the array report how many instances are
+  in the **complete** list — and the array is free to return fewer rows than
+  requested, so the short-page rule was never sound. It is now the fallback
+  for a firmware that reports no count, not the primary. A silently truncated
+  listing is how the orphan reaper comes to treat live volumes as deleted.
+
+### Changed
+- An error body is `{error: {errorCode, httpStatusCode, messages}}`, and
+  `errorCode` is a **number** — the stable thing to key a decision on, as
+  PowerVault's return code is. It is now read out and available; the messages
+  beside it are localised into nine languages and are for a human to read.
+- 409 and 422 now carry an explanation of what the array meant by them.
+
 ## [0.7.69~beta1] - 2026-08-05
 
 ### Fixed

@@ -214,6 +214,125 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
 }
 
 # ---------------------------------------------------------------------------
+# Paging is driven by the array's own count, not by a short page
+#
+# 'with_entrycount=true' makes a collection report entryCount: the number of
+# instances in the COMPLETE list. Stopping on a short page instead is a guess
+# - the array is free to return fewer rows than asked for - and a silently
+# truncated listing is how the orphan reaper comes to treat live volumes as
+# deleted.
+# ---------------------------------------------------------------------------
+
+{
+    my @pages;
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(entries({ id => '0' })) unless $path =~ m{/types/lun/instances};
+
+        my %q = $req->uri->query_form;
+        push @pages, $q{page};
+
+        # Three rows in total, handed out one page at a time and always
+        # SHORTER than the page size asked for. A client that stopped on a
+        # short page would see one row and call it the whole collection.
+        my @all = map { { id => "sv_$_", name => "vol$_" } } (1 .. 3);
+        my $i = ($q{page} // 1) - 1;
+        my @batch = defined $all[$i] ? ($all[$i]) : ();
+
+        return reply({ entryCount => 3, %{ entries(@batch) } });
+    });
+
+    my $rows = $api->volume_list();
+    is(scalar(@$rows), 3, 'every row arrives, though each page was short');
+    is_deeply([map { $_->{name} } @$rows], ['vol1','vol2','vol3'], '... in order');
+    is_deeply(\@pages, [1, 2, 3], 'and the pages were walked one at a time');
+
+    like($ua->last_request->uri->query, qr/with_entrycount=true/,
+        'the count is asked for, or the array reports none at all');
+}
+
+{
+    # No entryCount - an older firmware, or a collection that does not carry
+    # one. The short-page rule is the fallback, not the primary.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(entries({ id => '0' })) unless $path =~ m{/types/lun/instances};
+        my %q = $req->uri->query_form;
+        return reply(entries()) if ($q{page} // 1) > 1;
+        return reply(entries({ id => 'sv_1', name => 'only' }));
+    });
+
+    my $rows = $api->volume_list();
+    is(scalar(@$rows), 1, 'without a count, a short page still ends the listing');
+}
+
+{
+    # An empty page ends it whatever the count claims. A count that never
+    # arrives would otherwise spin to MAX_PAGES.
+    my $requests = 0;
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(entries({ id => '0' })) unless $path =~ m{/types/lun/instances};
+        $requests++;
+        return reply({ entryCount => 9999, %{ entries() } });
+    });
+
+    is_deeply($api->volume_list(), [], 'an empty first page is an empty collection');
+    is($requests, 1, '... asked for exactly once, not until the count is met');
+}
+
+# ---------------------------------------------------------------------------
+# 302 is an authorization error here, not a redirect
+#
+# Dell documents it as "authorization error or timeout when the
+# X-EMC-REST-CLIENT header field is missing or not set to true". Following it
+# would fetch the array's web UI and hand back HTML, and this client would
+# then report "the body is not JSON" - naming the symptom and hiding the
+# cause.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api();
+    my $hint = $api->error_hint(302, {});
+    like($hint, qr/AUTHORIZATION error, not a redirect/,
+        'a 302 is explained as what it is on this API');
+    like($hint, qr/X-EMC-REST-CLIENT/, '... and names the header that did not arrive');
+
+    like($api->error_hint(401, {}), qr/credentials/,
+        'a 401 is the credentials, because the header did arrive');
+    like($api->error_hint(403, {}), qr/EMC-CSRF-TOKEN/, 'a 403 is the CSRF token');
+    is($api->error_hint(200, {}), '', 'and a success is not explained');
+}
+
+{
+    my ($api, $ua) = make_api();
+    my $inner = $api->ua;
+    is($inner->max_redirect, 0, 'the user agent never follows a redirect')
+        if $inner && $inner->can('max_redirect');
+}
+
+# ---------------------------------------------------------------------------
+# The array's own error code
+#
+# errorCode is a number and the stable thing to key on; the messages beside it
+# are localised into nine languages and are for a human to read.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api();
+
+    is($api->error_code_of({ error => { errorCode => 131149829,
+        httpStatusCode => 404,
+        messages => [ { 'en-US' => 'The requested resource does not exist.' } ] } }),
+        131149829, 'the numeric code is read out of the error body');
+
+    is($api->error_code_of({ error => { messages => ['x'] } }), undef,
+        'an error without a code yields undef, not a guess');
+    is($api->error_code_of({}), undef, 'and neither does a body with no error');
+    is($api->error_code_of(undef), undef, 'nor nothing at all');
+}
+
+# ---------------------------------------------------------------------------
 # Capacity is bytes, not blocks
 # ---------------------------------------------------------------------------
 
