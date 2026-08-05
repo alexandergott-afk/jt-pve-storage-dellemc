@@ -374,7 +374,16 @@ sub _build_url {
     $base =~ s|/$||;
     $endpoint = "/$endpoint" unless $endpoint =~ m|^/|;
 
-    return "$self->{scheme}://$self->{portal}:$self->{port}${base}${endpoint}";
+    # A portal may carry its own port - '192.168.1.11:8443' - and appending
+    # the default on top of it produces an address nothing listens on. Found
+    # by the adverse suite the first time a portal with a port met a real
+    # socket. (An IPv6 literal would need brackets here; none of the
+    # supported arrays documents one for management, so that is left until
+    # an array asks for it.)
+    my $authority = $self->{portal};
+    $authority .= ":$self->{port}" unless $authority =~ /:\d+\z/;
+
+    return "$self->{scheme}://${authority}${base}${endpoint}";
 }
 
 # Overridable so tests do not have to wait out the backoff.
@@ -434,9 +443,7 @@ sub _request {
     my $rotations = 0;
 
     for my $attempt (1 .. $attempts) {
-        # Built inside the loop, from the CURRENT portal: a failover that
-        # rotated the address must not keep sending to the dead one.
-        my $req = HTTP::Request->new($method => $self->_build_url($endpoint));
+        my $req;
 
         unless ($opts{no_auth}) {
             my $ok = eval { $self->ensure_session(); 1 };
@@ -462,6 +469,17 @@ sub _request {
                 $self->_sleep($self->{retry_delay} * $attempt);
                 next;
             }
+        }
+
+        # Built AFTER the login, from the CURRENT portal. The login is what
+        # discovers a dead controller and rotates away from it; a URL built
+        # before it would aim this request at the address the login just
+        # abandoned. That was a real defect: the failover logged the
+        # rotation, the login succeeded on the live controller, and the
+        # request that followed still went to the dead one.
+        $req = HTTP::Request->new($method => $self->_build_url($endpoint));
+
+        unless ($opts{no_auth}) {
             my %auth = $self->_auth_headers();
             $req->header($_ => $auth{$_}) for keys %auth;
         }

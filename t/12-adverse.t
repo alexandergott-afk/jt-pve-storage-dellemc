@@ -28,9 +28,11 @@ BEGIN {
 
 use PVE::Storage::Custom::DellEMC::PowerStore::API;
 use PVE::Storage::Custom::DellEMC::PowerVault::API;
+use PVE::Storage::Custom::DellEMC::Unity::API;
 
 my $PS = 'PVE::Storage::Custom::DellEMC::PowerStore::API';
 my $PV = 'PVE::Storage::Custom::DellEMC::PowerVault::API';
+my $UN = 'PVE::Storage::Custom::DellEMC::Unity::API';
 
 # ---------------------------------------------------------------------------
 # A server that misbehaves in a chosen way
@@ -94,6 +96,22 @@ sub start_server {
                 my $body = '{"messages":[{"message_l10n":"invalid credentials"}]}';
                 print $client "HTTP/1.0 401 Unauthorized\r\n"
                     . "Content-Type: application/json\r\n"
+                    . "Content-Length: " . length($body) . "\r\n\r\n$body";
+            } elsif ($mode eq 'redirect') {
+                # What a real Unity answers when X-EMC-REST-CLIENT is
+                # missing, and what a captive portal answers to everything:
+                # a redirect towards a web UI. A client that follows it gets
+                # HTML and reports "not JSON" - the symptom, not the cause.
+                print $client "HTTP/1.0 302 Found\r\n"
+                    . "Location: http://127.0.0.1:1/web-ui/login\r\n"
+                    . "Content-Length: 0\r\n\r\n";
+            } elsif ($mode eq 'unity_ok') {
+                # The smallest believable Unity: a CSRF token and one pool.
+                my $body = '{"entries":[{"content":{"id":"pool_1",'
+                    . '"name":"A","sizeTotal":1000,"sizeFree":400}}]}';
+                print $client "HTTP/1.0 200 OK\r\n"
+                    . "Content-Type: application/json\r\n"
+                    . "EMC-CSRF-TOKEN: real-socket-token\r\n"
                     . "Content-Length: " . length($body) . "\r\n\r\n$body";
             } elsif ($mode eq 'giant_header') {
                 # A login that answers 200 but without the token header.
@@ -437,6 +455,108 @@ sub timed_failure {
 
     is($probe->('192.0.2.1', 3260, timeout => 0), 1,
         'a timeout of 0 disables the pre-check, as documented');
+}
+
+# ---------------------------------------------------------------------------
+# Unity, against the same misbehaving sockets
+#
+# Unity's transport has quirks of its own - a 302 that means "unauthorized",
+# a CSRF token, a mandatory client header - and none of it had ever met a
+# real socket that misbehaves. Every case must fail quickly, name the
+# storage, and never hang.
+# ---------------------------------------------------------------------------
+
+sub unity_on {
+    my ($portal, %args) = @_;
+    return $UN->new(
+        portal   => $portal,
+        username => 'admin',
+        password => 'secret',
+        storeid  => 'u480',
+        type     => 'dellunity',
+        scheme   => 'http',
+        timeout  => 3,
+        retries  => $args{retries} // 1,
+        %args,
+    );
+}
+
+{
+    # Accepts the connection and never says a word.
+    my ($port, $pid) = start_server('silent');
+    SKIP: {
+        skip 'could not start a local server', 3 unless $port;
+
+        my $api = unity_on("127.0.0.1:$port");
+        my $start = time();
+        my $ok = eval { $api->pool_list(); 1 };
+        my $elapsed = time() - $start;
+
+        ok(!$ok, 'Unity: a silent server is a failure, not a hang');
+        cmp_ok($elapsed, '<=', 3 * 3 + 3, '... bounded by the timeout');
+        like($@, qr/dellunity:u480/, '... and the error names the storage');
+    }
+    stop_server($pid);
+}
+
+{
+    # 200 with HTML: a proxy or captive portal answered instead of the array.
+    my ($port, $pid) = start_server('html');
+    SKIP: {
+        skip 'could not start a local server', 2 unless $port;
+
+        my $api = unity_on("127.0.0.1:$port");
+        my $ok = eval { $api->pool_list(); 1 };
+
+        ok(!$ok, 'Unity: HTML instead of JSON is a failure');
+        like($@, qr/not JSON|Authentication portal/i,
+            '... quoting enough of the body to identify the intercept');
+    }
+    stop_server($pid);
+}
+
+{
+    # A REAL 302 over a REAL socket. The client must not follow it - the
+    # Location points at a host nobody chose, and following would carry the
+    # Authorization header there - and the error must name the cause (the
+    # REST-client header) rather than the symptom.
+    my ($port, $pid) = start_server('redirect');
+    SKIP: {
+        skip 'could not start a local server', 2 unless $port;
+
+        my $api = unity_on("127.0.0.1:$port");
+        my $ok = eval { $api->pool_list(); 1 };
+
+        ok(!$ok, 'Unity: a redirect is refused, not followed');
+        like($@, qr/AUTHORIZATION error|X-EMC-REST-CLIENT/,
+            '... and explained as what it means on this API');
+    }
+    stop_server($pid);
+}
+
+{
+    # Controller failover, end to end over real sockets: the first address
+    # is a dead port, the second is a working Unity. The request must arrive.
+    my ($good_port, $good_pid) = start_server('unity_ok');
+    SKIP: {
+        skip 'could not start a local server', 3 unless $good_port;
+
+        # A port that nothing listens on: connection refused, instantly.
+        my $probe = IO::Socket::INET->new(LocalAddr => '127.0.0.1',
+            LocalPort => 0, Proto => 'tcp', Listen => 1);
+        my $dead_port = $probe->sockport;
+        close($probe);   # released: connecting now gets ECONNREFUSED
+
+        my $api = unity_on("127.0.0.1:$dead_port,127.0.0.1:$good_port",
+            retries => 2);
+
+        my $pools = eval { $api->pool_list() };
+        ok($pools, 'the request survives a dead first controller') or diag($@);
+        is($pools->[0]{name}, 'A', '... answered by the live one');
+        like($api->{portal}, qr/:$good_port\z/,
+            '... which is now the sticky current address');
+    }
+    stop_server($good_pid);
 }
 
 done_testing();

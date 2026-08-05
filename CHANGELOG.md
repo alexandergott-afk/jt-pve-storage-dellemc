@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.76~beta1] - 2026-08-06
+
+### Fixed
+- **The failover from 0.7.75 rotated the portal and then sent the request to
+  the address it had just abandoned.** The request URL was built at the top
+  of the attempt, before the login — and the login is exactly where a dead
+  controller is discovered and rotated away from. So the login would fail
+  over to the live controller, succeed, and the request that followed would
+  still go to the dead one; with two addresses the client ping-ponged until
+  its attempts ran out. The URL is now built after the login, from the
+  address the login proved alive.
+
+  Caught by driving the Unity client against real sockets — a dead port and
+  a live miniature Unity — where the fake user agents in the unit tests
+  could not see it: their logins do not cross the wire, so their rotations
+  happen at a different moment than a real login's.
+
+- **A portal carrying its own port broke the URL.** `1.2.3.4:8443` became
+  `1.2.3.4:8443:443`. Latent since the beginning; surfaced by the same real
+  sockets, whose test servers live on high ports.
+
+### Added
+- **The adverse suite now attacks Unity too**: a server that accepts and
+  never answers, HTML from an intercepting proxy, a real 302 over a real
+  socket — refused, not followed, and explained as what it means on this
+  API — and a controller failover end-to-end across two real sockets.
+
 ## [0.7.75~beta1] - 2026-08-06
 
 ### Added
