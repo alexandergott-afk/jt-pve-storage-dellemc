@@ -1,3 +1,31 @@
+jt-pve-storage-dellemc (0.7.75~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * dell-portal takes several comma-separated addresses and the client fails
+    over between them. Asked by the ME4024's tester: their array has one
+    management IP per controller and no floating address, so a controller
+    failover takes the configured address away with it. The data path never
+    needed help - dm-multipath and ALUA handle it and running guests never
+    notice - but management (status, allocation, snapshots, deletion) failed
+    until someone edited the storage by hand. A connection failure the array
+    never saw moves to the next address immediately without backoff; the
+    answering address becomes sticky; the session is dropped on every
+    rotation because a session belongs to the controller that issued it.
+    Every address gets at least one try even on the health client, so pvesm
+    status's worst case is one short timeout per address. One address
+    behaves exactly as before. All four families inherit the feature.
+  * Found while testing it: the request URL was built once, outside the
+    retry loop, so a rotated portal would still have sent every retry to the
+    dead address. It is now built per attempt.
+  * The bound is enforced: nested request layers each cycling the address
+    list turned a 2-second status timeout into 21 seconds on a dead array.
+    Once one request has watched every address fail to connect, a flag stops
+    the layers above from cycling the same dead set. Measured: two dead
+    addresses at dell-status-timeout 2 cost pvesm status 4.0 seconds - one
+    timeout per address, exactly the documented worst case.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 10:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.74~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

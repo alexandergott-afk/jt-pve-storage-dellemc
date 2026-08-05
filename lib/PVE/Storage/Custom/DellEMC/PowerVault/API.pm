@@ -99,6 +99,16 @@ sub _login {
 
     my $hash_error = $@ || "the array did not return a session key\n";
 
+    # The hashed attempt just watched every management address fail to
+    # connect. Basic authentication cannot succeed against addresses that do
+    # not answer TCP; trying it anyway doubles the timeout on a dead array,
+    # and this path runs inside the bounded status() budget.
+    if ($self->_portals_all_dead()) {
+        chomp $hash_error;
+        die $self->_msg("authentication failed: no management address is"
+            . " answering ($hash_error)") . "\n";
+    }
+
     # The guide notes SHA-256 is not compatible with LDAP accounts, and Basic
     # authentication is the documented alternative. Try it before giving up,
     # so an LDAP-backed account is not a hard failure.

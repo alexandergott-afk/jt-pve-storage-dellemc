@@ -26,7 +26,12 @@ my $OWNER;
 sub common_properties {
     return {
         'dell-portal' => {
-            description => "Management IP address or hostname of the array.",
+            description => "Management address(es) of the array. Several may"
+                . " be given comma-separated - on an array whose controllers"
+                . " each have their own management IP and no floating address"
+                . " (PowerVault ME, Unity), list both controllers so"
+                . " management survives a controller failover. The data path"
+                . " needs nothing: dm-multipath handles that on its own.",
             type => 'string',
         },
         'dell-username' => {

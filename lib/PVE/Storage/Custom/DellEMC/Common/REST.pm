@@ -72,8 +72,20 @@ sub new {
     die "username is required\n" unless $args{username};
     die "password is required\n" unless defined $args{password};
 
+    # 'portal' may name several management addresses, comma-separated. An ME
+    # has one management IP per controller and no floating address, so when a
+    # controller fails over, the address the storage was configured with goes
+    # away WITH it. The data path survives on its own - dm-multipath and ALUA
+    # are for exactly that - but every management operation would fail until
+    # someone edited the storage. Listing both controllers is the fix.
+    my @portals = grep { length }
+        map { s/^\s+|\s+\z//gr } split /,/, $args{portal};
+    die "portal is required\n" unless @portals;
+
     my $self = bless {
-        portal      => $args{portal},
+        portal      => $portals[0],
+        _portals    => \@portals,
+        _portal_idx => 0,
         username    => $args{username},
         password    => $args{password},
         port        => $args{port}        // DEFAULT_PORT,
@@ -307,6 +319,39 @@ sub _clear_session {
 # Called on every response before its status code is interpreted. The default
 # is to ignore it; a subclass whose array rotates a session token overrides
 # this to keep the stored one current.
+# Move to the next management address in the list.
+#
+# The SESSION GOES WITH THE CONTROLLER: an ME sessionKey or a Unity cookie
+# issued by one controller means nothing to the other, so rotating without
+# clearing it would replace a dead-address failure with an
+# authentication-failure loop against the live one.
+sub _rotate_portal {
+    my ($self) = @_;
+
+    my $portals = $self->{_portals} // [];
+    return 0 unless @$portals > 1;
+
+    my $from = $self->{portal};
+    $self->{_portal_idx} = ($self->{_portal_idx} + 1) % scalar(@$portals);
+    $self->{portal} = $portals->[ $self->{_portal_idx} ];
+    $self->_clear_session();
+
+    $self->log_warn("management address $from is not answering; trying"
+        . " $self->{portal}");
+
+    return 1;
+}
+
+# Did one request, just now, watch every configured address fail to connect?
+# 'Just now' is deliberate: the state of a network is a fact with a shelf
+# life, and a stale flag would refuse a login the array is ready to accept.
+sub _portals_all_dead {
+    my ($self) = @_;
+
+    my $at = $self->{_portals_dead_at} // return 0;
+    return (time() - $at) <= 10 ? 1 : 0;
+}
+
 sub _note_response { return }
 
 sub ensure_session {
@@ -371,17 +416,27 @@ sub _retry_after {
 sub _request {
     my ($self, $method, $endpoint, $data, %opts) = @_;
 
-    my $url = $self->_build_url($endpoint);
 
     my $orig_timeout = $self->{_ua}->timeout();
     $self->{_ua}->timeout($opts{timeout}) if $opts{timeout};
     my $restore = sub { $self->{_ua}->timeout($orig_timeout) if $opts{timeout} };
 
     my $attempts = $self->{retries};
+
+    # With several management addresses, every one of them deserves at least
+    # one try before the request is declared failed - even on the health
+    # client, whose retries are 1 on purpose. The worst case for status() is
+    # therefore one short timeout per address, which is still bounded.
+    my $portals = $self->{_portals} // [];
+    $attempts = scalar(@$portals) if @$portals > $attempts;
+
     my $last_error;
+    my $rotations = 0;
 
     for my $attempt (1 .. $attempts) {
-        my $req = HTTP::Request->new($method => $url);
+        # Built inside the loop, from the CURRENT portal: a failover that
+        # rotated the address must not keep sending to the dead one.
+        my $req = HTTP::Request->new($method => $self->_build_url($endpoint));
 
         unless ($opts{no_auth}) {
             my $ok = eval { $self->ensure_session(); 1 };
@@ -391,6 +446,19 @@ sub _request {
                 # Credentials that do not work will not start working on a
                 # retry; only a transport failure is worth another attempt.
                 last if $attempt >= $attempts || $last_error =~ /HTTP 40[13]/;
+
+                # The login already cycled every address and found them all
+                # dead; retrying the whole login against the same dead set
+                # only multiplies the timeout.
+                last if $self->_portals_all_dead();
+
+                # A login that could not reach the array at all is the
+                # controller-failover case; the next address gets the next
+                # attempt, without the backoff - failing over fast is the
+                # point of having a second address.
+                if ($self->_rotate_portal()) {
+                    next;
+                }
                 $self->_sleep($self->{retry_delay} * $attempt);
                 next;
             }
@@ -416,12 +484,47 @@ sub _request {
         eval { $self->_note_response($resp, $method, $endpoint); 1 };
 
         if ($resp->is_success) {
+            # The array answered: whatever was dead is not any more.
+            delete $self->{_portals_dead_at};
             $restore->();
             return $resp if $opts{raw};
             return $self->_decode_success($resp, $method, $endpoint);
         }
 
         my $code = $resp->code;
+
+        # LWP answers a connection it could not make with an internal 500 and
+        # marks it 'Client-Warning: Internal response'. That is not the array
+        # speaking - the array was never reached - so with another address
+        # configured, this is the moment to use it, immediately and without
+        # the backoff.
+        if (($resp->header('Client-Warning') // '') eq 'Internal response') {
+            # Once every address has answered with a connect failure inside
+            # ONE request, the array is unreachable as a whole. The flag
+            # stops the layers above - a login retry, a fallback login
+            # method, an outer request loop - from each cycling the same
+            # dead addresses again. Without it those layers multiply: a
+            # 2-second status timeout became 21 seconds on a dead storage,
+            # which is exactly what the bounded health path must not do.
+            $rotations++;
+            $self->{_portals_dead_at} = time()
+                if $rotations >= scalar(@{ $self->{_portals} // [''] });
+
+            if ($attempt < $attempts && !$self->{_portals_dead_at}
+                && $self->_rotate_portal()) {
+                $last_error = $self->translate_error($code,
+                    $self->_response_bytes($resp) // '', undef);
+                next;
+            }
+            if ($attempt < $attempts && $self->_rotate_portal()) {
+                # Keep rotating so the NEXT logical operation starts from a
+                # fresh address, but only one full cycle per request.
+                $last_error = $self->translate_error($code,
+                    $self->_response_bytes($resp) // '', undef);
+                last if $rotations >= scalar(@{ $self->{_portals} // [''] });
+                next;
+            }
+        }
 
         if ($opts{raw} && $opts{allow_status}
             && grep { $_ == $code } @{ $opts{allow_status} }) {
@@ -455,6 +558,10 @@ sub _request {
         last if $method eq 'POST' && $code >= 500;
 
         if ($attempt < $attempts) {
+            # A server-side failure may be one controller mid-failover; with
+            # another address on the list, the retry goes there. Both serve
+            # the same array, so flapping costs nothing but the login.
+            $self->_rotate_portal();
             my $wait = $self->_retry_after($resp, $attempt);
             $self->_sleep($wait);
             next;

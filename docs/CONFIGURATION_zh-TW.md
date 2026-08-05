@@ -8,7 +8,7 @@ English: [CONFIGURATION.md](CONFIGURATION.md)
 
 | 選項 | 型別 | 必填 | 預設 | 說明 |
 |---|---|---|---|---|
-| `dell-portal` | string | 是，且不可變更 | — | 陣列的管理 IP 或 FQDN，儲存建立後不能改 |
+| `dell-portal` | string | 是，且不可變更 | — | 管理位址（可多個）；**儲存建立後不能修改**，所以在控制器各有管理 IP、沒有浮動位址的陣列上（PowerVault ME、Unity），請一開始就把兩個控制器都列入：`192.168.1.11,192.168.1.12`。控制器 failover 時用戶端會自行換到下一個位址；資料路徑不需要任何處理，dm-multipath 會自己接手 |
 | `dell-username` | string | 是 | — | REST API 帳號 |
 | `dell-password` | string | 是 | — | REST API 密碼 |
 | `dell-ssl-verify` | boolean | 否 | `0` | 是否驗證陣列的 TLS 憑證 |

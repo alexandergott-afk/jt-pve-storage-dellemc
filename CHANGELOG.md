@@ -7,6 +7,44 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.75~beta1] - 2026-08-06
+
+### Added
+- **`dell-portal` takes several addresses, and the client fails over between
+  them.** Asked by the ME4024's tester: their array has one management IP
+  per controller — active on `.11`, standby on `.12` — and no floating
+  address, so a controller failover takes the configured address away with
+  it. The data path was never the problem: dm-multipath and ALUA handle that
+  on their own, and running guests never notice. What broke was management —
+  status, allocation, snapshots, deletion — until someone edited the storage
+  by hand.
+
+  Now: `--dell-portal 192.168.1.11,192.168.1.12`. A connection failure the
+  array never saw (LWP's own `Client-Warning: Internal response`) moves to
+  the next address immediately, without backoff — failing over fast is the
+  point of a second address. The address that answers becomes sticky. The
+  session is dropped on every rotation, because **a session belongs to the
+  controller that issued it**: carrying it across would swap a dead-address
+  failure for an authentication loop against the live controller. Every
+  address gets at least one try even on the health client, so `pvesm
+  status`'s worst case is one short timeout per address — still bounded.
+
+  One address configured behaves exactly as before. All four families
+  inherit the feature, since it lives in the shared transport.
+
+  The bound is enforced, not just promised. The first draft let nested
+  request layers — an outer call, a login retry, PowerVault's two login
+  methods — each cycle the address list, and a 2-second status timeout
+  became 21 seconds on a dead array. Once one request has watched every
+  address fail to connect, a flag stops the layers above from cycling the
+  same dead set again. Measured on this node: two dead addresses at
+  `dell-status-timeout 2` cost `pvesm status` 4.0 seconds — one timeout per
+  address, exactly the documented worst case.
+
+  Found while testing it: the request URL was built once, outside the retry
+  loop — so a rotated portal would still have sent every retry to the dead
+  address. It is now built per attempt.
+
 ## [0.7.74~beta1] - 2026-08-06
 
 ### Fixed

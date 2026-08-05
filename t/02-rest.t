@@ -492,4 +492,95 @@ like($@, qr/password is required/, 'password is mandatory');
         {}, 'an empty body is an empty result');
 }
 
+# ---------------------------------------------------------------------------
+# Controller failover: several management addresses
+#
+# An ME has one management IP per controller and no floating address, so a
+# controller failover takes the configured address away with it. The data
+# path survives on dm-multipath; what this protects is management - status,
+# allocation, snapshots - which would otherwise fail until somebody edited
+# the storage by hand.
+# ---------------------------------------------------------------------------
+
+{
+    # The request object knows which portal it was aimed at, so the fake can
+    # play a dead .11 and a live .12.
+    my $dead_calls = 0;
+    my ($api, $ua) = make_api(
+        portal  => ' 10.0.0.11 , 10.0.0.12 ',
+        retries => 3,
+        handler => sub {
+            my ($req) = @_;
+            my $host = $req->uri->host;
+            if ($host eq '10.0.0.11') {
+                $dead_calls++;
+                # What LWP hands back when the TCP connection fails: an
+                # internal 500 it generated itself, so marked.
+                return json_response(500, { error => "Can't connect" },
+                    'Client-Warning' => 'Internal response');
+            }
+            return json_response(200, { id => 'v1' });
+        });
+
+    is($api->{portal}, '10.0.0.11', 'the first address is used first, whitespace trimmed');
+
+    my $data = $api->get('/volume/v1');
+    is($data->{id}, 'v1', 'the request succeeds through the second controller');
+    is($api->{portal}, '10.0.0.12', '... which is now the sticky current address');
+    is($dead_calls, 1, 'the dead address was tried exactly once, with no backoff loop');
+
+    # Later requests go straight to the live controller.
+    $api->get('/volume/v1');
+    is($dead_calls, 1, 'subsequent requests do not revisit the dead address');
+}
+
+{
+    # The session belongs to the controller that issued it. Rotating without
+    # clearing it would swap a dead-address failure for an authentication
+    # loop against the live controller.
+    my ($api, $ua) = make_api(
+        portal  => '10.0.0.11,10.0.0.12',
+        retries => 2,
+        handler => sub {
+            my ($req) = @_;
+            return json_response(500, {},
+                'Client-Warning' => 'Internal response')
+                if $req->uri->host eq '10.0.0.11';
+            return json_response(200, { id => 'v1' });
+        });
+
+    $api->_mark_session({ token => 'issued-by-controller-A' });
+    $api->get('/volume/v1');
+    my $session = $api->{_session} // {};
+    isnt($session->{token} // '', 'issued-by-controller-A',
+        "controller A's session did not travel to controller B");
+}
+
+{
+    # Both dead: the failure must come back bounded, and having tried both.
+    my %tried;
+    my ($api) = make_api(
+        portal  => '10.0.0.11,10.0.0.12',
+        retries => 1,          # the health client's setting
+        handler => sub {
+            my ($req) = @_;
+            $tried{ $req->uri->host }++;
+            return json_response(500, {},
+                'Client-Warning' => 'Internal response');
+        });
+
+    ok(!eval { $api->get('/x'); 1 }, 'both controllers dead is still a failure');
+    ok($tried{'10.0.0.11'} && $tried{'10.0.0.12'},
+        '... but both addresses were given their chance, even at retries=1');
+}
+
+{
+    # One address configured: exactly the old behaviour, nothing rotates.
+    my ($api) = make_api(retries => 1, handler => sub {
+        return json_response(500, {}, 'Client-Warning' => 'Internal response');
+    });
+    ok(!eval { $api->get('/x'); 1 }, 'a single dead portal still fails');
+    is($api->{portal}, '10.0.0.5', '... without inventing a second address');
+}
+
 done_testing();

@@ -11,7 +11,7 @@ plugins — that is why the prefixes exist.
 
 | Option | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `dell-portal` | string | yes, fixed | — | Management IP or FQDN of the array. Cannot be changed after the storage is created |
+| `dell-portal` | string | yes, fixed | — | Management address(es); **cannot be changed after the storage is created**, so list both controllers up front on an array whose controllers each have their own management IP and no floating address (PowerVault ME, Unity): `192.168.1.11,192.168.1.12`. On a controller failover the client moves to the next address by itself. The data path needs nothing — dm-multipath handles it |
 | `dell-username` | string | yes | — | REST API user |
 | `dell-password` | string | yes | — | REST API password |
 | `dell-ssl-verify` | boolean | no | `0` | Verify the array's TLS certificate |
