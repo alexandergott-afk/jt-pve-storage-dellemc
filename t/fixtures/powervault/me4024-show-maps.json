@@ -1,0 +1,67 @@
+{
+  "volume-group-view": [],
+  "volume-view": [
+    {
+      "object-name": "volume-view",
+      "durable-id": "V9",
+      "volume-serial": "00c0ff446d150000fb922a6a01000000",
+      "volume-name": "pve-sas",
+      "volume-view-mappings": [
+        {
+          "object-name": "host-view",
+          "meta": "/meta/volume-view-mappings",
+          "durable-id": "V9_HG5",
+          "parent-id": "V9",
+          "mapped-id": "HG5",
+          "ports": "0,1,2,3",
+          "lun": "2",
+          "access": "read-write",
+          "access-numeric": 3,
+          "identifier": "00c0ff446d15000080912a6a01010000",
+          "nickname": "pvegroup01.*.*",
+          "host-profile": "Standard",
+          "host-profile-numeric": 0
+        }
+      ]
+    },
+    {
+      "object-name": "volume-view",
+      "durable-id": "V12",
+      "volume-serial": "00c0ff446ebe00002901736a01000000",
+      "volume-name": "pve-me4_SSD-999-d0",
+      "volume-view-mappings": [
+        {
+          "object-name": "host-view",
+          "meta": "/meta/volume-view-mappings",
+          "durable-id": "V12_H2",
+          "parent-id": "V12",
+          "ports": "0,1,2,3",
+          "lun": "4",
+          "access": "read-write",
+          "access-numeric": 3,
+          "identifier": "00c0ff446d15000001e9716a01010000",
+          "nickname": "pve-pve-host15.*",
+          "host-profile": "Standard",
+          "host-profile-numeric": 0
+        },
+        {
+          "object-name": "host-view",
+          "meta": "/meta/volume-view-mappings",
+          "durable-id": "V12_ALL",
+          "parent-id": "V12",
+          "ports": "",
+          "lun": "",
+          "access": "not-mapped",
+          "access-numeric": 0,
+          "identifier": "all other initiators",
+          "nickname": "",
+          "host-profile": "Standard",
+          "host-profile-numeric": 0
+        }
+      ]
+    }
+  ],
+  "status": [
+    { "object-name": "status", "response-type": "Success", "response": "Command completed successfully. (2026-08-05 10:00:00)", "return-code": 0 }
+  ]
+}

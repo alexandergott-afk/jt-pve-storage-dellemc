@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.64~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.65~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.65~beta1</div>
+        <div class="changelog-date">2026-08-05</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The first end-to-end run on real hardware. Three defects sat between a storage that came up and a disk that worked, each hidden by the one before it: a host addressed as an initiator, a mapping list that nested by volume, and a placeholder row for a default mapping that does not exist. All three fixed; the whole of FIRST_RUN then passed on a PowerVault ME4024 over Fibre Channel.</span>
+            <span class="lang-zh">第一次在實體硬體上端到端跑完。從儲存能夠啟用、到真的有一顆可用的磁碟之間，卡著三個缺陷，而且一個被前一個擋著看不到：host 被當成 initiator 定址、對應清單依磁碟區巢狀、以及一列描述「不存在的 default mapping」的佔位資料。三者全部修正後，FIRST_RUN 的每一項都在一台走 Fibre Channel 的 PowerVault ME4024 上通過。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.64~beta1</div>

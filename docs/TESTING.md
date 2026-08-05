@@ -16,14 +16,37 @@ real array sends.
 | `GET /show/host-groups` carries only `host-group` at the top level; hosts nest under `host` (singular), initiators under `initiator` | the host lookup found nothing, so the plugin recreated the host on every poll and the array refused with `-10389`; the storage stayed inactive | 0.7.63 |
 | `GET /show/pools` reports free space as `total-avail` / `total-avail-numeric`; there is no `avail` | every pool read as 100% used and PVE refuses to allocate into a full pool. Pool B measured 98.56% used, which is real | 0.7.63 |
 | `-10389` is the return code for "The specified host name is already in use" | now read as proof the host exists, from the code and never from the wording | 0.7.63 |
+| `map`/`unmap` take an identifier, not a name: `<name>` is an INITIATOR, `<name>.*` a host, `<name>.*.*` a host group | the bare host name was sent, looked up as an initiator, and refused with `-10386`. No volume could be mapped at all | 0.7.65 |
+| `show maps` nests: the top level is `volume-view`, one per volume, each carrying its rows under `volume-view-mappings` | the mapping list came back empty, every LUN looked free, and the second volume mapped to a host was refused with `-3177` | 0.7.65 |
+| Every volume carries a placeholder row for its default mapping — `lun ""`, `access "not-mapped"`, `access-numeric 0`, `identifier "all other initiators"`, `nickname ""` — visible only in the JSON | it was read as a host and unmapped on every delete, failing with `-10007` | 0.7.65 |
+| A mapping can be recorded at host-group level even when the `map` named a host, if that host is the group's only member | a group-level row holds its LUN against every host in the group | 0.7.65 |
+| The WWID rule: `3` + `6` (NAA) + OUI `00c0ff` + `000` + volume serial characters 7–12 + the serial's last 16. The `0000` in the serial is right-padded and the WWID's `000` left-padded — opposite directions | the plugin's computed WWID matched `multipath -ll` and `/dev/mapper` on four volumes | already correct |
+| `unmap volume initiator <host>.* <volume>` | was marked NOT VERIFIED in the source | verified |
+| The WWPN spelling a host object wants: bare hex, comma-separated (`100000109b643bca,100000109b643c04`) | the array accepted it | verified |
+| `*` percent-encoded in a path is decoded before the CLI sees it | which is why the URL escaping needs no exception for the `.*` suffix | verified |
+
+### The smoke test that ran on it
+
+Every item in `docs/FIRST_RUN` passed on that array once the three defects
+above were fixed: `pvesm status` (3.2s, capacity agreeing with the GUI),
+`pvesm alloc` for several volumes with LUNs 4/5/6 in sequence, mapping and
+dm-multipath (two paths, prio 50/10), `dd` read and write through
+`/dev/mapper` (175 MB/s write, 344 MB/s read, verified by checksum),
+`qm snapshot`, `qm rollback`, `qm delsnapshot`, `qm template`, a linked clone
+in seconds, the array correctly refusing to delete a template with a live
+clone (`-3442`), and unmap, delete and local device cleanup.
+
+**This is the first end-to-end run in the project's history.** It does not
+make the other two families verified, and it does not make iSCSI or SAS
+verified — this array ran Fibre Channel.
 
 Still not captured from that array, and therefore still inferred:
 
 | Open question | Why it matters | How it is covered meanwhile |
 |---|---|---|
 | How a host belonging to **no** host group appears in the JSON. The CLI prints ungrouped hosts in a separate block; which key that becomes is unknown | a node whose host is not in a group is the default case for a single-node install | the key list is no longer what decides. Every object in an ME answer names its own type in `object-name`, and a row saying `"object-name": "host"` is collected whichever key it arrived under |
-| Which field the host's multipath WWID actually derives from (`wwn` vs `serial-number`) | device discovery does not work at all if this is wrong | both are read, in that order |
-| The WWPN spelling the array wants in a host object (bare hex vs colon-separated) | a wrong spelling creates a host no initiator matches | the bare-hex form the CLI prints is sent; the array accepted `100000109b643bca,100000109b643c04` |
+| Whether a host that is **inside** a host group can be mapped to individually at all. On that array a host which was its group's only member had its mapping recorded at group level regardless | a deployment whose hosts are grouped may need group-aware comparison, not just host-aware | a group-level row is counted as holding its LUN, so no id is handed out twice. Whether such a deployment works otherwise is untested |
+| What should happen when `qm destroy` fails partway — the array refused to delete a template with a live clone, correctly, but PVE had already removed the VM configuration, so the volume was left with nothing pointing at it | an orphan needing `pvesm free` by hand | the orphan reaper reports it; it is not removed unattended |
 
 ## Hardware verification status
 
@@ -204,9 +227,12 @@ SSH, for PowerFlex through the API directly.
 | `total-size-numeric`, `alloc-size-numeric` | tried after the properties above; **Total Size** and **Alloc Size** are the printed column headings, which are not the same thing as the property names | — |
 | `wwn`, `volume-wwn`, `serial-number` | the WWID the host will see | the volumes basetype documents `wwn` as the volume's World Wide Name and `serial-number` as its serial; which one the host's WWID derives from is still **not verified** |
 | `volume-name`, `name` | object name | documented as **Name** |
-| `nickname` | the host or host group a mapping belongs to | `volume-view-mappings` documents it as the host or host group name, **blank if unset** |
+| `nickname` | the host or host group a mapping belongs to | `volume-view-mappings` documents it as the host or host group name, **blank if unset**. Confirmed on an ME4024 that it carries the identifier grammar's suffix: `pve-pve-host15.*` for a host, `pvegroup01.*.*` for a group. A comparison that does not drop the suffix never matches |
 | `identifier` | the initiator a mapping belongs to (WWPN or IQN) | `volume-view-mappings`, documented |
-| `lun`, `access`, `ports` | LUN, access mode and ports of a mapping | `volume-view-mappings`, documented |
+| `lun`, `access`, `ports` | LUN, access mode and ports of a mapping | `volume-view-mappings`, documented. Confirmed on an ME4024: `lun` arrives as a **string** (`"2"`), and is `""` on the default-mapping placeholder |
+| `access-numeric` | telling a real mapping from the default-mapping placeholder | confirmed on an ME4024: `3` read-write, `1` read-only, **`0` on the placeholder row**. Every volume carries one such row even with no default mapping, its `identifier` set to the display string `all other initiators` and its `nickname` empty. The CLI's own table does not show it; only the JSON does |
+| `volume-view`, `volume-group-view` | the top level of a `show maps` answer, one entry per volume | confirmed on an ME4024: the mapping rows nest inside these under `volume-view-mappings`, and there is no top-level array of mappings. The nested rows call themselves `host-view` in `object-name`, so this listing is walked by key, not by the type the row claims |
+| `volume-name`, `volume-serial` | which volume a nested mapping row belongs to | confirmed on an ME4024. The rows themselves name their parent only by `durable-id`, so the identity is carried down from the enclosing view — and then used to check that `show maps <volume>` filtered as asked |
 | `media` | `iSCSI`, `FC(P)`, `FC(L)`, `SAS` | documented as **Media** |
 | `target-id` | the IQN of an iSCSI port | documented as **Target ID** |
 | `ip-address` | iSCSI portal address | documented |

@@ -7,6 +7,76 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.65~beta1] - 2026-08-05
+
+**The first end-to-end run on real hardware.** A customer took 0.7.64 to a
+PowerVault ME4024 (`MIL-ME4024`, firmware `GT280R011-01`, Fibre Channel) and
+walked the whole of `docs/FIRST_RUN`. Three defects sat between the storage
+coming up and a working disk, each hidden by the one before it.
+
+### Fixed
+- **No volume could be mapped: `-10386`.** `map` and `unmap` take an
+  *identifier*, and the ME grammar distinguishes three kinds of object by a
+  suffix: `<name>` is an initiator, `<name>.*` a host, `<name>.*.*` a host
+  group. This plugin sent the bare host name, so the array looked for an
+  initiator by that name and, correctly, did not find one — with both
+  documented argument orders refused for the same reason.
+
+  Both directions had to change together. The array reports the same grammar
+  back in `show maps`, so a nickname arrives as `pve-pve-host15.*`; a
+  comparison that does not drop the suffix never matches, and fixing only the
+  sending side would have turned "cannot map" into "LUN collision".
+
+- **The second volume collided: `-3177`.** `show maps` answers with a tree
+  grouped by volume — the top level is `volume-view`, one entry per volume,
+  each carrying its rows under `volume-view-mappings`. There is no top-level
+  array of mappings. Indexing straight into one returned nothing, so every
+  LUN looked free and the second volume mapped to a host was given an id the
+  first already held. Each row now carries down the volume it belongs to,
+  which the rows themselves name only by `durable-id`.
+
+  This is the same mistake as the host listing in 0.7.63, in a different
+  listing of the same array.
+
+- **Every delete tried to unmap `all other initiators`: `-10007`.** Every
+  volume carries one row describing its default mapping, present even when
+  there is none: `lun ""`, `access "not-mapped"`, `access-numeric 0`,
+  `identifier "all other initiators"`, `nickname ""`. It does not appear in
+  the CLI's own table, only in the JSON, and the empty nickname is what
+  promoted that display string into the name list. It is now recognised by
+  its *access* rather than by the string, which a display layer chose and may
+  translate. This plugin never creates a default mapping.
+
+### Changed
+- **A mapping recorded at host-group level now counts as using its LUN.** The
+  array records one there even when `map` named a host, if that host is the
+  group's only member — and such a row holds the LUN against every host in
+  the group. PowerStore has handled this since it learned about host groups;
+  PowerVault had not. Being wrong this way costs one id out of 255.
+- **`show maps <volume>` is checked to have filtered.** The rows now carry
+  their volume, so the check is free. On the unmap path an unchecked answer
+  means reporting a volume mapped when it is not, and leaving a real mapping
+  in place.
+
+### Verified
+- `unmap volume initiator <host>.* <volume>`, which the source had marked
+  `NOT 0.7.65~beta1IFIED`.
+- The WWID rule: `3` + `6` (NAA) + OUI `00c0ff` + `000` + the volume serial's
+  characters 7–12 + its last 16. The plugin's computed WWID matched
+  `multipath -ll` and `/dev/mapper` on four volumes.
+- The WWPN spelling a host object wants: bare hex, comma-separated.
+- That a percent-encoded `*` is decoded before the array's CLI sees it, which
+  is why the URL escaping needs no exception for the new suffix.
+- The whole of `docs/FIRST_RUN`: capacity agreeing with the GUI, several
+  allocations with LUNs in sequence, dm-multipath with two paths, `dd` read
+  and write through `/dev/mapper` verified by checksum, snapshot, rollback,
+  snapshot delete, template, a linked clone in seconds, the array correctly
+  refusing to delete a template with a live clone, and unmap, delete and
+  local device cleanup.
+
+  This does not make the other two families verified, and it does not make
+  iSCSI or SAS verified. That array ran Fibre Channel.
+
 ## [0.7.64~beta1] - 2026-08-04
 
 ### Verified

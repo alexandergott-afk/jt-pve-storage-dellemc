@@ -1,3 +1,48 @@
+jt-pve-storage-dellemc (0.7.65~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * FIRST END-TO-END RUN ON REAL HARDWARE. A customer took 0.7.64 to a
+    PowerVault ME4024 (MIL-ME4024, firmware GT280R011-01, Fibre Channel) and
+    walked the whole of docs/FIRST_RUN. Three defects sat between the storage
+    coming up and a working disk, each hidden by the one before it.
+  * POWERVAULT: no volume could be mapped, -10386. 'map' and 'unmap' take an
+    IDENTIFIER, and the ME grammar distinguishes three kinds of object by a
+    suffix: <name> is an initiator, <name>.* a host, <name>.*.* a host group.
+    The bare host name was sent, so the array looked for an initiator by that
+    name and correctly did not find one. Both directions changed together:
+    the array reports the same grammar back in 'show maps', so a comparison
+    that does not drop the suffix never matches, and fixing only the sending
+    side turns "cannot map" into "LUN collision".
+  * POWERVAULT: the second volume collided, -3177. 'show maps' answers with a
+    tree grouped by volume - the top level is 'volume-view', one per volume,
+    each carrying its rows under 'volume-view-mappings'. There is no
+    top-level array of mappings, so the list came back empty, every LUN
+    looked free, and the second volume was given an id the first held. Each
+    row now carries down the volume it belongs to. This is the same mistake
+    as the host listing in 0.7.63, in a different listing of the same array.
+  * POWERVAULT: every delete tried to unmap 'all other initiators', -10007.
+    Every volume carries one row describing its default mapping, present even
+    when there is none: lun "", access "not-mapped", access-numeric 0,
+    identifier "all other initiators", nickname "". It is not in the CLI's
+    table, only in the JSON, and the empty nickname promoted that display
+    string into the name list. It is now recognised by its access rather than
+    by the string, which a display layer chose and may translate.
+  * POWERVAULT: a mapping recorded at host-group level now counts as using
+    its LUN. The array records one there even when 'map' named a host, if
+    that host is the group's only member, and such a row holds the LUN
+    against every host in the group.
+  * POWERVAULT: 'show maps <volume>' is checked to have filtered. The rows
+    now carry their volume, so the check is free; on the unmap path an
+    unchecked answer means reporting a volume mapped when it is not.
+  * VERIFIED on that array: 'unmap volume initiator <host>.* <volume>' (the
+    source had it marked NOT VERIFIED); the WWID rule, whose result matched
+    multipath -ll and /dev/mapper on four volumes; the bare-hex WWPN
+    spelling; that a percent-encoded '*' is decoded before the CLI sees it;
+    and every item in docs/FIRST_RUN. This does not make the other two
+    families, or iSCSI, or SAS, verified.
+
+ -- Jason Cheng <jason@jason.tools>  Wed, 05 Aug 2026 15:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.64~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

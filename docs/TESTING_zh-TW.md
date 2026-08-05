@@ -15,14 +15,34 @@ English: [TESTING.md](TESTING.md)
 | `GET /show/host-groups` 最上層只有 `host-group`；host 巢狀在 `host`（單數）底下，initiator 再巢狀在 `initiator` 底下 | host 查詢完全落空，外掛每次輪詢都重建 host，陣列以 `-10389` 拒絕，儲存一直停在 inactive | 0.7.63 |
 | `GET /show/pools` 的可用空間欄位是 `total-avail` / `total-avail-numeric`，沒有 `avail` | 每個儲存池都讀成 100% 已用，而 PVE 不會配置到已滿的儲存池裡。儲存池 B 實測 98.56% 已用，那是真實數字 | 0.7.63 |
 | `-10389` 是「The specified host name is already in use」的回傳碼 | 現在把它當成「host 確實存在」的證據，只讀代碼、絕不讀訊息文字 | 0.7.63 |
+| `map`／`unmap` 收的是識別碼而不是名稱：`<名稱>` 是 **initiator**、`<名稱>.*` 是 host、`<名稱>.*.*` 是 host group | 送出的是裸的 host 名稱，被當成 initiator 去查，以 `-10386` 拒絕。任何磁碟區都無法對應 | 0.7.65 |
+| `show maps` 是巢狀的：最上層是 `volume-view`，每顆磁碟區一筆，各自把資料列放在底下的 `volume-view-mappings` | 對應清單讀回來是空的，每個 LUN 都看起來沒人用，第二顆對應到同一 host 的磁碟區以 `-3177` 被拒 | 0.7.65 |
+| 每顆磁碟區都帶一列描述 default mapping 的佔位列 —— `lun ""`、`access "not-mapped"`、`access-numeric 0`、`identifier "all other initiators"`、`nickname ""` —— 只在 JSON 看得到 | 它被讀成一個 host，每次刪除都去解除對應，以 `-10007` 失敗 | 0.7.65 |
+| 即使 `map` 指定的是 host，只要該 host 是某個群組的唯一成員，對應仍可能被記錄在**群組層級** | 群組層級的資料列會替群組內每一個 host 佔住那個 LUN | 0.7.65 |
+| WWID 換算規則：`3` + `6`(NAA) + OUI `00c0ff` + `000` + 磁碟區序號第 7–12 碼 + 序號後 16 碼。序號中的 `0000` 是右補零，WWID 對應位置卻是左補零，方向相反 | 外掛算出的 WWID 與 `multipath -ll`、`/dev/mapper` 在四顆磁碟區上完全吻合 | 原本就正確 |
+| `unmap volume initiator <host>.* <volume>` | 原始碼中標註為 NOT VERIFIED | 已驗證 |
+| host 物件要的 WWPN 寫法：純十六進位、以逗號分隔（`100000109b643bca,100000109b643c04`） | 陣列接受 | 已驗證 |
+| 路徑中經過百分號編碼的 `*`，在 CLI 看到之前就會被解碼 | 這就是 URL 跳脫不需要為 `.*` 後綴開例外的原因 | 已驗證 |
+
+### 在該陣列上跑過的煙霧測試
+
+上述三個缺陷修好之後，`docs/FIRST_RUN` 的每一項都在那台陣列上通過：`pvesm
+status`（3.2 秒，容量與 GUI 一致）、連續數顆 `pvesm alloc`（LUN 4／5／6 依序
+遞增）、對應與 dm-multipath（兩條路徑，prio 50／10）、透過 `/dev/mapper` 的
+`dd` 讀寫（寫 175 MB/s、讀 344 MB/s，並以雜湊驗證）、`qm snapshot`、
+`qm rollback`、`qm delsnapshot`、`qm template`、秒級完成的連結複製、陣列正確
+拒絕刪除仍有存活複製的範本（`-3442`），以及解除對應、刪除與本機裝置清理。
+
+**這是本專案史上第一次端到端完整執行。** 它不代表另外兩個系列已經驗證，也不
+代表 iSCSI 或 SAS 已經驗證 —— 那台陣列走的是 Fibre Channel。
 
 以下仍未從該陣列上抓到，因此仍屬推測：
 
 | 未解的問題 | 為什麼重要 | 目前如何因應 |
 |---|---|---|
 | **不屬於任何 host group** 的 host 在 JSON 中長什麼樣。CLI 會把 ungrouped host 印在另一個區塊，但對應的鍵名不明 | 單節點安裝時，host 不在任何 group 裡才是常態 | 鍵名清單已經不是決定因素。ME 回應裡的每個物件都會在 `object-name` 說出自己的型別，只要那一列寫著 `"object-name": "host"`，不論它掛在哪個鍵底下都會被收進來 |
-| host 的 multipath WWID 究竟衍生自哪個欄位（`wwn` 或 `serial-number`） | 這一項錯了，裝置探索會完全無法運作 | 兩個都讀，依此順序 |
-| 陣列在 host 物件裡要的 WWPN 寫法（純十六進位或以冒號分隔） | 寫法錯了會建立出一個沒有任何 initiator 對得上的 host | 送出 CLI 印出來的純十六進位形式；該陣列接受了 `100000109b643bca,100000109b643c04` |
+| 位於 host group **內**的 host，究竟能不能被單獨對應。在該陣列上，一個身為群組唯一成員的 host，其對應一律被記錄在群組層級 | 若部署方式是把 host 放進群組，可能需要「群組層級」的比對，而不只是 host 層級 | 群組層級的資料列會被計為佔用該 LUN，因此不會有同一個號碼被發兩次。這種部署其餘部分是否可用，尚未測試 |
+| `qm destroy` 中途失敗時應該怎麼處理 —— 陣列正確拒絕刪除仍有存活複製的範本，但 PVE 此時已經移除虛擬機設定檔，於是磁碟區失去了所有指向它的參照 | 會留下需要手動 `pvesm free` 的孤兒 | 孤兒回收機制會回報它；不會在無人看管的情況下刪除 |
 
 ## 實機驗證狀態
 
@@ -173,9 +193,12 @@ help create host
 | `total-size-numeric`、`alloc-size-numeric` | 排在上面兩者之後；**Total Size** 與 **Alloc Size** 是列印出來的欄位標題，與屬性名稱並不是同一回事 | — |
 | `wwn`、`volume-wwn`、`serial-number` | 主機將看到的 WWID | volumes basetype 記載 `wwn` 為該 volume 的 World Wide Name、`serial-number` 為序號；主機的 WWID 究竟由哪一個推導出來，仍**未驗證** |
 | `volume-name`、`name` | 物件名稱 | 文件記載為 **Name** |
-| `nickname` | 一列對應屬於哪個 host 或 host group | `volume-view-mappings` 記載為 host 或 host group 名稱，**未設定時為空白** |
+| `nickname` | 一列對應屬於哪個 host 或 host group | `volume-view-mappings` 記載為 host 或 host group 名稱，**未設定時為空白** 。已在 ME4024 上確認它會帶上識別碼語法的後綴：host 是 `pve-pve-host15.*`，host group 是 `pvegroup01.*.*`。比對時若不去掉後綴，永遠不會命中 |
 | `identifier` | 一列對應屬於哪個 initiator（WWPN 或 IQN） | `volume-view-mappings`，已記載 |
 | `lun`、`access`、`ports` | 對應的 LUN、存取模式與連接埠 | `volume-view-mappings`，已記載 |
+| `access-numeric` | 用來分辨真實對應與 default mapping 的佔位列 | 已在 ME4024 上確認：`3` 為 read-write、`1` 為 read-only，**佔位列是 `0`**。即使沒有設定 default mapping，每顆磁碟區都會帶一列這種佔位列，其 `identifier` 是顯示字串 `all other initiators`、`nickname` 為空。CLI 的表格輸出不會顯示它，只有 JSON 有 |
+| `volume-view`、`volume-group-view` | `show maps` 回應的最上層，每顆磁碟區一筆 | 已在 ME4024 上確認：對應資料列巢狀在其底下的 `volume-view-mappings`，最上層沒有任何對應陣列。巢狀列的 `object-name` 自稱 `host-view`，所以這份清單是依鍵名走訪，而不是依資料列自稱的型別 |
+| `volume-name`、`volume-serial` | 巢狀的對應資料列屬於哪顆磁碟區 | 已在 ME4024 上確認。資料列本身只以 `durable-id` 指向父物件，因此identity 由外層的 view 帶下來 —— 並用來檢查 `show maps <volume>` 是否真的照要求過濾了 |
 | `media` | `iSCSI`、`FC(P)`、`FC(L)`、`SAS` | 文件記載為 **Media** |
 | `target-id` | iSCSI 連接埠的 IQN | 文件記載為 **Target ID** |
 | `ip-address` | iSCSI portal 位址 | 已記載 |

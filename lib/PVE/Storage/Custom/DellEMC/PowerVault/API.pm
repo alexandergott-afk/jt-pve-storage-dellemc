@@ -982,6 +982,72 @@ sub host_add_initiators {
     return 1;
 }
 
+# The identifier grammar 'map' and 'unmap' use, which is not the same as a
+# name:
+#
+#   <name>       an initiator, by nickname or by WWPN/IQN
+#   <name>.*     a HOST
+#   <name>.*.*   a host GROUP
+#
+# This plugin always addresses a host, so the suffix is not decoration — it is
+# what says which kind of object is meant. A bare host name is looked up as an
+# initiator and refused with -10386, "The specified initiator nickname or
+# identifier was not found in the system". Confirmed on an ME4024 running
+# GT280R011-01, where the bare form failed and '<name>.*' succeeded against
+# the same host in the same session.
+#
+# The '*' is percent-encoded on the way out; the array decodes it before its
+# CLI sees it. That was confirmed on the same array, and it is why the URL
+# escaping does not need to make an exception for this argument.
+sub _host_arg {
+    my ($self, $host) = @_;
+
+    return $host if !defined($host) || !length($host);
+    return $host if $host =~ /\.\*\z/;
+
+    return "$host.*";
+}
+
+# The array reports that same grammar back in 'show maps', so a mapping row's
+# nickname carries the suffix too. A comparison that does not drop it never
+# matches, and this plugin has already paid for that once: a host whose LUNs
+# all look free is handed one it is using, and the array refuses the mapping
+# with -3177.
+sub _strip_map_suffix {
+    my ($self, $name) = @_;
+
+    return $name unless defined $name;
+    $name =~ s/(?:\.\*)+\z//;
+
+    return $name;
+}
+
+# Is this row a mapping at all?
+#
+# Every volume carries one placeholder row describing its DEFAULT mapping,
+# present even when there is none: lun "", access "not-mapped",
+# access-numeric 0, identifier "all other initiators", nickname "". The CLI's
+# own table does not show it; only the JSON has it.
+#
+# 'all other initiators' is a display string and not an identifier the CLI
+# accepts, so trying to unmap it fails with -10007 — which is what happened on
+# every 'qm destroy'. It is recognised by its ACCESS and not by that string:
+# the string is what a display layer chose and may be translated or reworded,
+# while "no access" is the thing that makes the row not a mapping.
+sub _is_real_mapping {
+    my ($self, $row) = @_;
+
+    return 0 unless ref($row) eq 'HASH';
+
+    my $numeric = $row->{'access-numeric'};
+    return 0 if defined $numeric && !ref($numeric) && "$numeric" eq '0';
+
+    my $access = $row->{access};
+    return 0 if defined $access && !ref($access) && lc($access) eq 'not-mapped';
+
+    return 1;
+}
+
 sub mapping_list {
     my ($self, %opts) = @_;
 
@@ -990,12 +1056,48 @@ sub mapping_list {
 
     my $data = $self->_cmd(\@tokens, %opts);
 
-    # Depending on firmware the rows come back under 'volume-view-mappings'
-    # or 'host-view-mappings'; accept either.
-    my $rows = $self->_objects($data, 'volume-view-mappings');
-    push @$rows, @{ $self->_objects($data, 'host-view-mappings') };
+    # 'show maps' answers with a tree, grouped by volume: the top level is
+    # 'volume-view' (and 'volume-group-view'), one entry per volume, each
+    # carrying its rows under 'volume-view-mappings'. There is no top-level
+    # array of mappings, so indexing straight into one returns nothing —
+    # every LUN then looks free, and the second volume mapped to a host is
+    # refused with -3177, "The specified LUN overlaps a previously defined
+    # LUN". Confirmed on an ME4024 running GT280R011-01.
+    #
+    # The nested rows call themselves 'host-view' in 'object-name', so unlike
+    # the host listing this one cannot be driven by the type the row claims;
+    # it is walked by key.
+    my @rows;
+    for my $key ('volume-view', 'volume-group-view') {
+        for my $view (@{ $self->_objects($data, $key) }) {
+            next unless ref($view) eq 'HASH';
 
-    return $rows;
+            for my $nested ('volume-view-mappings', 'host-view-mappings') {
+                my $inner = $view->{$nested};
+                next unless ref($inner) eq 'ARRAY';
+
+                # Carry the volume's identity down. A nested row names its
+                # parent only by durable-id, which is of no use to a caller
+                # that asked about a volume by name.
+                for my $row (@$inner) {
+                    next unless ref($row) eq 'HASH';
+                    push @rows, {
+                        %$row,
+                        'volume-name'   => $view->{'volume-name'},
+                        'volume-serial' => $view->{'volume-serial'},
+                    };
+                }
+            }
+        }
+    }
+
+    return \@rows if @rows;
+
+    # Firmware that does put the rows at the top level after all.
+    my $flat = $self->_objects($data, 'volume-view-mappings');
+    push @$flat, @{ $self->_objects($data, 'host-view-mappings') };
+
+    return $flat;
 }
 
 # Mappings of one volume.
@@ -1019,9 +1121,32 @@ sub volume_mappings {
 
     my @out;
     for my $row (@$rows) {
+        # 'show maps <volume>' is asked to filter, and this checks that it
+        # did. The rows now carry the volume they were nested under, so the
+        # check costs nothing — and the caller of this is the unmap path,
+        # where acting on another volume's rows would mean reporting a volume
+        # mapped when it is not, and leaving a real mapping in place. A row
+        # that does not say which volume it belongs to is kept: refusing it
+        # would turn a firmware answering in a flatter shape into "nothing is
+        # mapped", which is the answer that leaves a ghost LUN behind.
+        my $named = $row->{'volume-name'};
+        next if defined $named && !ref $named && length $named
+             && defined $volume && length $volume
+             && $named ne $volume;
+
+        # The default-mapping placeholder is not something to unmap. Its
+        # nickname is empty, which is what promotes 'all other initiators'
+        # into the name list at all — and that string is not an identifier
+        # the CLI accepts, so unmapping it fails with -10007 on every delete.
+        # This plugin never creates a default mapping: every 'map volume' it
+        # sends names an initiator.
+        next unless $self->_is_real_mapping($row);
+
         my @names = grep { defined && length }
-            $row->{'nickname'}, $row->{'identifier'},
-            $row->{'host-id'},  $row->{'host'};
+            map { $self->_strip_map_suffix($_) }
+            grep { defined && !ref }
+            ($row->{'nickname'}, $row->{'identifier'},
+             $row->{'host-id'},  $row->{'host'});
 
         next unless @names;
 
@@ -1085,13 +1210,23 @@ sub next_free_lun {
 
     my %used;
     for my $row (@{ $self->mapping_list(%opts) }) {
-        my @names = grep { defined && length }
-            $row->{'nickname'},  $row->{'identifier'},
-            $row->{'host-id'},   $row->{'host'};
-        next unless grep { lc($_) eq $want } @names;
+        my @raw = grep { defined && !ref && length }
+            ($row->{'nickname'},  $row->{'identifier'},
+             $row->{'host-id'},   $row->{'host'});
+
+        # A mapping recorded against a host GROUP occupies that LUN on every
+        # host in the group, and this plugin cannot tell from here whether
+        # this node's host is one of them. So it counts as used. Being wrong
+        # that way costs a LUN id out of 255; being wrong the other way hands
+        # out an id the array then refuses, which is what -3177 is. The same
+        # trap is why the PowerStore client reads group mappings too.
+        my $group_level = grep { /\.\*\.\*\z/ } @raw;
+
+        my $mine = grep { lc($self->_strip_map_suffix($_)) eq $want } @raw;
+        next unless $mine || $group_level;
 
         my $lun = $row->{lun};
-        $used{$lun} = 1 if defined $lun && $lun =~ /^\d+$/;
+        $used{$lun} = 1 if defined $lun && !ref $lun && $lun =~ /^\d+\z/;
     }
 
     for my $lun ($base .. MAX_LUN_ID) {
@@ -1121,9 +1256,13 @@ sub volume_map {
 
     my $lun = $opts{lun} // $self->next_free_lun($host, base => $opts{lun_base}, %opts);
 
-    my @me5 = ('map', 'volume', 'access', 'rw', 'initiator', $host,
+    # '<host>.*', never the bare name: see _host_arg. A bare name asks the
+    # array about an INITIATOR by that name, and there is none.
+    my $harg = $self->_host_arg($host);
+
+    my @me5 = ('map', 'volume', 'access', 'rw', 'initiator', $harg,
                'lun', $lun, $volume);
-    my @me4 = ('map', 'volume', $volume, 'access', 'rw', 'initiator', $host,
+    my @me4 = ('map', 'volume', $volume, 'access', 'rw', 'initiator', $harg,
                'lun', $lun);
 
     my $ok = eval { $self->_cmd(\@me5, %opts); 1 };
@@ -1149,8 +1288,13 @@ sub volume_map {
 sub volume_unmap {
     my ($self, $volume, $host, %opts) = @_;
 
-    # NOT VERIFIED: `unmap volume initiator <host> <volume>`.
-    $self->_cmd(['unmap', 'volume', 'initiator', $host, $volume], %opts);
+    # Verified on an ME4024 running GT280R011-01, together with the '<host>.*'
+    # form the identifier has to take. Without the suffix this addresses an
+    # initiator that does not exist; with an EMPTY host it would become
+    # 'unmap volume <volume>', which Dell documents as removing the DEFAULT
+    # mapping — _cmd refuses an empty argument for exactly that reason.
+    $self->_cmd(['unmap', 'volume', 'initiator', $self->_host_arg($host),
+                 $volume], %opts);
 
     return 1;
 }

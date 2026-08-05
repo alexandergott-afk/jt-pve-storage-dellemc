@@ -504,7 +504,7 @@ is($API->wwn_to_wwid(undef), undef, 'undef WWN');
 
     $api->volume_map('pve-me5-100-d0', 'pve-c1-node1');
     my $path = $ua->last_request->uri->path;
-    like($path, qr{/api/map/volume/access/rw/initiator/pve-c1-node1/lun/2/pve-me5-100-d0$},
+    like($path, qr{/api/map/volume/access/rw/initiator/pve-c1-node1\.%2A/lun/2/pve-me5-100-d0$},
         'the mapping names the initiator and an explicit LUN, which the CLI requires');
 
     is($api->is_mapped('pve-me5-100-d0', 'pve-c1-node1'), 1, 'existing mapping found');
@@ -781,7 +781,7 @@ SKIP: {
     is($lun, 7, 'the LUN chosen is the one reported back');
 
     my ($map_path) = grep { m{/map/volume/} } @paths;
-    like($map_path, qr{/map/volume/access/rw/initiator/pve-pve-node1/lun/7/pve-me5-100-d0$},
+    like($map_path, qr{/map/volume/access/rw/initiator/pve-pve-node1\.%2A/lun/7/pve-me5-100-d0$},
         'the ME5 order is sent first: the volume comes last');
 
     is(scalar(grep { m{/map/volume/} } @paths), 1,
@@ -1125,6 +1125,137 @@ sub fixture {
 }
 
 # ---------------------------------------------------------------------------
+# 'show maps' on real hardware
+#
+# Three defects, each hidden by the one before it, all found on an ME4024
+# running GT280R011-01 once the storage could finally come up.
+#
+#  1. The identifier grammar. 'map'/'unmap' take an INITIATOR by bare name; a
+#     host is '<name>.*' and a host group '<name>.*.*'. The bare host name was
+#     sent, looked up as an initiator, and refused with -10386 — so no volume
+#     could ever be mapped.
+#  2. The answer nests. Top level is 'volume-view', one per volume, each
+#     carrying its rows under 'volume-view-mappings'. Indexing the top level
+#     found nothing, every LUN looked free, and the SECOND volume mapped to a
+#     host was refused with -3177.
+#  3. Every volume carries a placeholder row for its default mapping, whose
+#     identifier is the display string 'all other initiators'. It was read as
+#     a host and unmapped on every delete, failing with -10007.
+#
+# The payload below is that array's, kept verbatim.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(fixture('me4024-show-maps')) if $path =~ m{/show/maps};
+        return reply(ok_status());
+    });
+
+    my $rows = $api->mapping_list();
+    is(scalar(@$rows), 3, 'rows nested inside each volume-view are found');
+
+    my %by_volume;
+    push @{ $by_volume{ $_->{'volume-name'} // '?' } }, $_ for @$rows;
+    ok($by_volume{'pve-me4_SSD-999-d0'},
+        "each row carries down the volume it belongs to");
+    is(scalar(@{ $by_volume{'pve-sas'} }), 1, '... for every volume in the answer');
+
+    # The placeholder is present in the raw rows and absent from the mappings.
+    my $mappings = $api->volume_mappings('pve-me4_SSD-999-d0');
+    is(scalar(@$mappings), 1, 'the default-mapping placeholder is not a mapping');
+    is($mappings->[0]{host}, 'pve-pve-host15',
+        '... and the real row is named by its host, with the suffix dropped');
+
+    ok(!grep({ ($_->{host} // '') =~ /all other initiators/ } @$mappings),
+        'a display string is never handed back as a host to unmap');
+
+    # The LUN the array actually gave out must not be handed out again.
+    is($api->next_free_lun('pve-pve-host15', base => 4), 5,
+        'LUN 4 is in use by this host, so the next volume gets 5');
+
+    ok($api->is_mapped_to_any('pve-me4_SSD-999-d0', ['pve-pve-host15']),
+        'the volume is seen as mapped to this node');
+    ok(!$api->is_mapped_to_any('pve-me4_SSD-999-d0', ['pve-pve-host16']),
+        "... and not to a host that does not hold it");
+
+    # 'show maps <volume>' is asked to filter; this proves the plugin does not
+    # rely on it having done so. The fake above answers with every volume's
+    # rows whatever it is asked about — which is what a firmware that ignores
+    # the argument would do — and the unmap path must not act on a neighbour's
+    # mapping.
+    ok(!grep({ ($_->{host} // '') =~ /pvegroup01/ }
+             @{ $api->volume_mappings('pve-me4_SSD-999-d0') }),
+        "another volume's mapping never reaches the unmap path");
+
+    ok(!$api->is_mapped_to_any('pve-me4_SSD-999-d0', ['pvegroup01']),
+        '... and never makes an unmapped volume look mapped');
+}
+
+{
+    # A mapping recorded against a host GROUP occupies that LUN on every host
+    # in the group, and nothing here can tell whether this node is one of
+    # them. It counts as used: being wrong that way costs one id out of 255,
+    # being wrong the other way is the -3177 the array answers with.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(fixture('me4024-show-maps')) if $path =~ m{/show/maps};
+        return reply(ok_status());
+    });
+
+    is($api->next_free_lun('some-other-host', base => 2), 3,
+        'a group-level mapping holds its LUN against everyone');
+}
+
+# ---------------------------------------------------------------------------
+# The identifier grammar, both directions
+# ---------------------------------------------------------------------------
+
+{
+    my ($api) = make_api();
+
+    is($api->_host_arg('pve-pve-host15'), 'pve-pve-host15.*',
+        'a host is addressed as <name>.*');
+    is($api->_host_arg('pve-pve-host15.*'), 'pve-pve-host15.*',
+        '... and never doubled if it already carries it');
+    is($api->_host_arg(''), '', 'an empty name is left alone for _cmd to refuse');
+    is($api->_host_arg(undef), undef, '... as is no name at all');
+
+    # '$' also matches before a trailing newline, so a name that ends in one
+    # would be judged to carry the suffix when it does not.
+    is($api->_host_arg("pve-host\n"), "pve-host\n.*",
+        'the suffix check is anchored at the end of the string, not the line');
+
+    is($api->_strip_map_suffix('pve-pve-host15.*'), 'pve-pve-host15',
+        'a host nickname loses its one suffix');
+    is($api->_strip_map_suffix('pvegroup01.*.*'), 'pvegroup01',
+        'a host group loses both');
+    is($api->_strip_map_suffix('100000109b643c08'), '100000109b643c08',
+        'a WWPN is untouched');
+    is($api->_strip_map_suffix(undef), undef, 'and nothing stays nothing');
+}
+
+{
+    # The placeholder is recognised by its access, not by the words in it: a
+    # display string can be translated or reworded, "no access" cannot.
+    my ($api) = make_api();
+
+    ok(!$api->_is_real_mapping({ 'access-numeric' => 0, access => 'not-mapped',
+                                 identifier => 'all other initiators' }),
+        'access-numeric 0 is not a mapping');
+    ok(!$api->_is_real_mapping({ access => 'not-mapped' }),
+        '... nor is not-mapped without the numeric twin');
+    ok(!$api->_is_real_mapping({ access => 'Not-Mapped' }),
+        '... whatever case the array uses');
+    ok($api->_is_real_mapping({ 'access-numeric' => 3, access => 'read-write' }),
+        'read-write is');
+    ok($api->_is_real_mapping({ 'access-numeric' => 1, access => 'read-only' }),
+        'and so is read-only');
+    ok($api->_is_real_mapping({ nickname => 'h.*' }),
+        'a row that says nothing about access is kept, not dropped');
+}
+
+# ---------------------------------------------------------------------------
 # A host belonging to no group
 #
 # The one shape nobody has captured. The ME CLI prints ungrouped hosts in a
@@ -1369,7 +1500,7 @@ sub fixture {
     ok(eval { $api->volume_unmap('pve-me5-100-d0', 'pve-c1-node1'); 1 },
         'a complete command still goes through');
     like($ua->last_request->uri->path,
-        qr{/unmap/volume/initiator/pve-c1-node1/pve-me5-100-d0$},
+        qr{/unmap/volume/initiator/pve-c1-node1\.%2A/pve-me5-100-d0$},
         'with the initiator in its own position');
 }
 
