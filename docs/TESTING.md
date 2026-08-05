@@ -319,6 +319,12 @@ array may do the same under some firmware, or answer asynchronously with a
 job. Every create now falls back to a lookup by the name it just used, and
 fails loudly if even that cannot answer.
 
+The emulator has also caught what no unit test could: the create that
+answers 204 with no body, and — driven through a full `pvesm add` — a
+refused storage that had already written the multipath drop-in and issued
+the node-wide reconfigure. An end-to-end path against it belongs in every
+future family's bring-up.
+
 ### PowerStore (from the 4.x REST documentation)
 
 Some of the request shape *was* read from the Dell PowerStore REST API
