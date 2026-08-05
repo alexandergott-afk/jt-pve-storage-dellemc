@@ -150,11 +150,16 @@ jobs:
           body: |
             ## ⚠️ Beta software — read before installing
 
-            This release has **never been run against a physical Dell EMC
-            array**. Every array-facing behaviour is unverified: REST
-            endpoints and field names, the SCSI vendor and product strings
-            that decide which devices the plugin touches, the WWN to WWID
-            conversion, and the Fibre Channel path.
+            **One array has run this plugin**, and only one: a PowerVault
+            ME4024 (firmware `GT280R011-01`) over Fibre Channel, which as of
+            0.7.65 passes the whole of the first-run test. Everything else
+            remains unverified against hardware — **PowerStore and PowerFlex
+            entirely**, and on PowerVault the iSCSI and SAS paths, since that
+            array ran FC.
+
+            Read [what has and has not been verified](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md)
+            before trusting any of it: that page names each item and says
+            which it is.
 
             A storage plugin runs as root, creates and deletes volumes on the
             array, and manipulates block devices on every node. A defect can
@@ -162,10 +167,22 @@ jobs:
             node in a state that only a reboot clears. Use a non-production
             cluster and a non-production array, and keep independent backups.
 
-            See the [disclaimer](https://github.com/jasoncheng7115/jt-pve-storage-dellemc#disclaimer-and-risk)
-            and [what has and has not been verified](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md).
+            See the [disclaimer](https://github.com/jasoncheng7115/jt-pve-storage-dellemc#disclaimer-and-risk).
 
             ## Install
+
+            > Every 0.x release is marked **Pre-release**, so GitHub shows no
+            > "Latest" badge on any of them and `/releases/latest` will not
+            > resolve. That is deliberate — 1.0.0 is the on-hardware test
+            > pass. **Take the release at the top of the list**, which is the
+            > newest, or let the command below find it.
+
+            ```bash
+            # newest release, prereleases included
+            url=$(curl -s https://api.github.com/repos/jasoncheng7115/jt-pve-storage-dellemc/releases \
+                  | grep -om1 'https://[^"]*_all\.deb')
+            curl -LO "$url"
+            ```
 
             On **every** node of the cluster:
 
