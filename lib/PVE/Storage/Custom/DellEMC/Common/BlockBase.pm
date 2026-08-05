@@ -635,13 +635,23 @@ sub activate_storage {
           . " for storage '$storeid': $err";
     }
 
-    $class->_ensure_multipath_config();
-
     if ($class->_is_fc($scfg)) {
         $class->_activate_fc($storeid, $scfg);
     } else {
         $class->_activate_iscsi($storeid, $scfg);
     }
+
+    # The multipath drop-in is written only AFTER the protocol activation
+    # succeeded. Writing it triggers the one permitted node-wide 'multipathd
+    # reconfigure', and doing that first meant a storage about to be REFUSED
+    # — an FC storage on a node with no HBA, an iSCSI storage whose portals
+    # this node cannot reach — had already reconfigured every vendor's maps
+    # on a shared node and left this plugin's drop-in behind, for a storage
+    # that never came to exist. Found by running 'pvesm add' end-to-end
+    # against an API emulator on a node that could not serve either
+    # protocol. Nothing in the activation needs the drop-in: it tunes
+    # devices, and devices appear at activate_volume, not here.
+    $class->_ensure_multipath_config();
 
     $class->_ensure_host_throttled($storeid, $scfg);
 

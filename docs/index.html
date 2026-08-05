@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.78~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.79~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.79~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Running pvesm add end-to-end against the emulator found that a REFUSED add had already written the multipath drop-in and reconfigured every vendor's maps node-wide. The drop-in now waits until the protocol activation has actually succeeded.</span>
+            <span class="lang-zh">把 pvesm add 對模擬器端到端跑了一次，發現被「拒絕」的 add 早已寫入 multipath drop-in 並做了全節點的重讀。drop-in 現在會等到協定啟用真正成功之後才寫入。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.78~beta1</div>

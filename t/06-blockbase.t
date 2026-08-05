@@ -1228,4 +1228,35 @@ SKIP: {
         'a volume that is no longer there ends the wait');
 }
 
+# ---------------------------------------------------------------------------
+# A refused activation leaves no node state behind
+#
+# Writing the multipath drop-in triggers the one permitted node-wide
+# 'multipathd reconfigure'. A storage about to be REFUSED - FC with no HBA,
+# iSCSI with no reachable portal - must refuse BEFORE that write: the
+# reconfigure touches every vendor's maps on a shared node, and it was being
+# paid for a storage that never came to exist.
+# ---------------------------------------------------------------------------
+
+SKIP: {
+    skip 'PVE::Storage::Plugin is not available', 3
+        unless eval { require PVE::Storage::Plugin; 1 };
+
+    my $conf_written = 0;
+    my $scfg = { 'dell-portal' => '10.0.0.1', 'dell-protocol' => 'fc' };
+
+    no warnings 'redefine', 'once';
+    local *Test::Plugin::_ensure_multipath_config = sub { $conf_written++; return 1 };
+    # The node has no HBA, as far as this activation can tell.
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_fc_available = sub { 0 };
+
+    my $ok = eval { Test::Plugin->activate_storage('t1', $scfg, {}); 1 };
+
+    ok(!$ok, 'an FC storage on a node with no HBA is refused');
+    like($@, qr/no FC HBA/, '... saying why');
+    is($conf_written, 0,
+        'and the multipath drop-in was never written for it - no node-wide'
+      . ' reconfigure was paid for a storage that never came to exist');
+}
+
 done_testing();

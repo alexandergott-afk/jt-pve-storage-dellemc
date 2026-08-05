@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.79~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * A refused pvesm add had already reconfigured every vendor's multipath
+    maps. activate_storage wrote the multipath drop-in - and issued the one
+    permitted node-wide multipathd reconfigure - before the protocol
+    prerequisites were checked, so an FC storage on a node with no HBA, or
+    an iSCSI storage with no reachable portal, was refused correctly but
+    had already touched every vendor's maps on a shared node and left the
+    drop-in behind. The drop-in is now written only after the protocol
+    activation succeeded; nothing in the activation needs it, since it
+    tunes devices and devices appear at activate_volume. All three
+    BlockBase families are covered by the same reorder. Found by running
+    pvesm add end-to-end against a Unity API emulator on a node that could
+    serve neither protocol; both refusal paths re-run clean.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 04:10:00 +0800
+
 jt-pve-storage-dellemc (0.7.78~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

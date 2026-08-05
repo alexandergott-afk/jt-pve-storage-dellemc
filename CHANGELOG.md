@@ -7,6 +7,26 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.79~beta1] - 2026-08-06
+
+### Fixed
+- **A refused `pvesm add` had already reconfigured every vendor's multipath
+  maps.** Found by running the whole `pvesm add` path end-to-end against a
+  Unity API emulator on a node that could serve neither protocol.
+  `activate_storage` wrote the multipath drop-in — and issued the one
+  permitted node-wide `multipathd reconfigure` — *before* the protocol
+  prerequisites were checked. An FC storage on a node with no HBA, or an
+  iSCSI storage whose portals the node cannot reach, was refused as it
+  should be; but the reconfigure had already touched every vendor's maps on
+  a shared node, and this plugin's drop-in stayed behind, for a storage
+  that never came to exist.
+
+  The drop-in is now written only after the protocol activation succeeded.
+  Nothing in the activation needs it — it tunes devices, and devices appear
+  at `activate_volume`, not here. All three BlockBase families are covered
+  by the same reorder; both refusal paths were re-run against the emulator
+  and leave zero files and zero reconfigures behind.
+
 ## [0.7.78~beta1] - 2026-08-06
 
 ### Fixed

@@ -5,6 +5,21 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.79~beta1] - 2026-08-06
+
+### 修正
+- **被拒絕的 `pvesm add`，已經先把所有 vendor 的 multipath 設定重讀了一遍。**
+  這是把整條 `pvesm add` 路徑對著 Unity API 模擬器端到端跑、而節點兩種協定都
+  無法服務時發現的。`activate_storage` 在檢查協定前置條件**之前**就寫入了
+  multipath drop-in —— 並發出那唯一被允許的全節點 `multipathd reconfigure`。
+  沒有 HBA 的節點加 FC 儲存、或 portal 不可達的節點加 iSCSI 儲存，拒絕本身是
+  正確的；但 reconfigure 已經動過共用節點上每個 vendor 的 map，而本外掛的
+  drop-in 留在原地 —— 為了一個從未存在過的儲存。
+
+  drop-in 現在只在協定啟用成功之後才寫入。啟用過程不需要它 —— 它調校的是
+  裝置，而裝置要到 `activate_volume` 才出現。三個 BlockBase 系列同時受惠；
+  兩條拒絕路徑都對模擬器重跑過,零檔案殘留、零 reconfigure。
+
 ## [0.7.78~beta1] - 2026-08-06
 
 ### 修正
