@@ -7,6 +7,39 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.71~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: every rollback would eventually have made the volume
+  undeletable.** Dell's own white paper is explicit that a restore
+  *automatically creates a backup snapshot* — whether or not one was asked
+  for. Left to the array it gets a name of the array's choosing, which the
+  snapshot purge that runs before a volume can be deleted does not recognise
+  and the ownership gate would refuse to touch. Unity refuses to delete a
+  LUN that still has snapshots, so from the first `qm rollback` on, `qm
+  destroy` fails — days later, with nothing pointing back at the rollback
+  that caused it.
+
+  The restore now passes `copyName`, naming the backup snapshot in this
+  plugin's own scheme, pointed at the volume it belongs to, with room for
+  the counter Unity appends when the name is taken on the second rollback.
+  The lifecycle fake now creates a backup snapshot on every restore the way
+  the array does, and the test proves the volume can still be deleted after
+  one rollback and after two.
+
+- **Unity: an EFI disk could not have been created.** PVE asks for genuinely
+  tiny volumes — an EFI disk and a TPM state are 4 MiB each — and Unisphere
+  refuses a LUN below its minimum, taking the whole `qm create` with it. A
+  request below 1 GiB is now rounded up to it: too generous wastes space on
+  a handful of tiny volumes, too small breaks the feature outright.
+
+### Verified in the test suite
+- The whole feature matrix PVE asks about, per volume kind: snapshot and
+  rename of a linked clone (whose volname starts with `base-` and is not
+  one), clone from a template, clone from a snapshot, template conversion,
+  copy, export as `raw+size`, and fsfreeze for containers. A wrong 'no' in
+  that table is invisible — the button simply is not there.
+
 ## [0.7.70~beta1] - 2026-08-05
 
 ### Fixed

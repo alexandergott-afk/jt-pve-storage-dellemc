@@ -416,6 +416,29 @@ sub _array_snapshot_list {
     return \@out;
 }
 
+# The backup snapshot a restore leaves behind gets OUR name.
+#
+# Unity creates one on every restore whether or not it was asked for. With a
+# name of the array's choosing it is invisible to the snapshot purge that has
+# to run before a volume can be deleted - and Unity refuses to delete a LUN
+# that still has snapshots, so the volume becomes undeletable from then on.
+#
+# The name has to survive decode_snapshot_name and point back at this volume,
+# because that is exactly what the purge matches on. Room is left at the end
+# for the counter Unity appends when the name is already taken, which it will
+# be on the second rollback of the same volume.
+sub _rollback_copy_name {
+    my ($class, $volume) = @_;
+
+    my $naming = $class->naming;
+    my $name = $naming->encode_snapshot_name($volume, 'rollback');
+
+    my $room = $naming->max_snapshot_name_length - 4;
+    $name = substr($name, 0, $room) if length($name) > $room;
+
+    return $name;
+}
+
 sub _array_snapshot_rollback {
     my ($class, $scfg, $storeid, $volume, $snapshot, %opts) = @_;
 
@@ -423,7 +446,8 @@ sub _array_snapshot_rollback {
     my $row = $api->snapshot_get_by_name($snapshot, %opts)
         or die "snapshot '$snapshot' is not on the array\n";
 
-    return $api->volume_restore($row->{id}, %opts);
+    return $api->volume_restore($row->{id},
+        copy_name => $class->_rollback_copy_name($volume), %opts);
 }
 
 # A linked clone is a THIN CLONE of a snapshot. The snapshot has to exist

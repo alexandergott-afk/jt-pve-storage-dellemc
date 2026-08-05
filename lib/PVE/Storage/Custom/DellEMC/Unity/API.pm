@@ -38,6 +38,13 @@ use constant {
 
     MAX_VOLUME_SIZE => 256 * 1024 ** 4,
 
+    # Unisphere refuses a LUN smaller than this. NOT VERIFIED on hardware,
+    # and deliberately rounded UP from what any reference suggests: the cost
+    # of being too big is wasted space on a tiny volume, the cost of being
+    # too small is that every EFI disk (4 MiB) and TPM state (4 MiB) fails to
+    # create at all - and with them the whole 'qm create' that asked.
+    MIN_VOLUME_SIZE => 1024 * 1024 * 1024,
+
     # Collections are paged from 1.
     PAGE_SIZE => 500,
     MAX_PAGES => 200,
@@ -435,6 +442,13 @@ sub align_size {
     my $unit = SIZE_GRANULARITY;
     my $aligned = int(($bytes + $unit - 1) / $unit) * $unit;
 
+    # A LUN below the array's minimum is refused outright, and PVE asks for
+    # genuinely tiny volumes: an EFI disk and a TPM state are 4 MiB each. The
+    # guest sees the size it asked for regardless - PVE reads the image size
+    # from its own metadata, and raw data at the start of a bigger device is
+    # still raw data.
+    $aligned = MIN_VOLUME_SIZE if $aligned < MIN_VOLUME_SIZE;
+
     return $aligned;
 }
 
@@ -640,18 +654,42 @@ sub snapshot_delete {
     return $self->delete("/instances/snap/$id", %opts);
 }
 
-# NOT VERIFIED. gounity does not restore a snapshot — a CSI driver has no
-# reason to — so this is the documented form and nothing more. It is the one
-# call here that could not be read out of Dell's own code, and it is also the
-# most destructive, so the plugin's rollback path checks that nothing on this
-# node is using the device before it is reached.
+# Restore a LUN to a snapshot.
+#
+# The endpoint is NOT VERIFIED: gounity does not restore a snapshot, because a
+# CSI driver has no reason to, so this is the documented action form and
+# nothing more. It is also the most destructive call here, which is why the
+# plugin's rollback path proves nothing on this node is using the device
+# before it can be reached.
+#
+# 'copyName' is not optional in any way that matters. Dell's own white paper:
+#
+#   "When restoring LUNs, the system automatically creates a backup snapshot
+#    associated with the current point-in-time which allows administrators to
+#    reverse this operation..."
+#
+# So every rollback leaves a snapshot behind whether or not one was asked
+# for. Left to the array, it gets a name of the array's choosing - which this
+# plugin's own snapshot purge does not recognise, and which the ownership
+# gate would refuse to delete even if it did. Unity then refuses to delete a
+# LUN that still has snapshots, and the volume becomes undeletable: `qm
+# destroy` fails from then on, days after the rollback that caused it, with
+# nothing pointing back at it.
+#
+# Naming it ourselves is what makes it ours to clean up.
 sub volume_restore {
     my ($self, $snap_id, %opts) = @_;
 
     die $self->_msg("restoring needs a snapshot id") . "\n"
         unless defined $snap_id && length $snap_id;
 
-    return $self->post("/instances/snap/$snap_id/action/restore", {}, %opts);
+    my $copy_name = delete $opts{copy_name};
+
+    my $body = {};
+    $body->{copyName} = $copy_name
+        if defined $copy_name && length $copy_name;
+
+    return $self->post("/instances/snap/$snap_id/action/restore", $body, %opts);
 }
 
 # A thin clone is taken FROM A SNAPSHOT, and it is the linked-clone

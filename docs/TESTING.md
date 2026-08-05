@@ -285,6 +285,9 @@ rather than ABSENT, and those are different answers.
 | The WWN to WWID conversion | device discovery does not work at all if it is wrong |
 | `POST /instances/snap/<id>/action/restore` | the one destructive call that is **not** in Dell's client, because a CSI driver never rolls back |
 | Whether the array rounds a LUN size up or down | this plugin rounds up to 8 KiB first, which makes the question harmless either way |
+| The minimum LUN size Unisphere accepts | assumed 1 GiB, rounded up from every reference found; a tiny volume (EFI disk, TPM state, 4 MiB each) is rounded up to it, so being too generous wastes space and being wrong the other way breaks `qm create` |
+| How many thin clones one base resource supports, and how many snapshots one LUN family carries | Dell's white paper suggests both are bounded (thin clones per base, snapshots per family); a template with more linked clones than the limit will be refused by the array. Not enforced client-side — the array's refusal is authoritative |
+| That `copyName` on a snap restore names the automatic backup snapshot | Dell's white paper documents that every restore creates one; if `copyName` is ignored, the backup gets an array-chosen name that the snapshot purge does not recognise, and the volume becomes undeletable. **Check for a snapshot named `<volume>.pve-snap-rollback*` after the first `qm rollback`** |
 | Whether an HLU can be pinned | nothing depends on it; Unity assigns them |
 
 ### Testing Unity without a Unity

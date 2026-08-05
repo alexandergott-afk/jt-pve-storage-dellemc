@@ -511,10 +511,23 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
     # gives a volume smaller than PVE asked for, which fills and then fails.
     my ($api) = make_api();
 
-    is($A->align_size(1), 8 * 1024, 'a byte becomes one allocation unit');
-    is($A->align_size(8 * 1024), 8 * 1024, 'an exact multiple is left alone');
-    is($A->align_size(8 * 1024 + 1), 16 * 1024, 'anything over rounds up');
+    # The 8 KiB granularity still governs sizes above the minimum; below it,
+    # the minimum wins - the array refuses a LUN smaller than it accepts.
+    my $min = 1024**3;
+    is($A->align_size(1), $min, 'a byte becomes the array minimum');
+    is($A->align_size($min + 1), $min + 8 * 1024,
+        'above the minimum, the 8 KiB granularity rounds up');
+    is($A->align_size($min + 8 * 1024), $min + 8 * 1024,
+        'and an exact multiple is left alone');
     is($A->align_size(4 * 1024**3), 4 * 1024**3, 'a whole number of GiB is already aligned');
+
+    # PVE asks for genuinely tiny volumes - an EFI disk and a TPM state are
+    # 4 MiB each - and a LUN below the array's minimum is refused outright,
+    # taking the whole 'qm create' with it. Rounding up costs space; failing
+    # costs the feature.
+    cmp_ok($A->align_size(4 * 1024 * 1024), '>=', 1024**3,
+        'a tiny volume is rounded up to the array minimum');
+    is($A->align_size(1024**3), 1024**3, 'the minimum itself is left alone');
 }
 
 # ---------------------------------------------------------------------------

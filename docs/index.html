@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.70~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.71~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.71~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Unity creates a backup snapshot on every restore whether asked or not; unnamed, it made the volume undeletable days after the rollback that caused it. It now gets this plugin's own name. And an EFI disk (4 MiB) is rounded up past the array's minimum LUN size, so 'qm create' survives.</span>
+            <span class="lang-zh">Unity 在每次 restore 時都會自動建立備份快照；沒有命名的話，磁碟區會在倒回的幾天後變得刪不掉。現在它會拿到本外掛自己的名稱。另外 EFI disk（4 MiB）會被向上補足到陣列的最小 LUN 容量，讓 qm create 得以成功。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.70~beta1</div>

@@ -247,6 +247,9 @@ help create host
 | WWN 轉 WWID 的換算 | 這一項錯了，裝置探索會完全無法運作 |
 | `POST /instances/snap/<id>/action/restore` | 唯一**不在** Dell 客戶端裡的破壞性呼叫，因為 CSI driver 從來不需要倒回 |
 | 陣列對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |
+| Unisphere 接受的最小 LUN 容量 | 假設為 1 GiB，比查到的任何參考值都再向上取；極小的磁碟區（EFI disk 與 TPM state，各 4 MiB）會被向上補到這個值 —— 取太大只是浪費空間，取太小則會讓 `qm create` 整個失敗 |
+| 一個 base resource 支援多少個精簡複製、一個 LUN family 能帶多少快照 | Dell 白皮書顯示兩者都有上限；連結複製數超過上限的範本會被陣列拒絕。用戶端不做強制 —— 陣列的拒絕才是權威 |
+| 快照 restore 的 `copyName` 是否真的為自動備份快照命名 | Dell 白皮書記載每次 restore 都會產生一個備份快照；若 `copyName` 被忽略，備份會拿到陣列自取的名稱，快照清理認不得它，磁碟區從此刪不掉。**第一次 `qm rollback` 之後，請檢查有沒有名為 `<磁碟區>.pve-snap-rollback*` 的快照** |
 | HLU 能不能指定 | 沒有任何東西依賴它；Unity 自行配發 |
 
 ### 沒有 Unity 也能測 Unity

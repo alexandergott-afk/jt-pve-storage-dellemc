@@ -200,7 +200,27 @@ sub lun_by_id {
         return 1;
     }
 
-    sub volume_restore { return 1 }
+    # Unity creates a backup snapshot on EVERY restore, whether or not one
+    # was asked for. This fake does the same, and honours copyName - which is
+    # the whole point: with a name of the array's choosing the snapshot is
+    # invisible to the purge, and the volume can never be deleted again.
+    sub volume_restore {
+        my ($self, $snap_id, %opts) = @_;
+
+        my $name = $opts{copy_name};
+        $name = "SNAP_" . main::next_id() unless defined $name && length $name;
+
+        # The array appends a counter when the name is taken.
+        my $unique = $name;
+        my $n = 1;
+        $unique = $name . $n++ while $SNAP{$unique};
+
+        my ($of) = grep { $SNAP{$_}{id} eq $snap_id } keys %SNAP;
+        $SNAP{$unique} = { id => main::next_id(),
+                           resource => $of ? $SNAP{$of}{resource} : undef,
+                           clones => {} };
+        return 1;
+    }
 
     sub volume_clone {
         my ($self, $resource_id, $snap_id, $name) = @_;
@@ -485,6 +505,39 @@ reset_array();
 
     ok(!eval { $P->volume_snapshot_rollback($scfg, $store, $volname, 'nosuch'); 1 },
         'and one to a snapshot that is not there fails rather than doing nothing');
+
+    # The array left a backup snapshot behind, as it always does.
+    my @extra = grep { /rollback/ } @{ snaps_on_array() };
+    is(scalar(@extra), 1, 'a restore leaves the array\'s backup snapshot behind');
+    like($extra[0], qr/^pve-u480-700-disk0\./,
+        '... under a name that points back at this volume, not the array\'s own');
+
+    # Which is the point: it has to be deletable, or the volume never is.
+    ok(eval { $P->free_image($store, $scfg, $volname); 1 },
+        'so the volume can still be deleted afterwards') or diag($@);
+    is_deeply(names_on_array(), [], 'and nothing is left behind');
+    is_deeply(snaps_on_array(), [], '... including the backup snapshot');
+}
+
+{
+    # Roll back twice. The array appends a counter the second time, and the
+    # name still has to decode back to this volume or the second backup
+    # snapshot is the one that makes the volume undeletable.
+    reset_array();
+
+    my $volname = $P->alloc_image($store, $scfg, 701, 'raw', undef, 4 * 1024 * 1024);
+    $P->volume_snapshot($scfg, $store, $volname, 'good');
+
+    $P->volume_snapshot_rollback($scfg, $store, $volname, 'good');
+    $P->volume_snapshot_rollback($scfg, $store, $volname, 'good');
+
+    my @extra = sort grep { /rollback/ } @{ snaps_on_array() };
+    is(scalar(@extra), 2, 'two rollbacks leave two backup snapshots');
+    isnt($extra[0], $extra[1], '... with different names');
+
+    ok(eval { $P->free_image($store, $scfg, $volname); 1 },
+        'and the volume is still deletable') or diag($@);
+    is_deeply(snaps_on_array(), [], 'with every snapshot gone');
 }
 
 # ---------------------------------------------------------------------------
@@ -503,6 +556,55 @@ reset_array();
                       $N->encode_volume_name('u480', 999999999, 15), 'a' x 40)) {
         cmp_ok(length($name), '<=', 63, "'$name' fits");
     }
+}
+
+# ---------------------------------------------------------------------------
+# The whole feature matrix PVE will ask about
+#
+# A feature this table answers 'no' to simply disappears from the UI, so a
+# wrong 'no' is invisible: nothing fails, the button is just not there.
+# ---------------------------------------------------------------------------
+
+{
+    my $scfg2 = { %$scfg };
+    for my $case (
+        ['snapshot', 'vm-100-disk-0', undef,  1, 'snapshot of a disk'],
+        ['snapshot', 'base-100-disk-0/vm-101-disk-0', undef, 1,
+            'snapshot of a LINKED CLONE - the volname starts with base- and is not one'],
+        ['clone',    'base-100-disk-0', undef, 1, 'linked clone of a template'],
+        ['clone',    'vm-100-disk-0', 'snap1', 1, 'clone from a snapshot'],
+        ['template', 'vm-100-disk-0', undef,  1, 'converting to a template'],
+        ['rename',   'vm-100-disk-0', undef,  1, 'reassigning a disk'],
+        ['copy',     'vm-100-disk-0', undef,  1, 'full copy'],
+    ) {
+        my ($feature, $volname, $snap, $want, $why) = @$case;
+        is($P->volume_has_feature($scfg2, $feature, $store, $volname, $snap, 0) ? 1 : 0,
+            $want, $why);
+    }
+
+    is($P->volume_snapshot_needs_fsfreeze(), 1,
+        'a container filesystem is frozen while the array snapshots under it');
+    is_deeply([$P->volume_export_formats($scfg2, $store, 'vm-100-disk-0', undef, undef, 0)],
+        ['raw+size'], 'disks can leave for another storage type');
+}
+
+# ---------------------------------------------------------------------------
+# A tiny volume is still a volume
+#
+# An EFI disk is 4 MiB. The array refuses a LUN below its minimum, so the
+# create rounds up - and the whole 'qm create --efidisk0' lives or dies on it.
+# ---------------------------------------------------------------------------
+
+{
+    reset_array();
+
+    my $volname = $P->alloc_image($store, $scfg, 800, 'raw', undef, 4 * 1024);  # 4 MiB in KiB
+    ok($volname, 'an EFI-disk-sized allocation succeeds');
+    my ($size) = $P->volume_size_info($scfg, $store, $volname);
+    cmp_ok($size, '>=', 4 * 1024 * 1024, '... and the guest gets at least what it asked for');
+
+    $P->free_image($store, $scfg, $volname);
+    is_deeply(names_on_array(), [], 'and it deletes like any other volume');
 }
 
 done_testing();

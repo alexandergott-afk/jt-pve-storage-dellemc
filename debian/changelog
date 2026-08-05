@@ -1,3 +1,29 @@
+jt-pve-storage-dellemc (0.7.71~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: every rollback would eventually have made the volume undeletable.
+    Dell's white paper is explicit that a restore automatically creates a
+    backup snapshot, whether or not one was asked for. Left to the array it
+    gets a name the snapshot purge does not recognise and the ownership gate
+    refuses to touch; Unity then refuses to delete a LUN that still has
+    snapshots, so from the first qm rollback on, qm destroy fails - days
+    later, with nothing pointing back at the cause. The restore now passes
+    copyName, naming the backup in this plugin's own scheme with room for
+    the counter Unity appends on the second rollback. The lifecycle fake
+    creates a backup snapshot on every restore the way the array does, and
+    the tests prove the volume deletes after one rollback and after two.
+  * UNITY: an EFI disk could not have been created. PVE asks for 4 MiB
+    volumes (EFI disk, TPM state) and Unisphere refuses a LUN below its
+    minimum, taking the whole qm create with it. Requests below 1 GiB are
+    rounded up.
+  * UNITY: the whole PVE feature matrix is now asserted per volume kind -
+    snapshot and rename of a linked clone, clone from template and from
+    snapshot, template conversion, copy, raw+size export, container
+    fsfreeze. A wrong 'no' there is invisible: the button simply is not
+    there.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 01:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.70~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.
