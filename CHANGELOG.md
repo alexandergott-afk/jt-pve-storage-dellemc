@@ -7,6 +7,31 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.74~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: the rollback backup snapshot from 0.7.71 carried two traps of its
+  own.** Found by continuing to hunt, three releases after the feature
+  shipped.
+
+  First, the backup is always the newest snapshot on the volume, and it was
+  visible to PVE — so `volume_rollback_is_possible` refused every **second**
+  rollback with "not the most recent snapshot", blocking the very operation
+  the backup exists to protect. The backups are now filtered from what PVE
+  sees; the purge that runs before a volume delete does not come through
+  that path, so hiding them orphans nothing.
+
+  Second, the backup's snapshot name was `rollback` — a name a PVE user can
+  type. A user snapshot called `rollback` would have collided with it, and
+  the cleanup would have deleted the user's snapshot. The name is now
+  `pve.rollback`, with a dot: **PVE forbids dots in snapshot names**, so no
+  user snapshot can ever be named this. The test creates a user snapshot
+  actually called `rollback`, rolls back twice, and asserts it survives.
+
+  And the backups no longer accumulate: the previous one is removed before
+  each restore, so one safety net exists instead of one per rollback holding
+  space forever, invisible to PVE.
+
 ## [0.7.73~beta1] - 2026-08-06
 
 ### Fixed

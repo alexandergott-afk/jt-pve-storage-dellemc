@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.74~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: the rollback backup snapshot from 0.7.71 carried two traps of its
+    own. Being the newest snapshot on the volume and visible to PVE, it made
+    volume_rollback_is_possible refuse every SECOND rollback with "not the
+    most recent snapshot" - blocking the operation it exists to protect. And
+    its snapshot name was 'rollback', a name a PVE user can type; a user
+    snapshot by that name would have been deleted by the cleanup. The
+    backups are now filtered from what PVE sees (the purge does not come
+    through that path, so nothing is orphaned), named 'pve.rollback' with a
+    dot PVE forbids in snapshot names so no user can ever collide, and
+    capped at one - the previous backup is removed before each restore
+    instead of accumulating invisibly forever. The test creates a user
+    snapshot actually called 'rollback', rolls back twice, and asserts it
+    survives; reverting the fix fails four tests.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 04:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.73~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

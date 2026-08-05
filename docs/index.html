@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.73~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.74~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.74~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The rollback backup snapshot carried two traps of its own: being the newest, it blocked every second rollback; and its name was one a user could type, putting their snapshot in the cleanup's path. Now hidden from PVE, named with a dot no user can type, and capped at one.</span>
+            <span class="lang-zh">倒回的備份快照自己帶著兩個陷阱：它永遠最新，因此擋住每一次第二次倒回；而它的名字使用者打得出來，使用者的快照會落入清理範圍。現在它對 PVE 隱藏、改用使用者打不出來的帶點名稱，且永遠只保留一份。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.73~beta1</div>

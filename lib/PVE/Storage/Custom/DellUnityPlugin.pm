@@ -498,27 +498,47 @@ sub _array_snapshot_list {
     return \@out;
 }
 
-# The backup snapshot a restore leaves behind gets OUR name.
+# The backup snapshot a restore leaves behind gets OUR name — and a name no
+# user can collide with.
 #
 # Unity creates one on every restore whether or not it was asked for. With a
 # name of the array's choosing it is invisible to the snapshot purge that has
 # to run before a volume can be deleted - and Unity refuses to delete a LUN
 # that still has snapshots, so the volume becomes undeletable from then on.
 #
-# The name has to survive decode_snapshot_name and point back at this volume,
-# because that is exactly what the purge matches on. Room is left at the end
-# for the counter Unity appends when the name is already taken, which it will
-# be on the second rollback of the same volume.
+# The name has to satisfy three parties at once:
+#   - the PURGE: it must decode back to this volume, or a volume delete
+#     leaves it behind;
+#   - the USER: it must be a snapname no PVE user can ever have chosen. PVE
+#     forbids '.' in a snapshot name, so 'pve.rollback' is out of their
+#     reach - an earlier draft used 'rollback', which a user can type, and
+#     the cleanup below would then have deleted their snapshot;
+#   - the ROLLBACK GUARD: volume_snapshot_list filters it out (below), or
+#     the backup - always the newest snapshot - would make every SECOND
+#     rollback refuse with "not the most recent snapshot".
+#
+# Room is left for the counter Unity appends when the name is taken.
+use constant ROLLBACK_SNAPNAME => 'pve.rollback';
+
 sub _rollback_copy_name {
     my ($class, $volume) = @_;
 
     my $naming = $class->naming;
-    my $name = $naming->encode_snapshot_name($volume, 'rollback');
+    my $name = $volume
+        . PVE::Storage::Custom::DellEMC::Common::Naming::SNAPSHOT_INFIX
+        . ROLLBACK_SNAPNAME;
 
     my $room = $naming->max_snapshot_name_length - 4;
     $name = substr($name, 0, $room) if length($name) > $room;
 
     return $name;
+}
+
+sub _is_rollback_backup {
+    my ($class, $snapname) = @_;
+
+    return 0 unless defined $snapname;
+    return index($snapname, ROLLBACK_SNAPNAME) == 0 ? 1 : 0;
 }
 
 sub _array_snapshot_rollback {
@@ -528,8 +548,36 @@ sub _array_snapshot_rollback {
     my $row = $api->snapshot_get_by_name($snapshot, %opts)
         or die "snapshot '$snapshot' is not on the array\n";
 
+    # One safety-net backup is enough. Without this they accumulate one per
+    # rollback, each holding space, none visible to PVE, all of them only
+    # ever cleaned when the volume itself is deleted. The dot in the name is
+    # what makes this delete safe: no user snapshot can be named this.
+    my $existing = eval { $api->snapshot_list(%opts) } // [];
+    for my $old (@$existing) {
+        my $name = $old->{name} // next;
+        my $decoded = $class->naming->decode_snapshot_name($name) or next;
+        next unless ($decoded->{volume} // '') eq $volume;
+        next unless $class->_is_rollback_backup($decoded->{snapname});
+
+        eval { $api->snapshot_delete($old->{id}, %opts) };
+        warn "Could not remove the previous rollback backup '$name': $@" if $@;
+    }
+
     return $api->volume_restore($row->{id},
         copy_name => $class->_rollback_copy_name($volume), %opts);
+}
+
+# The rollback backups stay out of PVE's sight. They are not restore points
+# PVE knows about, and being the newest snapshot on the volume they would
+# otherwise make volume_rollback_is_possible refuse every second rollback.
+# The PURGE does not come through here - it walks _array_snapshot_list
+# directly - so hiding them from PVE does not orphan them.
+sub volume_snapshot_list {
+    my ($class, $scfg, $storeid, $volname) = @_;
+
+    my $snapshots = $class->SUPER::volume_snapshot_list($scfg, $storeid, $volname);
+
+    return [ grep { !$class->_is_rollback_backup($_->{name}) } @$snapshots ];
 }
 
 # A linked clone is a THIN CLONE of a snapshot. The snapshot has to exist

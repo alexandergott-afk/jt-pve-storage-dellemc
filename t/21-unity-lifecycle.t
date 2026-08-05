@@ -529,8 +529,23 @@ reset_array();
     # The array left a backup snapshot behind, as it always does.
     my @extra = grep { /rollback/ } @{ snaps_on_array() };
     is(scalar(@extra), 1, 'a restore leaves the array\'s backup snapshot behind');
-    like($extra[0], qr/^pve-u480-700-disk0\./,
-        '... under a name that points back at this volume, not the array\'s own');
+    like($extra[0], qr/^pve-u480-700-disk0\.pve-snap-pve\.rollback/,
+        '... under a name that points back at this volume, with a dot no PVE'
+      . ' user can type');
+
+    # Invisible to PVE: not a restore point it knows about, and being the
+    # newest it would otherwise block every second rollback.
+    my $visible = $P->volume_snapshot_list($scfg, $store, $volname);
+    ok(!grep({ $_->{name} =~ /rollback/ } @$visible),
+        'the backup snapshot is filtered from what PVE sees');
+    ok(grep({ $_->{name} eq 'good' } @$visible),
+        '... while the user\'s own snapshots still show');
+
+    # And precisely because it is invisible, a SECOND rollback must not be
+    # blocked by it.
+    ok(eval { $P->volume_rollback_is_possible($scfg, $store, $volname, 'good'); 1 },
+        'a second rollback is still possible with the backup present')
+        or diag($@);
 
     # Which is the point: it has to be deletable, or the volume never is.
     ok(eval { $P->free_image($store, $scfg, $volname); 1 },
@@ -551,9 +566,10 @@ reset_array();
     $P->volume_snapshot_rollback($scfg, $store, $volname, 'good');
     $P->volume_snapshot_rollback($scfg, $store, $volname, 'good');
 
+    # The previous backup is removed before each restore: one safety net,
+    # not one per rollback quietly holding space forever.
     my @extra = sort grep { /rollback/ } @{ snaps_on_array() };
-    is(scalar(@extra), 2, 'two rollbacks leave two backup snapshots');
-    isnt($extra[0], $extra[1], '... with different names');
+    is(scalar(@extra), 1, 'two rollbacks leave ONE backup snapshot, not two');
 
     ok(eval { $P->free_image($store, $scfg, $volname); 1 },
         'and the volume is still deletable') or diag($@);
@@ -679,6 +695,33 @@ reset_array();
     ok(!eval { $P->_array_snapshot_delete($scfg, $store,
             'pve-u480-902-disk0.pve-snap-stuck'); 1 },
         'a snapshot the listing still carries is not reported deleted');
+}
+
+# ---------------------------------------------------------------------------
+# A user snapshot named 'rollback' is not ours to touch
+#
+# An earlier draft named the backup '<vol>.pve-snap-rollback' - a snapname a
+# user can type. The cleanup before each restore would then have deleted
+# their snapshot. The dot in 'pve.rollback' is the fence: PVE forbids dots
+# in snapshot names.
+# ---------------------------------------------------------------------------
+
+{
+    reset_array();
+
+    my $volname = $P->alloc_image($store, $scfg, 903, 'raw', undef, 4 * 1024 * 1024);
+    $P->volume_snapshot($scfg, $store, $volname, 'rollback');   # a USER's name
+    $P->volume_snapshot($scfg, $store, $volname, 'later');
+
+    $P->volume_snapshot_rollback($scfg, $store, $volname, 'later');
+    $P->volume_snapshot_rollback($scfg, $store, $volname, 'later');
+
+    my $visible = $P->volume_snapshot_list($scfg, $store, $volname);
+    ok(grep({ $_->{name} eq 'rollback' } @$visible),
+        "a user's snapshot that HAPPENS to be called 'rollback' survives both rollbacks");
+
+    ok($P->volume_snapshot_delete($scfg, $store, $volname, 'rollback'),
+        '... and the user can still delete it themselves');
 }
 
 done_testing();
