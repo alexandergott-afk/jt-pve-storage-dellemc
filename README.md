@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.66~beta1). One array has run it**, and only
+> **This is a beta release (0.7.67~beta1). One array has run it**, and only
 > one: a PowerVault ME4024 on firmware `GT280R011-01` over Fibre Channel,
 > which as of 0.7.65 passes the whole of the first-run test. **Everything
 > else is still unverified against hardware** — PowerStore and PowerFlex
@@ -37,7 +37,7 @@ all operate on a single VM disk as their natural unit.
 
 ## Project status
 
-> **Version 0.7.66~beta1 — three storage types are code complete, and
+> **Version 0.7.67~beta1 — three storage types are code complete, and
 > has NOT been run against a PowerStore array.**
 > Every array-facing detail — REST paths and field names, the SCSI vendor and
 > product strings, the WWN to WWID conversion — is still unverified, so this

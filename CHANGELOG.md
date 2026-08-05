@@ -7,6 +7,38 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.67~beta1] - 2026-08-05
+
+### Changed
+- **The newest release is now the one people find.** GitHub will not call a
+  prerelease "Latest", so marking every 0.x one left the green badge on
+  whatever old release happened not to be marked — for a while that was
+  v0.7.49, three weeks and twenty releases behind, and that is what a first
+  visitor saw as current. A stale build presented as the newest is a worse
+  signal than a missing badge. Releases are no longer marked prerelease and
+  the newest is set as latest explicitly.
+
+  Nothing is lost by this: the release body opens with the beta warning, the
+  README opens with it, and the version number says beta on its own.
+
+- **The install URL no longer goes stale.** Every release now carries a copy
+  of the package under a name that does not change, so the documented command
+  is right forever and never has to be edited:
+
+  ```bash
+  curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
+  ```
+
+  GitHub resolves `latest` but not the file name, and every real file name has
+  the version in it — so without this, every document naming a download URL
+  went stale the moment a release was cut and somebody would follow it to an
+  old build. The version is inside the package where `apt` and `dpkg` read it;
+  `dpkg-deb -f ... Version` says which one was fetched.
+
+  The versioned copy stays, because that is the name a bug report should
+  quote. `SHA256SUMS` lists both, which is why the verify step now passes
+  `--ignore-missing`.
+
 ## [0.7.66~beta1] - 2026-08-05
 
 ### Fixed

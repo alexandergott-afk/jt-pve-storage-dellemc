@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.67~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * The newest release is now the one people find. GitHub will not call a
+    prerelease "Latest", so marking every 0.x one left the green badge on
+    whatever old release happened not to be marked - for a while that was
+    v0.7.49, three weeks and twenty releases behind, and that is what a first
+    visitor saw as current. Releases are no longer marked prerelease and the
+    newest is set as latest explicitly. The beta warning is not lost: the
+    release body opens with it, the README opens with it, and the version
+    number says beta on its own.
+  * The install URL no longer goes stale. Every release now carries a copy of
+    the package under a name that does not change, so the documented command
+    is right forever:
+      .../releases/latest/download/jt-pve-storage-dellemc_all.deb
+    GitHub resolves 'latest' but not the file name, and every real file name
+    has the version in it. The version is inside the package where apt and
+    dpkg read it; 'dpkg-deb -f ... Version' says which one was fetched. The
+    versioned copy stays, because that is the name a bug report should quote,
+    and SHA256SUMS lists both - hence --ignore-missing in the verify step.
+
+ -- Jason Cheng <jason@jason.tools>  Wed, 05 Aug 2026 22:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.66~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.
