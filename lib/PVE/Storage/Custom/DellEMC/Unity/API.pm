@@ -440,11 +440,25 @@ sub volume_create {
     my $data = $self->post('/types/storageResource/action/createLun',
         $body, %opts);
 
-    # The answer carries the storageResource id, which is the LUN's id.
+    # The answer normally carries the storageResource id, which is the LUN's.
     my $content = $self->_content($data) // {};
     my $id = $self->_ref_id($content->{storageResource}) // $content->{id};
+    return $id if defined $id && length $id;
 
-    return $id;
+    # It did not. Found by driving this client against a Unity API emulator,
+    # which answers the create with 204 and no body at all - and a real array
+    # under some firmware may do the same, or answer asynchronously with a
+    # job. Returning undef here would be the worst of both: the volume exists
+    # and the caller has no handle to it, so the next thing it does is create
+    # a second one.
+    #
+    # The name is known, and a lookup by it answers the question directly.
+    my $row = $self->volume_get_by_name($name, %opts);
+    return $row->{id} if $row && defined $row->{id} && length $row->{id};
+
+    die $self->_msg("the array accepted the create for volume '$name' but"
+        . " neither returned its id nor reports it by name. The volume may"
+        . " exist; check the array before retrying.") . "\n";
 }
 
 sub volume_delete {
@@ -518,8 +532,14 @@ sub snapshot_create {
     }, %opts);
 
     my $content = $self->_content($data) // {};
+    my $id = $content->{id};
+    return $id if defined $id && length $id;
 
-    return $content->{id};
+    my $row = $self->snapshot_get_by_name($name, %opts);
+    return $row->{id} if $row && defined $row->{id} && length $row->{id};
+
+    die $self->_msg("the array accepted the snapshot '$name' but neither"
+        . " returned its id nor reports it by name") . "\n";
 }
 
 sub snapshot_get_by_name {
@@ -569,8 +589,16 @@ sub volume_clone {
         { snap => { id => $snap_id }, name => $name }, %opts);
 
     my $content = $self->_content($data) // {};
+    my $id = $self->_ref_id($content->{storageResource}) // $content->{id};
+    return $id if defined $id && length $id;
 
-    return $self->_ref_id($content->{storageResource}) // $content->{id};
+    # Same as volume_create: an answer with no id is not a failure, but it is
+    # not a handle either.
+    my $row = $self->volume_get_by_name($name, %opts);
+    return $row->{id} if $row && defined $row->{id} && length $row->{id};
+
+    die $self->_msg("the array accepted the clone into '$name' but neither"
+        . " returned its id nor reports it by name") . "\n";
 }
 
 # ---------------------------------------------------------------------------

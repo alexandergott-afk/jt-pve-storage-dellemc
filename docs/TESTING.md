@@ -287,6 +287,35 @@ rather than ABSENT, and those are different answers.
 | Whether the array rounds a LUN size up or down | this plugin rounds up to 8 KiB first, which makes the question harmless either way |
 | Whether an HLU can be pinned | nothing depends on it; Unity assigns them |
 
+### Testing Unity without a Unity
+
+`github.com/mackayd/Unity-API-Emulator` is a single Python file that speaks
+Unity's REST envelope: the `entries`/`content` shapes, `?fields=`, filtering,
+pagination, `name:` lookups, and the two authentication rules — it answers
+**302** when `X-EMC-REST-CLIENT` is missing and **403** when a write arrives
+without `EMC-CSRF-TOKEN`.
+
+```bash
+git clone https://github.com/mackayd/Unity-API-Emulator
+python3 Unity_RestAPI_Emulator.py --port 18443 \
+    --username admin --password 'Password123!' \
+    --strict-auth --require-csrf --quiet
+```
+
+Then point a storage at `127.0.0.1:18443` with `dell-ssl-verify 0`.
+
+**It is not a Dell product and does not emulate storage behaviour.** It
+cannot tell you whether a delete really deletes, whether a WWID matches a
+device, or whether a mapping reaches a host. What it can do is exercise the
+transport, the authentication, the response shapes and the request bodies
+over real HTTP, which nothing else here can do before hardware.
+
+It has already been worth it: the emulator answers `createLun` with 204 and
+no body, and that made `volume_create` return `undef` in silence. A real
+array may do the same under some firmware, or answer asynchronously with a
+job. Every create now falls back to a lookup by the name it just used, and
+fails loudly if even that cannot answer.
+
 ### PowerStore (from the 4.x REST documentation)
 
 Some of the request shape *was* read from the Dell PowerStore REST API

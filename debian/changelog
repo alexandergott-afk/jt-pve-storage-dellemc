@@ -1,3 +1,25 @@
+jt-pve-storage-dellemc (0.7.69~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: a create that returned no id returned undef, in silence. Found by
+    driving the client against a Unity REST API emulator, which answers
+    createLun with 204 and no body; a real array may do the same under some
+    firmware, or answer asynchronously with a job. Returning undef is the
+    worst of both outcomes - the volume exists and the caller has no handle
+    to it, so the next thing it does is create a second one on top of the
+    first. Every create, clone and snapshot now falls back to a lookup by the
+    name it just used, and fails loudly if even that cannot answer.
+  * Added a way to exercise a family's client over real HTTP before hardware:
+    github.com/mackayd/Unity-API-Emulator, one Python file that speaks
+    Unity's envelope, enforces X-EMC-REST-CLIENT with a 302 and
+    EMC-CSRF-TOKEN with a 403, and answers name: lookups. It is not a Dell
+    product and does not emulate storage behaviour, so it proves nothing
+    about whether a delete deletes - but it independently confirmed three
+    things this client was written to expect, and found the defect above.
+    docs/TESTING.md says how to run it and what it cannot tell you.
+
+ -- Jason Cheng <jason@jason.tools>  Wed, 05 Aug 2026 23:59:00 +0800
+
 jt-pve-storage-dellemc (0.7.68~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

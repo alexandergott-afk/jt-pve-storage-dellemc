@@ -330,6 +330,47 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
 }
 
 {
+    # An emulator answers createLun with 204 and no body, and a real array
+    # under some firmware may do the same or answer with a job. Returning
+    # undef would be the worst of both: the volume exists and the caller has
+    # no handle to it, so the next thing it does is create a second one.
+    my $created = 0;
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(content({ id => 'pool_1', name => 'A',
+                               sizeTotal => 10**12, sizeFree => 10**12 }))
+            if $path =~ m{/instances/pool/name:};
+        if ($path =~ m{action/createLun}) { $created = 1; return reply({}, 204) }
+        return reply(content({ id => 'sv_9', name => 'pve-u480-100-disk0' }))
+            if $created && $path =~ m{/instances/lun/name:};
+        return reply(content({}));
+    });
+
+    my $id = $api->volume_create('pve-u480-100-disk0', 4 * 1024**3, pool => 'A');
+    is($id, 'sv_9', 'a create that returns no id is resolved by looking the name up');
+}
+
+{
+    # And when even that cannot answer, it dies rather than handing back
+    # undef - the volume may exist, and a silent undef is how a second one
+    # gets created on top of it.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(content({ id => 'pool_1', name => 'A',
+                               sizeTotal => 10**12, sizeFree => 10**12 }))
+            if $path =~ m{/instances/pool/name:};
+        return reply({}, 204) if $path =~ m{action/createLun};
+        return reply({ error => { messages => ['not found'] } }, 404)
+            if $path =~ m{/instances/lun/name:};
+        return reply(content({}));
+    });
+
+    ok(!eval { $api->volume_create('pve-u480-100-disk0', 4 * 1024**3, pool => 'A'); 1 },
+        'a create whose result cannot be established is an error, not undef');
+    like($@, qr/may exist/, '... and says the volume may be there');
+}
+
+{
     # Fields are opt-in on this API, so a pool that comes back as an empty
     # shell looks exactly like one that was found. Sending the create anyway
     # would put a null where the pool goes, and the array's refusal would not

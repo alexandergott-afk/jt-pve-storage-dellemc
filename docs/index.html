@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.68~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.69~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.69~beta1</div>
+        <div class="changelog-date">2026-08-05</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Driving the Unity client against a REST API emulator found a create that returned undef in silence when the array answered with no body — the volume exists and nothing points at it, which is how a second one gets created on top. Every create now resolves itself by name or fails loudly.</span>
+            <span class="lang-zh">把 Unity 客戶端接上一個 REST API 模擬器，找出了一個「陣列回應沒有內容時就靜靜回傳 undef」的建立動作 —— 磁碟區存在、卻沒有任何東西指向它，而那正是第二顆被建在第一顆之上的原因。現在每個建立動作都會以名稱自行確認，否則大聲失敗。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.68~beta1</div>

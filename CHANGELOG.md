@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.69~beta1] - 2026-08-05
+
+### Fixed
+- **Unity: a create that returned no id returned `undef`, in silence.** Found
+  by driving the client against a Unity REST API emulator, which answers
+  `createLun` with **204 and no body**. A real array may do the same under
+  some firmware, or answer asynchronously with a job.
+
+  Returning `undef` there is the worst of both outcomes: the volume exists,
+  and the caller has no handle to it — so the next thing it does is create a
+  second one on top of the first. Every create, clone and snapshot now falls
+  back to a lookup by the name it just used, and fails loudly if even that
+  cannot answer, saying that the object may exist and to check the array
+  before retrying.
+
+### Added
+- **A way to exercise a family's client over real HTTP before hardware.**
+  `github.com/mackayd/Unity-API-Emulator` is one Python file that speaks
+  Unity's envelope, enforces `X-EMC-REST-CLIENT` with a 302 and
+  `EMC-CSRF-TOKEN` with a 403, and answers `name:` lookups. It is not a Dell
+  product and does not emulate storage behaviour — it proves nothing about
+  whether a delete deletes — but it independently confirmed three things this
+  client was written to expect, and found the defect above.
+
+  `docs/TESTING.md` says how to run it and, as importantly, what it cannot
+  tell you.
+
 ## [0.7.68~beta1] - 2026-08-05
 
 ### Added

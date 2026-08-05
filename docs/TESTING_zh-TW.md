@@ -249,6 +249,31 @@ help create host
 | 陣列對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |
 | HLU 能不能指定 | 沒有任何東西依賴它；Unity 自行配發 |
 
+### 沒有 Unity 也能測 Unity
+
+`github.com/mackayd/Unity-API-Emulator` 是一個單一 Python 檔，它會說 Unity 的
+REST 信封格式：`entries`／`content` 兩種形狀、`?fields=`、篩選、分頁、`name:`
+查詢，以及兩條認證規則 —— 缺少 `X-EMC-REST-CLIENT` 時回 **302**，寫入時缺少
+`EMC-CSRF-TOKEN` 則回 **403**。
+
+```bash
+git clone https://github.com/mackayd/Unity-API-Emulator
+python3 Unity_RestAPI_Emulator.py --port 18443 \
+    --username admin --password 'Password123!' \
+    --strict-auth --require-csrf --quiet
+```
+
+然後把儲存指向 `127.0.0.1:18443`，並設定 `dell-ssl-verify 0`。
+
+**它不是 Dell 的產品，也不會模擬儲存行為。** 它無法告訴你刪除是否真的刪掉了、
+WWID 是否對得上一顆裝置、對應是否真的送達主機。它能做的是在**真實 HTTP** 上
+驗證傳輸層、認證、回應形狀與請求內容 —— 而在有硬體之前，這裡沒有其他東西做得到。
+
+它已經證明了自己的價值：這個模擬器對 `createLun` 回的是 204 且沒有內容，而那讓
+`volume_create` 靜靜回傳了 `undef`。某些韌體的真實陣列可能也是如此，或以非同步
+job 回應。現在每一個建立動作都會退回「用剛才那個名稱查一次」，而如果連那樣都無法
+回答，就會大聲失敗。
+
 ### PowerStore（出自 4.x REST 文件）
 
 請求的形狀有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：
