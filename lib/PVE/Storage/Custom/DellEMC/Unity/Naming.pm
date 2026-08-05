@@ -11,22 +11,29 @@ use base qw(PVE::Storage::Custom::DellEMC::Common::Naming);
 
 # Unity's own limits.
 #
-# NOT VERIFIED ON HARDWARE: Dell documents a LUN name as up to 85 characters.
-# The value is read from documentation, not from an array, and a name the
-# array quietly truncates is worse than one it rejects — a truncated name
-# still looks like it worked until two volumes collide. Confirm on the first
-# run against a Unity 480 and record the result in docs/TESTING.md.
+# 63, from Dell's own code rather than from prose: `gounity`, the client
+# Dell's CSI driver uses against Unity, carries
 #
-# 85 is used rather than the inherited 63 because the storeid, the vmid, the
-# object kind and a snapshot name all have to fit alongside each other, and
-# this project has already had to shorten a snapshot name on PowerVault's 32.
-sub max_volume_name_length   { 85 }
-sub max_snapshot_name_length { 85 }
-sub max_host_name_length     { 85 }
+#     LunNameMaxLength = 63
+#     if len(name) > LunNameMaxLength {
+#         return ..., fmt.Errorf("lun name %s should not exceed 63 characters")
+#     }
+#
+# and refuses the request before it reaches the array. An earlier draft of
+# this file said 85, read from a documentation page about Unisphere; the
+# number that matters is the one Dell's own client enforces, because it is
+# the one derived from what the array does. Filesystems have the same 63.
+#
+# This is also exactly the inherited default, so nothing here widens the
+# shared limit — it records where the number comes from.
+sub max_volume_name_length   { 63 }
+sub max_snapshot_name_length { 63 }
+sub max_host_name_length     { 63 }
 
-# The storeid's share of a volume name. Wider than the default because the
-# names are longer here, but still bounded.
-sub max_storeid_length { 32 }
+# The storeid's share of a volume name. The whole name is 63, and the vmid,
+# the object kind and a snapshot name all have to fit alongside it, so this
+# stays at the shared default rather than being widened to match PowerStore's.
+sub max_storeid_length { 24 }
 
 # The inherited character rule stays narrower than what Unity accepts: '.'
 # separates a volume from its snapshot suffix in this plugin's own naming

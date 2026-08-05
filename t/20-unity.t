@@ -1,10 +1,9 @@
 #!/usr/bin/perl
 # Unity XT naming.
 #
-# The API client is not written yet. What this file protects is the part that
-# can be checked without an array at all: that Unity's wider name limit does
-# not weaken the ownership gate, and that the limit is read from the subclass
-# rather than resolved in the parent package.
+# What this file protects is the part that can be checked without an array at
+# all: that the ownership gate holds, and that the name limit is read from the
+# subclass rather than resolved in the parent package.
 #
 # That second one is not hypothetical. PowerFlex inherited PowerVault's naming
 # and enforced PowerVault's 31-character limit, because the inherited methods
@@ -29,7 +28,11 @@ my $V = 'PVE::Storage::Custom::DellEMC::PowerVault::Naming';
 # The limit belongs to this class
 # ---------------------------------------------------------------------------
 
-is($U->max_volume_name_length, 85, 'Unity documents 85 characters');
+# 63 comes from Dell's own gounity client, which refuses a longer name before
+# it reaches the array. An earlier draft of this file said 85, read off a
+# Unisphere documentation page; the number that matters is the one Dell's own
+# code enforces.
+is($U->max_volume_name_length, 63, "Dell's own client enforces 63");
 isnt($U->max_volume_name_length, $V->max_volume_name_length,
     '... which is not the limit another family happens to have');
 
@@ -67,8 +70,9 @@ for my $name ($U->encode_cloudinit_name('u480', 100),
 # The ownership gate
 #
 # This is what stands between the plugin and deleting somebody's production
-# LUN, so a wider name limit must not widen what it accepts. The two-argument
-# form with the storeid is the only one that authorises anything.
+# LUN. The two-argument form with the storeid is the only one that authorises
+# anything: the one-argument form proves only that a name looks like some PVE
+# plugin's, which does not make it this storage's to delete.
 # ---------------------------------------------------------------------------
 
 ok($U->is_pve_managed_volume($vol, 'u480'),
@@ -98,11 +102,11 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
 # ---------------------------------------------------------------------------
 
 {
-    # PVE allows a 40-character snapshot name; a whole Unity name is 85, so
-    # unlike PowerVault this should never need shortening. If it ever does,
-    # the volume half must still be exact — an approximate volume name points
-    # at the wrong object.
-    my $long = 'a' x 40;
+    # PVE allows a 40-character snapshot name and a whole Unity name is 63, so
+    # a long one has to be shortened. When that happens the VOLUME half must
+    # still be exact — an approximate volume name points at the wrong object,
+    # and only the snapshot half may ever be a prefix.
+    my $long = 'a' x 40;   # PVE's own maximum for a snapshot name
     my $snap = eval { $U->encode_snapshot_name($vol, $long) };
     ok(defined $snap, 'a 40-character snapshot name is accepted') or diag($@);
     like($snap, qr/^\Q$vol\E\./, '... with the volume half exact');
