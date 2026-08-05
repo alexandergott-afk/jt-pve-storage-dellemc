@@ -114,6 +114,19 @@ jobs:
             cp "$f" "$(basename "$f" | tr '~' '.')"
           done
 
+          # A second copy under a name that never changes, so the install
+          # instructions can carry one URL that is right forever:
+          #
+          #   .../releases/latest/download/jt-pve-storage-dellemc_all.deb
+          #
+          # GitHub resolves 'latest' but not the file name, and every real
+          # file name has the version in it — so without this, every document
+          # naming a download URL goes stale the moment a release is cut, and
+          # somebody follows it to an old build. The name is cosmetic: apt and
+          # dpkg read the version out of the control file, not the file name.
+          cp jt-pve-storage-dellemc_*.beta*_all.deb jt-pve-storage-dellemc_all.deb \
+            2>/dev/null || cp jt-pve-storage-dellemc_*_all.deb jt-pve-storage-dellemc_all.deb
+
           sha256sum *.deb > SHA256SUMS
           ls -la
 
@@ -142,10 +155,19 @@ jobs:
             artifacts/*.deb
             artifacts/SHA256SUMS
           fail_on_unmatched_files: true
-          # Every 0.x release is a prerelease: nothing has been verified
-          # against physical hardware yet. 1.0.0 is the on-hardware test
-          # pass, so that is when this stops being true.
-          prerelease: ${{ startsWith(steps.version.outputs.deb, '0.') }}
+          # NOT marked prerelease, and deliberately so. GitHub refuses to
+          # call a prerelease "Latest", so marking every 0.x one left the
+          # green badge on whatever old release happened not to be marked —
+          # for a while that was v0.7.49, three weeks and twenty releases
+          # behind, and that is what a first visitor saw as current. A stale
+          # version presented as the newest is a worse signal than a missing
+          # badge.
+          #
+          # The warning is not lost: the body below opens with it, the README
+          # opens with it, and the version itself says beta. What this buys is
+          # that the newest build is the one people find.
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           body: |
             ## ⚠️ Beta software — read before installing

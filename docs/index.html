@@ -471,15 +471,20 @@
                     <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
                     都附有預先建置的 <code>.deb</code> 與 <code>SHA256SUMS</code>。請安裝這一份 —— 它就是該版本測試時所用的建置。</span>
             </p>
-            <pre><span class="comment"># with the .deb and SHA256SUMS downloaded from the release page</span>
-<span class="cmd">sha256sum</span> -c SHA256SUMS <span class="comment"># must say OK before installing</span></pre>
+            <pre><span class="comment"># always the newest build; this URL never has to be edited</span>
+<span class="cmd">curl</span> -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
+<span class="cmd">curl</span> -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/SHA256SUMS
+<span class="cmd">sha256sum</span> -c SHA256SUMS --ignore-missing <span class="comment"># must say OK before installing</span>
+
+<span class="comment"># which version did that fetch?</span>
+<span class="cmd">dpkg-deb</span> -f jt-pve-storage-dellemc_all.deb Version</pre>
             <p>
                 <span class="lang-en">Check the sum before installing: this package writes to <code>/etc/multipath/conf.d</code> and talks to your array.</span>
                 <span class="lang-zh">安裝前先核對雜湊值：這個套件會寫入 <code>/etc/multipath/conf.d</code>，也會與你的陣列通訊。</span>
             </p>
             <p>
-                <span class="lang-en">The file name spells the version with a dot (<code>..._0.7.60.beta1-1_all.deb</code>) because GitHub will not serve an asset name containing <code>~</code>. The version inside the package is unchanged &mdash; <code>apt</code> reads the control file, not the name &mdash; and <code>SHA256SUMS</code> names the file as served, so the check works on what you downloaded.</span>
-                <span class="lang-zh">檔名中的版本是用點分隔的（<code>..._0.7.60.beta1-1_all.deb</code>），因為 GitHub 不會提供檔名含 <code>~</code> 的附件。套件內部的版本不變 &mdash; <code>apt</code> 讀的是控制檔而不是檔名 &mdash; 而 <code>SHA256SUMS</code> 記錄的就是實際提供的檔名，因此驗證可以直接對下載下來的檔案運作。</span>
+                <span class="lang-en">The version is inside the package, not in that file name, so the command above never goes stale. Each release also carries a versioned copy &mdash; <code>..._0.7.66.beta1-1_all.deb</code>, spelled with a dot because GitHub will not serve an asset name containing <code>~</code> &mdash; and that is the name to quote in a bug report. <code>SHA256SUMS</code> lists both, which is why the check above passes <code>--ignore-missing</code>.</span>
+                <span class="lang-zh">版本在套件裡面，不在那個檔名上，所以上面那道指令永遠不會過期。每一版同時也附一份帶版號的副本 &mdash; <code>..._0.7.66.beta1-1_all.deb</code>，版本用點分隔是因為 GitHub 不會提供檔名含 <code>~</code> 的附件 &mdash; 回報問題時請引用那個檔名。<code>SHA256SUMS</code> 兩份都列，這就是上面要加 <code>--ignore-missing</code> 的原因。</span>
             </p>
         </div>
     </div>
@@ -491,7 +496,7 @@
                 <span class="lang-en">Install on every node</span>
                 <span class="lang-zh">在每台節點上安裝</span>
             </div>
-            <pre><span class="cmd">apt</span> install ./jt-pve-storage-dellemc_*_all.deb</pre>
+            <pre><span class="cmd">apt</span> install ./jt-pve-storage-dellemc_all.deb</pre>
             <p>
                 <span class="lang-en">Use <code>apt install ./file.deb</code> rather than <code>dpkg -i</code>: dpkg does not install dependencies, and the missing binaries only surface much later as failures inside the plugin.</span>
                 <span class="lang-zh">請用 <code>apt install ./file.deb</code> 而不是 <code>dpkg -i</code>：dpkg 不會安裝相依套件，缺少的執行檔要到很後面才會以外掛內部的錯誤浮現。</span>

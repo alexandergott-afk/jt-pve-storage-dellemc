@@ -203,29 +203,45 @@ Install the package from the
 That is the build the release was tested with; building from source is for
 working on the plugin, not for installing it.
 
-### 1. Download and verify
+### 1. Download
 
-Download the `.deb` and the `SHA256SUMS` beside it from the release page,
-then:
+Every release carries a copy under a name that does not change, so this
+command always fetches the newest build and never has to be edited:
 
 ```bash
-sha256sum -c SHA256SUMS       # must say OK before you install
+curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
 ```
 
-The file on the release page spells the version with a dot —
-`jt-pve-storage-dellemc_0.7.60.beta1-1_all.deb` — because GitHub will not
-serve an asset name containing `~`. The package version inside is unchanged;
-the file name is cosmetic and `apt` reads the control file, not it.
-`SHA256SUMS` names the file as served, so `sha256sum -c` works on what you
-downloaded.
+The version is inside the package, not in that name — `apt` and `dpkg` read
+the control file. To see which one you got:
+
+```bash
+dpkg-deb -f jt-pve-storage-dellemc_all.deb Version
+```
+
+### 2. Verify
+
+```bash
+curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing    # must say OK before you install
+```
+
+`--ignore-missing` because `SHA256SUMS` also lists the versioned copy of the
+same package, which you did not download. The release page carries both: the
+versioned name is what a bug report should quote, the fixed name is what
+scripts and instructions should use.
+
+The versioned name spells the version with a dot —
+`jt-pve-storage-dellemc_0.7.66.beta1-1_all.deb` — because GitHub will not
+serve an asset name containing `~`. The package version inside is unchanged.
 
 Check the sum. This package writes to `/etc/multipath/conf.d` and talks to
 your array.
 
-### 2. Install on every node
+### 3. Install on every node
 
 ```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
+apt install ./jt-pve-storage-dellemc_all.deb
 ```
 
 **Every** node in the cluster. One without the package answers "Parameter
@@ -236,7 +252,7 @@ Use `apt install ./file.deb`, not `dpkg -i`: `dpkg -i` does not pull in
 dependencies, and the missing binaries only surface later as failures deep
 inside the plugin.
 
-### 3. After an upgrade
+### 4. After an upgrade
 
 ```bash
 systemctl restart pvestatd

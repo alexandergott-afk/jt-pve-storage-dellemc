@@ -122,29 +122,44 @@ Proxmox VE 的儲存外掛在每一台節點上都是以 root 權限執行。本
 
 請從 [release 頁面](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases) 安裝套件。那一份就是該版本測試時所用的建置；從原始碼建置是給要修改這個外掛的人用的，不是安裝用的。
 
-### 1. 下載並驗證
+### 1. 下載
 
-請從 release 頁面下載 `.deb` 以及旁邊的 `SHA256SUMS`，然後：
+每一版都會附一份檔名固定不變的副本，因此下面這道指令永遠會抓到最新的建置，也永遠不必修改：
 
 ```bash
-sha256sum -c SHA256SUMS       # 顯示 OK 之後才安裝
+curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
 ```
 
-release 頁面上的檔案，版本是用點分隔的 —— `jt-pve-storage-dellemc_0.7.60.beta1-1_all.deb` —— 因為 GitHub 不會提供檔名含 `~` 的附件。套件內部的版本不變；檔名只是外觀，`apt` 讀的是控制檔而不是檔名。`SHA256SUMS` 記錄的就是實際提供的檔名，因此 `sha256sum -c` 可以直接對下載下來的檔案運作。
+版本在套件裡面，不在檔名上 —— `apt` 與 `dpkg` 讀的是控制檔。想確認抓到的是哪一版：
+
+```bash
+dpkg-deb -f jt-pve-storage-dellemc_all.deb Version
+```
+
+### 2. 驗證
+
+```bash
+curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing    # 顯示 OK 之後才安裝
+```
+
+加上 `--ignore-missing` 是因為 `SHA256SUMS` 同時也列出同一個套件那份帶版號的副本，而你沒有下載它。release 頁面兩份都有：回報問題時請引用**帶版號**的那個檔名，腳本與說明文件則使用**固定**的那個。
+
+帶版號的檔名，版本是用點分隔的 —— `jt-pve-storage-dellemc_0.7.66.beta1-1_all.deb` —— 因為 GitHub 不會提供檔名含 `~` 的附件。套件內部的版本不變。
 
 請確實核對雜湊值。這個套件會寫入 `/etc/multipath/conf.d`，也會與你的陣列通訊。
 
-### 2. 在每一台節點上安裝
+### 3. 在每一台節點上安裝
 
 ```bash
-apt install ./jt-pve-storage-dellemc_<version>_all.deb
+apt install ./jt-pve-storage-dellemc_all.deb
 ```
 
 叢集內**每一台**節點都要裝。少裝的節點會回應「Parameter verification failed (400)」或「No such storage」，也無法成為線上遷移的目的地。
 
 請使用 `apt install ./file.deb`，不要用 `dpkg -i`：`dpkg -i` 不會自動安裝相依套件，缺少的執行檔會等到外掛實際操作時才以難以解讀的錯誤浮現。
 
-### 3. 升級之後
+### 4. 升級之後
 
 ```bash
 systemctl restart pvestatd
