@@ -338,6 +338,21 @@ reset_array();
     my ($size) = $P->volume_size_info($scfg, $store, $volname);
     cmp_ok($size, '>=', 4 * 1024 * 1024 * 1024, 'the size is reported in bytes');
 
+    # The WWID, through the exact call BlockBase makes: ($scfg, $name), two
+    # arguments, no storeid. An extra parameter in this family's signature
+    # once swallowed the name and answered undef for every volume - device
+    # discovery dead on arrival, and invisible to these tests because the
+    # device layer is stubbed. This call is not stubbed.
+    my $wwid = $P->_array_get_wwid($scfg, 'pve-u480-100-disk0');
+    ok(defined $wwid, 'the WWID lookup answers, called exactly as BlockBase calls it');
+    like($wwid, qr/^3[0-9a-f]{32}\z/, '... with a WWID of the shape multipath expects');
+
+    # And through path(), which is what QEMU gets: never unknown-* for a
+    # volume the array reports.
+    my ($dev) = $P->path($scfg, $volname, $store);
+    unlike($dev, qr/unknown/, 'path() resolves the device, not a placeholder');
+    is($dev, "/dev/mapper/$wwid", '... at the WWID the array reported');
+
     # Resize takes the new total, not a delta.
     $P->volume_resize($scfg, $store, $volname, 8 * 1024**3);
     ($size) = $P->volume_size_info($scfg, $store, $volname);

@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.80~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: every WWID lookup answered `undef` — device discovery was dead on
+  arrival.** BlockBase calls `_array_get_wwid` with two arguments,
+  `($scfg, $array_name)`, at ten call sites; Unity's implementation declared
+  three, so the volume name landed in a parameter nothing reads and the name
+  itself was `undef`. `path()` would have handed QEMU
+  `/dev/mapper/unknown-*`, activation could not find the disk it had just
+  mapped, and `free_image` would have taken the no-WWID branch — for every
+  volume, from the first minute on hardware.
+
+  The lifecycle tests missed it because they stub the device layer. Two
+  guards now exist: a systematic arity comparison of all 22 `_array_*`
+  methods against BlockBase's actual call sites (this was the only
+  mismatch), and a test that calls `_array_get_wwid` exactly as BlockBase
+  does and asserts `path()` resolves to `/dev/mapper/<wwid>`, never a
+  placeholder. Reverting the fix fails four tests.
+
 ## [0.7.79~beta1] - 2026-08-06
 
 ### Fixed

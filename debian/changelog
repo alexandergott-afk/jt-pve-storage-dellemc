@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.80~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: every WWID lookup answered undef - device discovery dead on
+    arrival. BlockBase calls _array_get_wwid with two arguments at ten call
+    sites; Unity's implementation declared three, so the volume name landed
+    in a parameter nothing reads. path() would have handed QEMU
+    /dev/mapper/unknown-*, activation could not find the disk it had just
+    mapped, and free_image would have taken the no-WWID branch - for every
+    volume, from the first minute on hardware. The lifecycle tests missed it
+    because they stub the device layer. All 22 _array_* signatures were
+    compared against BlockBase's actual call sites (this was the only
+    mismatch), and a new test calls the method exactly as BlockBase does and
+    asserts path() resolves to /dev/mapper/<wwid>, never a placeholder.
+    Reverting the fix fails four tests.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 07:35:00 +0800
+
 jt-pve-storage-dellemc (0.7.79~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

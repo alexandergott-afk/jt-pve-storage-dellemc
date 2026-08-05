@@ -5,6 +5,21 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.80~beta1] - 2026-08-06
+
+### 修正
+- **Unity：每一次 WWID 查詢都回 `undef` —— 裝置探索等於一上機就陣亡。**
+  BlockBase 以兩個參數呼叫 `_array_get_wwid`（`$scfg, $array_name`），共十個
+  呼叫點；Unity 的實作卻宣告了三個，於是磁碟區名稱落進一個沒人讀的參數，
+  `$name` 本身是 `undef`。`path()` 會把 `/dev/mapper/unknown-*` 交給 QEMU、
+  activation 找不到自己剛對應的磁碟、`free_image` 會走無 WWID 分支 —— 每一顆
+  磁碟區、從上機的第一分鐘開始。
+
+  生命週期測試沒抓到,因為它們把裝置層 stub 掉了。現在有兩道防護:一次把全部
+  22 個 `_array_*` 方法的參數數與 BlockBase 實際呼叫點系統性比對(只有這一個
+  不匹配),以及一個「以 BlockBase 的原樣呼叫」的測試,斷言 `path()` 解析出
+  `/dev/mapper/<wwid>` 而非佔位符。還原修正會有四個測試失敗。
+
 ## [0.7.79~beta1] - 2026-08-06
 
 ### 修正

@@ -413,8 +413,16 @@ sub _array_rename_volume {
     return $api->volume_rename($row->{id}, $to, %opts);
 }
 
+# Two arguments after the class, NOT three. BlockBase calls every
+# _array_get_wwid as ($scfg, $array_name) - ten call sites, no storeid - and
+# an extra parameter here meant the volume NAME landed in it while $name
+# stayed undef. Every WWID lookup then answered undef, which is device
+# discovery dead on arrival: path() hands back /dev/mapper/unknown-*,
+# activation cannot find the disk it just mapped, and free_image takes the
+# no-WWID branch. The lifecycle tests missed it because they stub the device
+# layer; the signature test below does not.
 sub _array_get_wwid {
-    my ($class, $scfg, $storeid, $name, %opts) = @_;
+    my ($class, $scfg, $name, %opts) = @_;
 
     return $class->_api($scfg, %opts)->volume_get_wwid($name, %opts);
 }
