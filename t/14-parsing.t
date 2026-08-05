@@ -26,6 +26,7 @@ BEGIN {
 use PVE::Storage::Custom::DellEMC::Common::Naming;
 use PVE::Storage::Custom::DellEMC::PowerStore::API;
 use PVE::Storage::Custom::DellEMC::PowerVault::API;
+use PVE::Storage::Custom::DellEMC::Unity::API;
 
 my $N  = 'PVE::Storage::Custom::DellEMC::Common::Naming';
 my $PS = 'PVE::Storage::Custom::DellEMC::PowerStore::API';
@@ -282,6 +283,89 @@ SKIP: {
     is($N->pve_volname_to_array('ps1', 'base-100-disk-0/vm-101-disk-0'),
         $N->encode_volume_name('ps1', 101, 0),
         'a linked clone names the clone, not the base');
+}
+
+# ---------------------------------------------------------------------------
+# Unity
+#
+# Fields are opt-in on this API, so "missing" is not an edge case here - it
+# is what every forgotten ?fields= parameter produces. Everything below must
+# come back as nothing or as a death, never as a value a destructive path
+# would use.
+# ---------------------------------------------------------------------------
+
+{
+    my $U = 'PVE::Storage::Custom::DellEMC::Unity::API';
+    my $api = bless { storeid => 'u', type => 'dellunity' }, $U;
+
+    # The envelope, malformed every way an intercepted response arrives.
+    is_deeply($api->_entries(undef), [], 'entries of nothing is nothing');
+    is_deeply($api->_entries([1,2]), [], 'entries of a bare list is nothing');
+    is_deeply($api->_entries({ entries => { a => 1 } }), [],
+        'entries that is a hash is nothing');
+    is_deeply($api->_entries({ entries => [ 'x', 42, [ ], { content => 'str' } ] }),
+        [], 'entries whose rows are not content hashes yield no rows');
+
+    is($api->_content({ content => [1] }), undef,
+        'content that is a list is not an object');
+    is($api->_content('raw'), undef, 'a string body is not an object');
+
+    # References: Unity writes { id => ... } - anything else is not an id.
+    is($api->_ref_id({ id => 'sv_1' }), 'sv_1', 'the one true shape');
+    is($api->_ref_id({ id => { nested => 1 } }), undef, 'a nested id is refused');
+    is($api->_ref_id([ 'sv_1' ]), undef, 'a list is refused');
+    is($api->_ref_id('sv_1'), 'sv_1', 'a bare string is passed through');
+
+    # Sizes: bytes, and only digits count.
+    is($api->_bytes({ f => '12.5' }, 'f'), 0, 'a fraction is not a byte count');
+    is($api->_bytes({ f => '1e9' },  'f'), 0, 'scientific notation is refused');
+    is($api->_bytes({ f => -5 },     'f'), 0, 'a negative size is refused');
+    is($api->_bytes({ f => { } },    'f'), 0, 'a structure is refused');
+    is($api->_bytes({ },             'f'), 0, 'an absent field is zero, not a die');
+
+    # The WWID: 32 hex digits or nothing. A wrong WWID is a wrong DEVICE.
+    is($U->wwn_to_wwid('60:06:01:60:12:34:56:78:9A:BC:DE:F0:11:22:33:44:55'),
+        undef, '33 digits is refused, not truncated');
+    is($U->wwn_to_wwid('xyzz' x 8), undef, 'non-hex is refused');
+    is($U->wwn_to_wwid(''), undef, 'empty is refused');
+}
+
+{
+    # The plugin-side parsers.
+    my $P = 'PVE::Storage::Custom::DellUnityPlugin';
+    SKIP: {
+        skip 'PVE::Storage::Plugin is not available', 10
+            unless eval { require PVE::Storage::Plugin;
+                          require PVE::Storage::Custom::DellUnityPlugin; 1 };
+
+        # The timestamp: reading a zone offset and discarding it dated every
+        # snapshot wrong by the node's distance from UTC on another family.
+        # Two spellings of the same instant must agree.
+        is($P->_to_epoch('2026-08-06T10:00:00.000Z'),
+           $P->_to_epoch('2026-08-06T18:00:00+08:00'),
+            'a zone offset is applied, not discarded');
+        is($P->_to_epoch('2026-08-06T10:00:00Z') -
+           $P->_to_epoch('2026-08-06T10:00:00-05:30'), -(5*3600+1800),
+            '... in the right direction for a negative offset');
+
+        is($P->_to_epoch('not-a-date'), 0, 'garbage dates to zero');
+        is($P->_to_epoch('2026-13-45T99:99:99Z'), 0, 'an impossible date to zero');
+        is($P->_to_epoch({ iso => 'x' }), 0, 'a structure to zero');
+        is($P->_to_epoch(undef), 0, 'nothing to zero');
+
+        is($P->_num('123'), 123, 'a numeric string is a number');
+        is($P->_num('12.5'), 0, 'a fraction is refused, not rounded');
+        is($P->_num([1]), 0, 'a structure is refused');
+
+        # A LUN row with no wwn must yield a row with no wwid - never a
+        # fabricated one. BlockBase treats a missing wwid as "device
+        # discovery cannot work", loudly; a wrong one is a wrong device.
+        my $api = bless { storeid => 'u', type => 'dellunity' },
+            'PVE::Storage::Custom::DellEMC::Unity::API';
+        my $row = $P->_volume_row($api, { id => 'sv_1', name => 'v',
+                                          sizeTotal => 100 });
+        is($row->{wwid}, undef, 'no wwn means no wwid, not a guessed one');
+    }
 }
 
 done_testing();
