@@ -7,6 +7,44 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.66~beta1] - 2026-08-05
+
+### Fixed
+- **Every successful delete printed a multipath failure.** Seen twice per
+  `qm destroy` on the ME4024:
+
+  ```
+  multipath -f /dev/mapper/3600c0ff... failed or timed out,
+  trying dmsetup remove --force
+  ```
+
+  Nothing had failed and nothing had timed out. `cleanup_lun_devices` removes
+  the map by name — `multipathd remove map` — and then calls the flush as the
+  belt to that pair of braces; `multipath -f` on a map that is already gone
+  exits non-zero, and that was reported as a fault. The flush now checks
+  whether the device is still there before saying anything: gone is what was
+  being asked for. Anything else, **including not being able to tell**, still
+  gets the `dmsetup` fallback — a stat that times out on a dead map is
+  exactly the state that fallback exists for.
+
+  A line that appears on every normal operation is worse than no line: it
+  reads like a fault, and it buries the case where the flush really did time
+  out.
+
+### Changed
+- **The project no longer claims that no hardware has run it.** A PowerVault
+  ME4024 has, over Fibre Channel, and as of 0.7.65 it passes the whole
+  first-run test. The README, the docs site, the phase table and the release
+  notes said otherwise in five places. What is *still* unverified is now
+  stated instead, because it is most of it: PowerStore and PowerFlex
+  entirely, and PowerVault's iSCSI and SAS paths.
+- **The release notes explain why no release carries GitHub's "Latest"
+  badge.** Every 0.x is a prerelease and GitHub will not mark a prerelease
+  latest, so `/releases/latest` does not resolve at all. Deliberate, but not
+  obvious to somebody looking for the file to download — so the notes now say
+  to take the top of the list, and give a command that resolves the newest
+  release with prereleases included.
+
 ## [0.7.65~beta1] - 2026-08-05
 
 **The first end-to-end run on real hardware.** A customer took 0.7.64 to a

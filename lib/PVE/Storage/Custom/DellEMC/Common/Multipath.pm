@@ -651,6 +651,21 @@ sub multipath_flush {
     my $err = $@;
 
     if ($err || (defined $exit && $exit != 0)) {
+        # 'multipath -f' fails when there is no such map, and no such map is
+        # the ordinary outcome here: cleanup_lun_devices removes the map by
+        # name first, and this call is the belt to that pair of braces. So a
+        # non-zero exit was printed as "failed or timed out" on every
+        # successful delete — seen on an ME4024, twice per 'qm destroy' —
+        # which reads like a fault and buries the case where the flush really
+        # did time out.
+        #
+        # Gone is what was being asked for. Anything else, including not
+        # being able to tell, still gets the fallback: is_block_device
+        # answers undef when the stat times out, and on a dead map that is
+        # exactly the state the fallback exists for.
+        my $present = is_block_device($device);
+        return 1 if defined $present && !$present;
+
         warn "multipath -f $device failed or timed out, trying dmsetup remove --force\n";
         my $name = _untaint_device_name(basename($device));
         if ($name) {

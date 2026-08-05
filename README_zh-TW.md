@@ -6,7 +6,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 > ## ⚠️ BETA 版軟體 —— 安裝前請務必閱讀
 >
-> **這是 beta 版（0.7.65~beta1），而且從未在任何實體 Dell EMC 陣列上執行過。** 所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定「外掛會去碰哪些裝置」的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及整條 Fibre Channel 路徑。
+> **這是 beta 版（0.7.66~beta1），而且只有一台陣列跑過它**：一台韌體為 `GT280R011-01`、走 Fibre Channel 的 PowerVault ME4024，自 0.7.65 起完整通過首次執行測試。**其餘的一切都尚未經過實機驗證** —— PowerStore 與 PowerFlex 完全沒有，PowerVault 這邊的 iSCSI 與 SAS 路徑也沒有，因為那台陣列走的是 FC。[docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 逐項列出了哪些是哪些；在信任這裡任何一項之前，請先讀它。
 >
 > **請不要安裝在正式環境的叢集，也不要指向存有重要資料的陣列。** 儲存外掛是以 root 權限執行的，它會在陣列上建立與刪除 volume，並在每一台節點上操作區塊裝置。這裡的缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態；而且因為 multipath 與 SCSI 狀態是全節點共用的，受害範圍不一定只限於本外掛自己的儲存。
 >
@@ -18,7 +18,7 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 
 ## 專案狀態
 
-> **版本 0.7.65~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
+> **版本 0.7.66~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
 > 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
@@ -28,8 +28,8 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 | 2 | `Common::BlockBase` 抽象 plugin 基底 | **已完成** |
 | 3 | PowerStore REST API 客戶端 | **已完成** |
 | 4 | `dellpowerstore` plugin、災難復原工具、文件 | **程式碼已完成**，實機測試未進行 |
-| 5 | FC 驗證、PVE 9.2 驗證、發佈 1.0.0 | 需要實機 |
-| 6 | PowerVault ME4／ME5 的 `dellpowervault` plugin | **程式碼已完成**，實機測試未進行 |
+| 5 | FC 驗證、PVE 9.2 驗證、1.0.0 發行 | FC 已在一台 PowerVault ME4024 上**驗證通過**；1.0.0 仍待另外兩個系列 |
+| 6 | `dellpowervault` 外掛，支援 PowerVault ME4／ME5 | **已在一台 ME4024 上以 FC 通過實機測試**（0.7.65）；iSCSI 與 SAS 仍待驗證 |
 | 7 | `dellpowerflex` plugin，NVMe/TCP 與 SDC | **程式碼已完成**，實機測試未進行 |
 | 8+ | PowerMax | 未開始 |
 
@@ -75,7 +75,7 @@ PowerScale 未排入。它是 NAS，需要自己的目錄語意與 content type�
 
 ### 開發狀態
 
-這是**測試版（beta）軟體**，公開的目的就是為了被測試。它連一次都沒有在實體 Dell EMC 陣列上執行過。凡是在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 中標記為 `NOT VERIFIED ON HARDWARE` 的項目 —— 目前是所有面向陣列的行為 —— 都有可能根本就是錯的。
+這是**測試版（beta）軟體**，公開的目的就是為了被測試。至今只有一台陣列、以一種通訊協定跑過它。在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 中仍標記為 `NOT VERIFIED ON HARDWARE` 的項目，都有可能根本就是錯的 —— 而那次實機測試翻出來的三個缺陷，一個藏在另一個後面，正是這句警告的意思。
 
 ### 可能發生什麼問題
 

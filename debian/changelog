@@ -1,3 +1,30 @@
+jt-pve-storage-dellemc (0.7.66~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * MULTIPATH: every successful delete printed a failure that had not
+    happened - "multipath -f /dev/mapper/... failed or timed out, trying
+    dmsetup remove --force", twice per qm destroy on the ME4024.
+    cleanup_lun_devices removes the map by name first and then calls the
+    flush as the belt to that pair of braces; multipath -f on a map that is
+    already gone exits non-zero. The flush now checks whether the device is
+    still there before saying anything: gone is what was being asked for.
+    Anything else, including not being able to tell, still gets the dmsetup
+    fallback - a stat that times out on a dead map is exactly the state that
+    fallback exists for. A line on every normal operation reads like a fault
+    and buries the case where the flush really did time out.
+  * The project no longer claims that no hardware has run it. A PowerVault
+    ME4024 has, over Fibre Channel, and as of 0.7.65 it passes the whole
+    first-run test. The README, the docs site, the phase table and the
+    release notes said otherwise in five places. What is still unverified is
+    stated instead: PowerStore and PowerFlex entirely, and PowerVault's
+    iSCSI and SAS paths.
+  * The release notes explain why no release carries GitHub's "Latest"
+    badge - every 0.x is a prerelease, and GitHub will not mark a prerelease
+    latest - and give a command that resolves the newest release with
+    prereleases included.
+
+ -- Jason Cheng <jason@jason.tools>  Wed, 05 Aug 2026 18:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.65~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

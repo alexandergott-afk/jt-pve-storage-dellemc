@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.65~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.66~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -183,8 +183,8 @@
     </h2>
     <div class="alert alert--danger">
         <strong>
-            <span class="lang-en">BETA SOFTWARE. This has never been run against a physical Dell EMC array. Use at your own risk.</span>
-            <span class="lang-zh">BETA 版軟體。從未在任何實體 Dell EMC 陣列上執行過。使用風險自負。</span>
+            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel. PowerStore, PowerFlex, iSCSI and SAS remain unverified. Use at your own risk.</span>
+            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024。PowerStore、PowerFlex、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
         </strong>
         <ul>
             <li>
@@ -1006,6 +1006,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.66~beta1</div>
+        <div class="changelog-date">2026-08-05</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Every successful delete printed a multipath failure that had not happened — the map was removed by name a moment earlier, so flushing it exits non-zero. And the project stopped claiming no hardware has ever run it, in the five places that still said so.</span>
+            <span class="lang-zh">每次成功的刪除都會印出一則其實沒有發生的 multipath 失敗 —— map 在前一刻已經以名稱移除，再去 flush 它自然以非零狀態結束。另外，本專案不再宣稱「從未在硬體上執行過」，先前仍這樣寫的五個地方都已更正。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.65~beta1</div>

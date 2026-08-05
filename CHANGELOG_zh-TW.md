@@ -5,6 +5,39 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.66~beta1] - 2026-08-05
+
+### 修正
+- **每一次成功的刪除都會印出一則 multipath 失敗訊息。** 在該 ME4024 上，每次
+  `qm destroy` 都會出現兩次：
+
+  ```
+  multipath -f /dev/mapper/3600c0ff... failed or timed out,
+  trying dmsetup remove --force
+  ```
+
+  其實什麼都沒失敗，也沒有逾時。`cleanup_lun_devices` 會先以名稱移除該 map
+  （`multipathd remove map`），接著才呼叫 flush 作為雙保險；而對一個已經不存在
+  的 map 執行 `multipath -f` 本來就會以非零狀態結束，這卻被當成故障回報。現在
+  flush 會先確認裝置是否還在才決定要不要出聲：**不在**正是我們要的結果。其餘
+  情況 —— **包括無法判斷** —— 仍然會走 `dmsetup` 備援：在一個已死的 map 上
+  stat 逾時，正是那道備援存在的理由。
+
+  一則在每次正常操作都會出現的訊息，比沒有訊息更糟：它看起來像故障，而且會把
+  「flush 真的逾時了」那一次埋掉。
+
+### 變更
+- **本專案不再宣稱「從未在硬體上執行過」。** 已經有一台 PowerVault ME4024 走
+  Fibre Channel 跑過它，而且自 0.7.65 起完整通過首次執行測試。README、文件站、
+  開發階段表與 release 說明總共五處寫的都還是舊的。現在改為陳述**仍然**未驗證
+  的部分，因為那才是絕大多數：PowerStore 與 PowerFlex 完全沒有，PowerVault 的
+  iSCSI 與 SAS 路徑也沒有。
+- **release 說明會解釋為什麼沒有任何一版掛著 GitHub 的「Latest」標記。** 所有
+  0.x 都是預先發行版，而 GitHub 不允許預先發行版被標記為 latest，因此
+  `/releases/latest` 根本無法解析。這是刻意的，但對一個正在找檔案下載的人來說
+  並不明顯 —— 所以說明現在會請人取清單最上方那一個，並附上一道會把預先發行版
+  一併納入、解析出最新 release 的指令。
+
 ## [0.7.65~beta1] - 2026-08-05
 
 **第一次在實體硬體上端到端跑完。** 一位客戶把 0.7.64 裝到 PowerVault ME4024
