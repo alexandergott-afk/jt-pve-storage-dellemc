@@ -59,6 +59,42 @@ A storage id that does not leave room raises an error at creation time rather
 than producing a truncated name that could collide with another VM's volume.
 Keep the storage id short on this family.
 
+
+## Unity XT (`dellunity`)
+
+| Option | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `unity-pool` | string | no | — | Pool new LUNs are created in. Required on an array with more than one pool |
+| `unity-thin` | boolean | no | `1` | Create thin LUNs. Thin provisioning must be licensed on the array |
+
+```bash
+pvesm add dellunity unity480 \
+    --dell-portal 10.0.0.10 \
+    --dell-username admin --dell-password '...' \
+    --dell-protocol fc \
+    --unity-pool pool_1 \
+    --content images,rootdir
+```
+
+### What is different about this family
+
+**Nothing here has been run against a Unity array.** See
+[TESTING.md](TESTING.md) for what that means item by item.
+
+- **The array is asked for a LUN by name**, at
+  `/instances/lun/name:<name>`, rather than with a server-side filter. Every
+  other family here needs a filter, and an unverified filter that returns
+  nothing is indistinguishable from "there is nothing there".
+- **Host access replaces rather than adds.** Unity's `hostAccess` is the
+  whole list of hosts that may see a LUN, so mapping this node reads the
+  current list and sends the union. That is why a mapping operation makes two
+  round trips rather than one.
+- **A linked clone is a thin clone of a snapshot**, so a template's marker
+  snapshot outlives its clones and the array refuses to delete a template
+  while one exists.
+- **`unity-thin` needs a licence.** If thin provisioning is not licensed on
+  the array, set it to `0`; the array refuses the create otherwise.
+
 ## PowerFlex options
 
 Used by the `dellpowerflex` type. PowerFlex does not reach the host as a SCSI

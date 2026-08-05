@@ -7,6 +7,58 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.68~beta1] - 2026-08-05
+
+### Added
+- **Unity XT, as a fourth storage type: `dellunity`.** A customer has a Unity
+  480 on Fibre Channel, so this family is written against hardware that
+  exists. One VM disk is one Unity LUN, with the array's own snapshots and
+  thin clones; dm-multipath, device discovery and every safety check are the
+  shared layer's, already exercised on an ME4024 over the same protocol.
+
+  **Nothing here has been run against a Unity array** — but very little of it
+  is guessed. Every URI, request body and field list comes from
+  `github.com/dell/gounity`, the client Dell's own CSI driver uses, rather
+  than from documentation prose. Where the two disagreed the code won: a
+  Unisphere page gives the LUN name limit as 85 characters and Dell's client
+  refuses anything over 63 before the request reaches the array.
+
+  What that settled, and what shapes the code:
+
+  - **Unity answers a lookup by name directly**, at
+    `/instances/lun/name:<name>`. Every other family here needs a server-side
+    filter, and an unverified filter that returns nothing is
+    indistinguishable from "there is nothing there" — the mistake that hid
+    every PowerStore volume once. This family carries none of those defences
+    because it does not need them.
+  - **`hostAccess` replaces the host list rather than adding to it.** Mapping
+    reads the current list and sends the union; unmapping sends the
+    difference; both read inside the caller's retry loop, because a list read
+    before another node's write and sent after it puts back exactly the state
+    that write removed. Sending only this node's host is how a volume gets
+    unmapped from every other node in the cluster.
+  - **A LUN is read as `lun` and acted on as `storageResource`**, and the
+    pool key on a create is `storagePool` — `pool` is only what a LUN reports
+    back.
+  - **A linked clone is a thin clone of a snapshot**, so a template's marker
+    outlives its clones and the array refuses to delete a template while one
+    exists.
+  - Sizes are bytes, not the 512-byte blocks PowerVault reports.
+
+  120 tests, none of which need an array: 85 against a fake Unity for the
+  client, and 35 walking a whole VM's life against a fake that refuses what a
+  real one refuses — a LUN with snapshots, a snapshot with a clone reading
+  from it, a LUN still mapped, a name over 63 characters. That shape is what
+  caught three shipped defects on PowerVault.
+
+  Writing those tests found one: fields are opt-in on this API, so a pool
+  that comes back as an empty shell looks exactly like one that was found,
+  and the create would have sent a null where the pool id goes.
+
+  `docs/TESTING.md` records every field with where it came from, and the five
+  questions only an array can answer — including the SCSI vendor and product
+  strings, which decide whether the plugin recognises a device at all.
+
 ## [0.7.67~beta1] - 2026-08-05
 
 ### Changed

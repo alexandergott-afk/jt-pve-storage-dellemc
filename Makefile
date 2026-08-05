@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.67~beta1
+VERSION = 0.7.68~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -46,6 +46,7 @@ uninstall:
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerFlexPlugin.pm
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerScalePlugin.pm
 	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellPowerVaultPlugin.pm
+	rm -f  $(PERL5DIR)/PVE/Storage/Custom/DellUnityPlugin.pm
 	rm -rf $(PERL5DIR)/PVE/Storage/Custom/DellEMC/
 	@for f in $(BIN_SCRIPTS); do rm -f $(BINDIR)/$$(basename $$f); done
 

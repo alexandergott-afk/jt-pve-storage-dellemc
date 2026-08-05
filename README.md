@@ -6,7 +6,7 @@ Dell EMC storage plugins for Proxmox VE.
 
 > ## ⚠️ BETA SOFTWARE — READ BEFORE INSTALLING
 >
-> **This is a beta release (0.7.67~beta1). One array has run it**, and only
+> **This is a beta release (0.7.68~beta1). One array has run it**, and only
 > one: a PowerVault ME4024 on firmware `GT280R011-01` over Fibre Channel,
 > which as of 0.7.65 passes the whole of the first-run test. **Everything
 > else is still unverified against hardware** — PowerStore and PowerFlex
@@ -38,7 +38,7 @@ the unit an operator actually thinks about.
 
 ## Project status
 
-> **Version 0.7.67~beta1 — three storage types are code complete. One of
+> **Version 0.7.68~beta1 — three storage types are code complete. One of
 > them has passed a full run on real hardware: PowerVault ME, over Fibre
 > Channel, on an ME4024.**
 > PowerStore and PowerFlex have never been run against an array at all, and
@@ -59,7 +59,8 @@ the unit an operator actually thinks about.
 | 5 | FC verification, PVE 9.2 verification, 1.0.0 release | FC **verified** on a PowerVault ME4024; 1.0.0 still needs the other families |
 | 6 | `dellpowervault` plugin for PowerVault ME4/ME5 | **on-hardware pass on an ME4024 over FC** (0.7.65); iSCSI and SAS outstanding |
 | 7 | `dellpowerflex` plugin, NVMe/TCP and SDC | **code done**, on-hardware pass outstanding |
-| 8+ | PowerMax | not started |
+| 8 | `dellunity` plugin for Unity XT | **code done**, on-hardware pass outstanding |
+| 9+ | PowerMax | not started |
 
 ## Product families
 
@@ -73,9 +74,9 @@ an API client, not a restructuring.
 | 1 | **PowerStore** | `dellpowerstore` | iSCSI / FC (dm-multipath) | **in development** |
 | 2 | **PowerVault ME4/ME5** | `dellpowervault` | iSCSI / FC / SAS (dm-multipath) | **in development** |
 | 3 | **PowerFlex** | `dellpowerflex` | NVMe/TCP or SDC | **in development** |
-| 4 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath), NVMe/FC and NVMe/TCP (NVMe-oF) | planned |
+| 4 | **Unity XT** | `dellunity` | iSCSI / FC (dm-multipath) | **in development** |
+| 5 | PowerMax | `dellpowermax` | FC / iSCSI (dm-multipath), NVMe/FC and NVMe/TCP (NVMe-oF) | planned |
 | — | PowerScale | `dellpowerscale` | NFS (directory semantics) | not scheduled |
-| — | Unity XT | `dellunity` | iSCSI / FC | not scheduled |
 | — | ObjectScale, PowerProtect | — | — | out of scope |
 
 PowerStore, PowerVault ME and PowerMax share the block base class. PowerFlex

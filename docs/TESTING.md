@@ -250,6 +250,43 @@ SSH, for PowerFlex through the API directly.
 formatted string like `1996.7GB` and is only parsed when the numeric one is
 absent.
 
+### Unity XT (from Dell's own `gounity` client)
+
+Every URI, request body and field name below is read from
+`github.com/dell/gounity` — the client Dell's CSI driver uses against Unity —
+rather than from documentation prose. Where the two disagreed, the code won.
+**None of it has been run against a Unity array.**
+
+| Field | Read for | State |
+|---|---|---|
+| `id` | every object's handle; a LUN and its `storageResource` share it | documented |
+| `name` | object name, and the key of the `name:` lookup | documented |
+| `wwn` | the WWID the host will see, `'3'` + the bare hex | the conversion itself is **NOT VERIFIED**; confirm against `multipath -ll` on the first run |
+| `sizeTotal`, `sizeUsed`, `sizeAllocated` | volume size and space in use, in **bytes** — not the 512-byte blocks PowerVault reports | Dell's own `LunDisplayFields` |
+| `hostAccess` | which hosts may see a LUN. A list of `{host: {id}, accessMask}`, and writing it **REPLACES** the list | Dell's own field list; the replacement semantics are why `ExportVolume` and `ModifyVolumeExport` both exist in Dell's client |
+| `accessMask` | `'1'` production, `'2'` snapshot, `'3'` both — a **string**, not a number | Dell's client hardcodes `'1'` |
+| `pool`, `storagePool` | **not interchangeable**: `storagePool` is the key a create takes, `pool` is what a LUN reports back | Dell's own `CreateLun` body |
+| `sizeFree`, `sizeTotal`, `sizeUsed`, `sizeSubscribed` (pool) | pool capacity, in bytes | Dell's own `StoragePoolFields` |
+| `isThinEnabled` | thin provisioning, sent as the **string** `'true'` | Dell's client uses `strconv.FormatBool` |
+| `creationTime` | snapshot date, ISO 8601 with a zone offset | documented; the offset is read and applied, which cost another family a release |
+| `storageResource` (on a snap) | which LUN a snapshot belongs to | Dell's own `SnapshotDisplayFields` |
+| `fcHostInitiators`, `iscsiHostInitiators` | initiators registered to a host | Dell's own `HostDisplayFields` |
+| `initiatorId`, `parentHost` | an initiator's WWPN/IQN and the host it belongs to | Dell's own `HostInitiatorsDisplayFields` |
+| `initiatorType` | `'1'` FC, `'2'` iSCSI — **strings** | Dell's own constants |
+| `entries[].content`, `content` | the two response shapes | documented |
+
+Fields are **opt-in**: a request without `?fields=` comes back with almost
+nothing. The first failure mode to expect is an object that looks EMPTY
+rather than ABSENT, and those are different answers.
+
+| Open question | Why it matters |
+|---|---|
+| The SCSI vendor and product strings. `DGC` / `VRAID` is the CLARiiON inheritance and is what this plugin gates on; if it is wrong, no device is ever recognised | this gate decides which devices the plugin will touch — confirm with `sg_inq /dev/sdX` |
+| The WWN to WWID conversion | device discovery does not work at all if it is wrong |
+| `POST /instances/snap/<id>/action/restore` | the one destructive call that is **not** in Dell's client, because a CSI driver never rolls back |
+| Whether the array rounds a LUN size up or down | this plugin rounds up to 8 KiB first, which makes the question harmless either way |
+| Whether an HLU can be pinned | nothing depends on it; Unity assigns them |
+
 ### PowerStore (from the 4.x REST documentation)
 
 Some of the request shape *was* read from the Dell PowerStore REST API

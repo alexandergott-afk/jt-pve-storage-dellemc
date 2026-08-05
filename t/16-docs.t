@@ -24,11 +24,13 @@ BEGIN {
 use PVE::Storage::Custom::DellPowerStorePlugin;
 use PVE::Storage::Custom::DellPowerVaultPlugin;
 use PVE::Storage::Custom::DellPowerFlexPlugin;
+use PVE::Storage::Custom::DellUnityPlugin;
 
 my @PLUGINS = qw(
     PVE::Storage::Custom::DellPowerStorePlugin
     PVE::Storage::Custom::DellPowerVaultPlugin
     PVE::Storage::Custom::DellPowerFlexPlugin
+    PVE::Storage::Custom::DellUnityPlugin
 );
 
 my $DOCS = -d 'docs' ? 'docs' : '../docs';
@@ -49,7 +51,7 @@ sub slurp {
 my %declared;
 for my $plugin (@PLUGINS) {
     my $props = $plugin->properties();
-    $declared{$_} = 1 for grep { /^(?:dell|pstore|pvault|pflex)-/ } keys %$props;
+    $declared{$_} = 1 for grep { /^(?:dell|pstore|pvault|pflex|unity)-/ } keys %$props;
 }
 
 ok(scalar(keys %declared) > 15, 'the plugins declare a set of options')
@@ -69,7 +71,7 @@ for my $language ('', '_zh-TW') {
     # And nothing documented that does not exist. An operator who copies one
     # of these into storage.cfg gets the whole storage refused.
     my %mentioned;
-    while ($text =~ /^\|\s*`((?:dell|pstore|pvault|pflex)-[a-z0-9-]+)`/gm) {
+    while ($text =~ /^\|\s*`((?:dell|pstore|pvault|pflex|unity)-[a-z0-9-]+)`/gm) {
         $mentioned{$1} = 1;
     }
 

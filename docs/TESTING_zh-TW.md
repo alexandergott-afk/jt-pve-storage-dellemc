@@ -214,6 +214,41 @@ help create host
 
 `-numeric` 欄位以 512 位元組區塊計；不帶後綴的欄位是像 `1996.7GB` 這樣的格式化字串，只有在數值欄位不存在時才會被解析。
 
+### Unity XT（出自 Dell 自己的 `gounity` 客戶端）
+
+以下每一個 URI、請求內容與欄位名稱，都是從 `github.com/dell/gounity` 讀出來的
+—— 那是 Dell 的 CSI driver 實際用來打 Unity 的客戶端 —— 而不是文件敘述。兩者
+不一致時，以程式碼為準。**沒有任何一項在 Unity 陣列上執行過。**
+
+| 欄位 | 讀來做什麼 | 狀態 |
+|---|---|---|
+| `id` | 每個物件的識別碼；LUN 與它的 `storageResource` 共用同一個 | 文件記載 |
+| `name` | 物件名稱，也是 `name:` 查詢的鍵 | 文件記載 |
+| `wwn` | 主機會看到的 WWID，`'3'` + 純十六進位 | 換算本身**未驗證**；第一次上機時請與 `multipath -ll` 對照 |
+| `sizeTotal`、`sizeUsed`、`sizeAllocated` | 磁碟區大小與已用空間，單位是**位元組** —— 不是 PowerVault 的 512 位元組區塊 | Dell 自己的 `LunDisplayFields` |
+| `hostAccess` | 哪些主機可以看到這顆 LUN。是一組 `{host: {id}, accessMask}`，而且寫入時是**取代**整份清單 | Dell 自己的欄位清單；Dell 客戶端同時有 `ExportVolume` 與 `ModifyVolumeExport`，正是取代語意的證據 |
+| `accessMask` | `'1'` production、`'2'` snapshot、`'3'` 兩者 —— 是**字串**不是數字 | Dell 客戶端寫死 `'1'` |
+| `pool`、`storagePool` | **不可互換**：建立時的鍵是 `storagePool`，`pool` 是 LUN 回報時用的 | Dell 自己的 `CreateLun` 內容 |
+| `sizeFree`、`sizeTotal`、`sizeUsed`、`sizeSubscribed`（儲存池） | 儲存池容量，單位位元組 | Dell 自己的 `StoragePoolFields` |
+| `isThinEnabled` | 精簡佈建，送出時是**字串** `'true'` | Dell 客戶端使用 `strconv.FormatBool` |
+| `creationTime` | 快照時間，ISO 8601 且帶時區位移 | 文件記載；位移會被讀取並套用 —— 忽略它曾讓另一個系列付出一個版本 |
+| `storageResource`（快照上） | 快照屬於哪一顆 LUN | Dell 自己的 `SnapshotDisplayFields` |
+| `fcHostInitiators`、`iscsiHostInitiators` | 已註冊到某個 host 的 initiator | Dell 自己的 `HostDisplayFields` |
+| `initiatorId`、`parentHost` | initiator 的 WWPN／IQN，以及它所屬的 host | Dell 自己的 `HostInitiatorsDisplayFields` |
+| `initiatorType` | `'1'` 是 FC、`'2'` 是 iSCSI —— **字串** | Dell 自己的常數 |
+| `entries[].content`、`content` | 兩種回應形狀 | 文件記載 |
+
+欄位是 **opt-in**：不帶 `?fields=` 的請求，回來幾乎什麼都沒有。所以第一個要預期
+的失敗模式是「物件看起來是**空的**」而不是「**不存在**」，而那是兩個不同的答案。
+
+| 未解的問題 | 為什麼重要 |
+|---|---|
+| SCSI 的 vendor 與 product 字串。`DGC` / `VRAID` 是承襲自 CLARiiON 的寫法，也是本外掛用來過濾的依據；若是錯的，任何裝置都不會被辨識 | 這道閘門決定外掛會去碰哪些裝置 —— 請以 `sg_inq /dev/sdX` 確認 |
+| WWN 轉 WWID 的換算 | 這一項錯了，裝置探索會完全無法運作 |
+| `POST /instances/snap/<id>/action/restore` | 唯一**不在** Dell 客戶端裡的破壞性呼叫，因為 CSI driver 從來不需要倒回 |
+| 陣列對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |
+| HLU 能不能指定 | 沒有任何東西依賴它；Unity 自行配發 |
+
 ### PowerStore（出自 4.x REST 文件）
 
 請求的形狀有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：

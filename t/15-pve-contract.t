@@ -22,11 +22,13 @@ BEGIN {
 use PVE::Storage::Custom::DellPowerStorePlugin;
 use PVE::Storage::Custom::DellPowerVaultPlugin;
 use PVE::Storage::Custom::DellPowerFlexPlugin;
+use PVE::Storage::Custom::DellUnityPlugin;
 
 my @PLUGINS = qw(
     PVE::Storage::Custom::DellPowerStorePlugin
     PVE::Storage::Custom::DellPowerVaultPlugin
     PVE::Storage::Custom::DellPowerFlexPlugin
+    PVE::Storage::Custom::DellUnityPlugin
 );
 
 # ---------------------------------------------------------------------------
@@ -387,6 +389,7 @@ SKIP: {
         'PVE::Storage::Custom::DellPowerStorePlugin' => [qw(iscsi fc)],
         'PVE::Storage::Custom::DellPowerVaultPlugin' => [qw(iscsi fc)],
         'PVE::Storage::Custom::DellPowerFlexPlugin'  => [qw(sdc nvme)],
+        'PVE::Storage::Custom::DellUnityPlugin'      => [qw(fc iscsi)],
     );
 
     for my $plugin (@PLUGINS) {

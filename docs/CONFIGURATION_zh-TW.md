@@ -51,6 +51,39 @@ PowerVault 的 volume 與 snapshot 名稱**上限為 32 bytes**，而且 volume 
 
 若 storeid 長到放不下，外掛會在建立時直接報錯，而不是產生一個被截斷、可能與其他 VM 的 volume 撞名的名稱。在這個系列請使用簡短的 storage id。
 
+
+## Unity XT（`dellunity`）
+
+| 選項 | 型別 | 必填 | 預設 | 說明 |
+|---|---|---|---|---|
+| `unity-pool` | string | 否 | — | 新 LUN 建立在哪個儲存池。陣列有多個儲存池時為必填 |
+| `unity-thin` | boolean | 否 | `1` | 建立精簡佈建的 LUN。陣列必須已授權精簡佈建 |
+
+```bash
+pvesm add dellunity unity480 \
+    --dell-portal 10.0.0.10 \
+    --dell-username admin --dell-password '...' \
+    --dell-protocol fc \
+    --unity-pool pool_1 \
+    --content images,rootdir
+```
+
+### 這個系列有什麼不一樣
+
+**這裡沒有任何一項在 Unity 陣列上執行過。** 逐項的說明請見
+[TESTING_zh-TW.md](TESTING_zh-TW.md)。
+
+- **以名稱直接向陣列詢問 LUN**，端點是 `/instances/lun/name:<名稱>`，而不是送
+  server-side filter。其他每個系列都得用 filter，而一個未驗證的 filter 回傳空
+  集合，跟「根本沒有這個東西」無法區分。
+- **主機存取是取代而不是附加。** Unity 的 `hostAccess` 是「允許看到這顆 LUN 的
+  完整主機清單」，所以對應本節點時會先讀出現況再送出聯集。這就是為什麼一次對應
+  operations 會有兩趟往返而不是一趟。
+- **連結複製是快照的精簡複製**，因此範本的標記快照必須比它的複製活得久，而陣列
+  會拒絕刪除仍有存活複製的範本。
+- **`unity-thin` 需要授權。** 如果陣列沒有精簡佈建的授權，請設為 `0`，否則陣列
+  會拒絕建立。
+
 ## PowerFlex 專屬選項
 
 由 `dellpowerflex` 型別使用。PowerFlex 的 volume 不是以 SCSI LUN 的形式送到主機，因此這裡完全用不到 multipath 相關選項；`dell-protocol` 在這個系列接受的是 `nvme`（預設）或 `sdc`，而不是 `iscsi` 或 `fc`。
