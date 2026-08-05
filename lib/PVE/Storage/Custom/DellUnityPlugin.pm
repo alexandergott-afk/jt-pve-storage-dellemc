@@ -184,8 +184,49 @@ sub _volume_row {
         size  => $class->_num($row->{sizeTotal}),
         used  => $class->_num($row->{sizeAllocated} // $row->{sizeUsed}),
         wwid  => $api->wwn_to_wwid($row->{wwn}),
+        # A thin clone names the snapshot it reads from. This is what lets a
+        # linked clone be listed under the volid PVE stored for it.
+        source_id => $api->_ref_id($row->{parentSnap}),
         ctime => 0,
     };
+}
+
+# Which volumes are linked clones, and of which template.
+#
+# Without this a linked clone is listed under its own name, and 'qm rescan'
+# sees a volume no configuration references — so it adds the clone a SECOND
+# time, as an unused disk of the VM that owns it. A Unity thin clone reports
+# the snapshot it was taken from in parentSnap; a clone this plugin made was
+# taken from a template's marker snapshot, whose name decodes back to the
+# template. One snapshot listing answers for every volume at once — never a
+# per-volume call, this runs inside list_images.
+sub _array_clone_parents {
+    my ($class, $scfg, $storeid, $volumes, %opts) = @_;
+
+    return {} unless ref($volumes) eq 'ARRAY' && @$volumes;
+    return {} unless grep { $_->{source_id} } @$volumes;
+
+    my $api   = $class->_api($scfg, %opts);
+    my $snaps = eval { $api->snapshot_list(%opts) } // [];
+
+    my %base_of;
+    for my $snap (@$snaps) {
+        my $name = $snap->{name} or next;
+        my $id   = $snap->{id}   or next;
+        my $decoded = $class->naming->decode_snapshot_name($name) or next;
+        $base_of{$id} = $decoded->{volume} if $decoded->{is_base};
+    }
+
+    return {} unless %base_of;
+
+    my %parents;
+    for my $volume (@$volumes) {
+        my $source = $volume->{source_id} // next;
+        my $base   = $base_of{$source}    // next;
+        $parents{ $volume->{name} } = $base;
+    }
+
+    return \%parents;
 }
 
 sub _num {
@@ -302,14 +343,49 @@ sub _await_volume {
       . " five seconds\n";
 }
 
+# "Absent" on a DESTRUCTIVE path is confirmed by a listing, not believed
+# from a single 404.
+#
+# The manual gives three causes for 404: an invalid id, an invalid resource
+# type name, and an invalid URI PATTERN. The by-name lookup is a URI pattern
+# — /instances/lun/name:<name> — and whether this firmware supports it is
+# exactly the kind of thing nothing here has run against. If it does not,
+# every lookup answers 404, every volume reads as absent, and free_image
+# reports success for deletes that never happened: PVE drops the disk from
+# the VM configuration while the data sits on the array. Lesson 37's shape,
+# arriving through a new door.
+#
+# So when the by-name lookup says absent and the next step is to NOT delete
+# something, the listing gets the last word: a listing that succeeds without
+# the name in it proves absence; a listing that carries the name proves the
+# lookup is broken, and that is a loud error naming the firmware, not a
+# quiet success. The cost is one listing per delete-of-absent, which is
+# rare.
+sub _absence_confirmed {
+    my ($class, $api, $kind, $name, %opts) = @_;
+
+    my $rows = $kind eq 'snap' ? $api->snapshot_list(%opts)
+                               : $api->volume_list(%opts);
+
+    my ($ghost) = grep { ($_->{name} // '') eq $name } @$rows;
+    return 1 unless $ghost;
+
+    die "the by-name lookup reports '$name' absent, but the $kind listing"
+      . " carries it (id $ghost->{id}). This firmware may not support"
+      . " /instances/<type>/name: lookups; please report its version."
+      . " Refusing to treat the volume as deleted.\n";
+}
+
 sub _array_delete_volume {
     my ($class, $scfg, $storeid, $name, %opts) = @_;
 
     my $api = $class->_api($scfg, %opts);
 
     # Absent is a completed delete; unreachable is not, and
-    # volume_get_by_name dies rather than returning undef for that.
-    my $row = $api->volume_get_by_name($name, %opts) or return 1;
+    # volume_get_by_name dies rather than returning undef for that. A 404,
+    # though, is only believed after the listing agrees — see above.
+    my $row = $api->volume_get_by_name($name, %opts);
+    return $class->_absence_confirmed($api, 'lun', $name, %opts) unless $row;
 
     return $api->volume_delete($row->{id}, %opts);
 }
@@ -378,7 +454,13 @@ sub _array_snapshot_delete {
     my ($class, $scfg, $storeid, $snapshot, %opts) = @_;
 
     my $api = $class->_api($scfg, %opts);
-    my $row = $api->snapshot_get_by_name($snapshot, %opts) or return 1;
+
+    # Same confirmation as a volume delete: a snapshot wrongly read as
+    # absent stays on the array, and Unity then refuses to delete the LUN it
+    # belongs to — the volume becomes undeletable with nothing pointing at
+    # the cause.
+    my $row = $api->snapshot_get_by_name($snapshot, %opts);
+    return $class->_absence_confirmed($api, 'snap', $snapshot, %opts) unless $row;
 
     return $api->snapshot_delete($row->{id}, %opts);
 }

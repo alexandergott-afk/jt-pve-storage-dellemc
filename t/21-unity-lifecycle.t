@@ -82,13 +82,23 @@ sub lun_by_id {
         my $row = $LUN{$name} or return undef;
         return { id => $row->{id}, name => $name, wwn => $row->{wwn},
                  sizeTotal => $row->{size}, sizeAllocated => 0,
+                 (defined $row->{parent_snap}
+                     ? (parentSnap => { id => $row->{parent_snap} },
+                        isThinClone => 1) : ()),
                  hostAccess => [ map { { host => { id => $_ }, accessMask => '1' } }
                                  sort keys %{ $row->{hosts} } ] };
     }
 
     sub volume_list {
         my ($self) = @_;
-        return [ map { $self->volume_get_by_name($_) } sort keys %LUN ];
+        # Built directly rather than through volume_get_by_name: the
+        # broken-firmware test blinds the by-name lookup while the listing
+        # must keep telling the truth, exactly as the real array would.
+        return [ map { { id => $LUN{$_}{id}, name => $_,
+                         sizeTotal => $LUN{$_}{size},
+                         (defined $LUN{$_}{parent_snap}
+                             ? (parentSnap => { id => $LUN{$_}{parent_snap} }) : ()),
+                       } } sort keys %LUN ];
     }
 
     sub volume_create {
@@ -182,7 +192,7 @@ sub lun_by_id {
 
     sub snapshot_list {
         my ($self) = @_;
-        return [ map { $self->snapshot_get_by_name($_) } sort keys %SNAP ];
+        return [ map { { id => $SNAP{$_}{id}, name => $_ } } sort keys %SNAP ];
     }
 
     sub snapshot_delete {
@@ -229,6 +239,7 @@ sub lun_by_id {
 
         $self->volume_create($name, 4 * 1024**3);
         $SNAP{$snap}{clones}{$name} = 1;
+        $LUN{$name}{parent_snap} = $snap_id;
 
         return $LUN{$name}{id};
     }
@@ -456,6 +467,15 @@ reset_array();
     ok(grep({ /^pve-u480-500/ } @{ names_on_array() }),
         '... and the template is still there, which is what PVE must be told');
 
+    # The clone must be reported under the template's volid, or 'qm rescan'
+    # adds it a second time as an unused disk.
+    my $vols = $P->_array_list_volumes($scfg, $store, 'pve-u480-');
+    my $parents = $P->_array_clone_parents($scfg, $store, $vols);
+    is($parents->{'pve-u480-501-disk0'}, 'pve-u480-500-disk0',
+        'the linked clone is mapped back to its template');
+    ok(!exists $parents->{'pve-u480-500-disk0'},
+        '... and the template itself is nobody\'s clone');
+
     $P->free_image($store, $scfg, $clone);
     ok(!grep({ /^pve-u480-501/ } @{ names_on_array() }), 'the clone is deleted');
 
@@ -605,6 +625,60 @@ reset_array();
 
     $P->free_image($store, $scfg, $volname);
     is_deeply(names_on_array(), [], 'and it deletes like any other volume');
+}
+
+# ---------------------------------------------------------------------------
+# A firmware whose by-name lookup does not work
+#
+# The manual lists "invalid URI pattern" among 404's causes, so a firmware
+# without /instances/<type>/name: support answers 404 to every lookup - and
+# every volume then reads as absent. On the delete path that is lesson 37:
+# free_image reports success, PVE drops the disk from the VM configuration,
+# and the data sits on the array with nothing pointing at it.
+# ---------------------------------------------------------------------------
+
+{
+    reset_array();
+
+    my $volname = $P->alloc_image($store, $scfg, 900, 'raw', undef, 4 * 1024 * 1024);
+    is_deeply(names_on_array(), ['pve-u480-900-disk0'], 'the volume exists');
+
+    # The by-name lookup goes blind; the listing still tells the truth.
+    no warnings 'redefine', 'once';
+    local *Test::UnityApi::volume_get_by_name = sub { return undef };
+
+    ok(!eval { $P->_array_delete_volume($scfg, $store, 'pve-u480-900-disk0'); 1 },
+        'a delete whose lookup says absent while the listing disagrees is REFUSED');
+    like($@, qr/listing carries it/, '... and says what the contradiction was');
+    like($@, qr/firmware/, '... pointing at the firmware, which is the likely cause');
+
+    is_deeply(names_on_array(), ['pve-u480-900-disk0'],
+        'and the volume is still there - success was never reported');
+}
+
+{
+    # Genuinely absent: lookup says no, listing agrees, delete succeeds.
+    reset_array();
+
+    ok(eval { $P->_array_delete_volume($scfg, $store, 'pve-u480-901-disk0'); 1 },
+        'a volume absent from BOTH the lookup and the listing is a completed delete')
+        or diag($@);
+}
+
+{
+    # The same guard on snapshots: one wrongly read as absent stays behind,
+    # and Unity then refuses to delete the LUN it belongs to.
+    reset_array();
+
+    my $volname = $P->alloc_image($store, $scfg, 902, 'raw', undef, 4 * 1024 * 1024);
+    $P->volume_snapshot($scfg, $store, $volname, 'stuck');
+
+    no warnings 'redefine', 'once';
+    local *Test::UnityApi::snapshot_get_by_name = sub { return undef };
+
+    ok(!eval { $P->_array_snapshot_delete($scfg, $store,
+            'pve-u480-902-disk0.pve-snap-stuck'); 1 },
+        'a snapshot the listing still carries is not reported deleted');
 }
 
 done_testing();

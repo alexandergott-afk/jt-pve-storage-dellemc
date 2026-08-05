@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.72~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.73~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.73~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">"Absent" on a Unity delete now gets a listing's second opinion — a firmware without by-name lookups would otherwise have turned every delete into a reported success that deleted nothing. And linked clones map back to their template, so qm rescan does not duplicate them.</span>
+            <span class="lang-zh">Unity 刪除路徑上的「不存在」現在要經過列舉的第二意見 —— 否則不支援以名稱查詢的韌體，會把每一次刪除都變成「回報成功但什麼都沒刪」。另外連結複製會對應回它的範本，qm rescan 不會再把它加成兩份。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.72~beta1</div>

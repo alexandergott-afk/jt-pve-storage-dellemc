@@ -7,6 +7,31 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.73~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: "absent" on a delete is now confirmed by a listing, not believed
+  from one 404.** The manual gives three causes for 404, and one of them is
+  an invalid **URI pattern** — which is what the by-name lookup is. A
+  firmware without `/instances/<type>/name:` support would answer 404 to
+  every lookup, every volume would read as absent, and `free_image` would
+  report success for deletes that never happened: PVE drops the disk from
+  the VM configuration while the data sits on the array.
+
+  On the destructive paths — volume delete and snapshot delete — an absent
+  answer from the lookup now gets the listing's second opinion. A listing
+  that succeeds without the name proves absence; one that carries the name
+  proves the lookup is broken, and that is a loud error naming the firmware,
+  not a quiet success. One listing per delete-of-absent, which is rare.
+
+- **Unity: `qm rescan` would have duplicated every linked clone.** A linked
+  clone must be listed under the volid PVE stored for it —
+  `base-.../vm-...` — or rescan sees a volume no configuration references
+  and adds it a second time as an unused disk. A Unity thin clone reports
+  the snapshot it reads from in `parentSnap`; that snapshot's name decodes
+  back to the template, so the mapping costs one snapshot listing for every
+  volume at once, never a per-volume call.
+
 ## [0.7.72~beta1] - 2026-08-06
 
 ### Fixed

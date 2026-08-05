@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.7.73~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: "absent" on a delete is confirmed by a listing, not believed from
+    one 404. The manual gives three causes for 404 and one is an invalid URI
+    pattern - which is what the by-name lookup is. A firmware without
+    /instances/<type>/name: support would answer 404 to every lookup, every
+    volume would read absent, and free_image would report success for
+    deletes that never happened: PVE drops the disk from the VM
+    configuration while the data sits on the array. On the destructive
+    paths an absent lookup now gets the listing's second opinion; a listing
+    that carries the name is a loud error naming the firmware.
+  * UNITY: qm rescan would have duplicated every linked clone as an unused
+    disk. A linked clone is now listed under the volid PVE stored for it,
+    mapped through parentSnap and one snapshot listing for all volumes at
+    once - never a per-volume call.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 03:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.72~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.
