@@ -289,6 +289,7 @@ rather than ABSENT, and those are different answers.
 | How many thin clones one base resource supports, and how many snapshots one LUN family carries | Dell's white paper suggests both are bounded (thin clones per base, snapshots per family); a template with more linked clones than the limit will be refused by the array. Not enforced client-side — the array's refusal is authoritative |
 | That `copyName` on a snap restore names the automatic backup snapshot | Dell's white paper documents that every restore creates one; if `copyName` is ignored, the backup gets an array-chosen name that the snapshot purge does not recognise, and the volume becomes undeletable. **Check for a snapshot named `<volume>.pve-snap-rollback*` after the first `qm rollback`** |
 | Whether an HLU can be pinned | nothing depends on it; Unity assigns them |
+| The iSCSI portal query: the `iscsiPortal` type, its `ipAddress` and `iscsiNode` fields, and whether the node name is the target IQN | the customer's array runs FC, so this path will be the last to meet hardware; until then an iSCSI Unity storage fails at portal discovery with a legible error rather than a wrong login |
 
 ### Testing Unity without a Unity
 

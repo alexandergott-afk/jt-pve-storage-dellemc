@@ -649,8 +649,13 @@ sub activate_storage {
     # on a shared node and left this plugin's drop-in behind, for a storage
     # that never came to exist. Found by running 'pvesm add' end-to-end
     # against an API emulator on a node that could not serve either
-    # protocol. Nothing in the activation needs the drop-in: it tunes
-    # devices, and devices appear at activate_volume, not here.
+    # protocol.
+    #
+    # Nothing in the activation NEEDS the drop-in. On iSCSI a login can
+    # surface previously-mapped LUNs a moment before this line runs, but the
+    # reconfigure that follows the first write reapplies the settings to
+    # maps that already formed, and the kernel's own built-in table covers
+    # these vendors' devices meanwhile - so the late write costs nothing.
     $class->_ensure_multipath_config();
 
     $class->_ensure_host_throttled($storeid, $scfg);
