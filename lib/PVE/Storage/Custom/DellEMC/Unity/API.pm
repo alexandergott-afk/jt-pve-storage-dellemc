@@ -361,6 +361,374 @@ sub align_size {
     return $aligned;
 }
 
+# ---------------------------------------------------------------------------
+# Volumes
+#
+# A LUN is READ as 'lun' and ACTED ON as 'storageResource'. They share an id,
+# so the same string addresses both — which is exactly why getting the type
+# wrong fails in a way that reads like a permissions problem rather than a
+# wrong URL.
+# ---------------------------------------------------------------------------
+
+sub volume_get {
+    my ($self, $id, %opts) = @_;
+
+    return $self->_instance('lun', $id, FIELDS_LUN, %opts);
+}
+
+sub volume_get_by_name {
+    my ($self, $name, %opts) = @_;
+
+    return $self->_instance_by_name('lun', $name, FIELDS_LUN, %opts);
+}
+
+sub volume_list {
+    my ($self, %opts) = @_;
+
+    return $self->_collection('lun', FIELDS_LUN, %opts);
+}
+
+sub volume_create {
+    my ($self, $name, $size, %opts) = @_;
+
+    die $self->_msg("a volume needs a name") . "\n"
+        unless defined $name && length $name;
+
+    my $pool = delete $opts{pool};
+    my $pool_id = delete $opts{pool_id};
+
+    unless (defined $pool_id && length $pool_id) {
+        my $row = defined($pool) && length($pool)
+            ? $self->pool_get_by_name($pool, %opts)
+            : ($self->pool_list(%opts))->[0];
+
+        die $self->_msg(defined($pool) && length($pool)
+            ? "pool '$pool' does not exist on this array"
+            : "the array reported no pools. Create a pool before using this"
+              . " storage.") . "\n" unless $row;
+
+        $pool_id = $row->{id};
+    }
+
+    # An object that came back without the field that was asked for is the
+    # failure mode this API makes easy: fields are opt-in, so a lookup that
+    # succeeded and a lookup that returned an empty shell look the same to
+    # anything that only checks the row is there. Sending the create anyway
+    # would put a null where the pool goes, and the array's refusal would not
+    # say which of the two happened.
+    die $self->_msg("the array returned a pool with no id"
+        . (defined($pool) && length($pool) ? " for '$pool'" : '')
+        . ". This usually means the query did not ask for the fields it"
+        . " needed.") . "\n" unless defined $pool_id && length $pool_id;
+
+    my $aligned = $self->align_size($size);
+
+    # 'storagePool' is the key a create takes. 'pool' is what a LUN reports
+    # back afterwards; they are not interchangeable, and the array's refusal
+    # for the wrong one does not say which.
+    my $body = {
+        name          => $name,
+        description   => 'Managed by Proxmox VE (jt-pve-storage-dellemc)',
+        lunParameters => {
+            storagePool   => { id => $pool_id },
+            size          => $aligned + 0,
+            # Sent as a STRING, as Dell's own client does.
+            isThinEnabled => (delete $opts{thin} // 1) ? 'true' : 'false',
+        },
+    };
+
+    my $data = $self->post('/types/storageResource/action/createLun',
+        $body, %opts);
+
+    # The answer carries the storageResource id, which is the LUN's id.
+    my $content = $self->_content($data) // {};
+    my $id = $self->_ref_id($content->{storageResource}) // $content->{id};
+
+    return $id;
+}
+
+sub volume_delete {
+    my ($self, $id, %opts) = @_;
+
+    die $self->_msg("deleting a volume needs its id") . "\n"
+        unless defined $id && length $id;
+
+    return $self->delete("/instances/storageResource/$id", %opts);
+}
+
+# Unity takes the NEW TOTAL, not a delta — unlike PowerVault's
+# 'expand volume size', which takes the amount to add.
+sub volume_resize {
+    my ($self, $id, $size, %opts) = @_;
+
+    my $aligned = $self->align_size($size);
+
+    $self->post("/instances/storageResource/$id/action/modifyLun",
+        { lunParameters => { size => $aligned + 0 } }, %opts);
+
+    return $aligned;
+}
+
+sub volume_rename {
+    my ($self, $id, $name, %opts) = @_;
+
+    $self->post("/instances/storageResource/$id/action/modifyLun",
+        { name => $name }, %opts);
+
+    return 1;
+}
+
+# The WWID dm-multipath will know the device by.
+#
+# Unity reports a LUN's wwn colon-separated and upper case,
+# '60:06:01:60:...'. Linux forms the WWID as '3' + the bare hex, lower case.
+# NOT VERIFIED against a device: confirm on the first run by comparing this
+# against `multipath -ll`, which is how the PowerVault rule was confirmed.
+sub wwn_to_wwid {
+    my ($class, $wwn) = @_;
+
+    return undef unless defined $wwn && !ref($wwn);
+
+    (my $hex = $wwn) =~ s/[^0-9A-Fa-f]//g;
+    return undef unless length($hex) == 32;
+
+    return '3' . lc($hex);
+}
+
+sub volume_get_wwid {
+    my ($self, $name, %opts) = @_;
+
+    my $lun = $self->volume_get_by_name($name, %opts) // return undef;
+
+    return $self->wwn_to_wwid($lun->{wwn});
+}
+
+# ---------------------------------------------------------------------------
+# Snapshots
+# ---------------------------------------------------------------------------
+
+sub snapshot_create {
+    my ($self, $resource_id, $name, %opts) = @_;
+
+    my $data = $self->post('/types/snap/instances', {
+        name            => $name,
+        storageResource => { id => $resource_id },
+        description     => 'Managed by Proxmox VE',
+        isAutoDelete    => JSON::false,
+    }, %opts);
+
+    my $content = $self->_content($data) // {};
+
+    return $content->{id};
+}
+
+sub snapshot_get_by_name {
+    my ($self, $name, %opts) = @_;
+
+    return $self->_instance_by_name('snap', $name, FIELDS_SNAP, %opts);
+}
+
+sub snapshot_list {
+    my ($self, %opts) = @_;
+
+    return $self->_collection('snap', FIELDS_SNAP, %opts);
+}
+
+sub snapshot_delete {
+    my ($self, $id, %opts) = @_;
+
+    die $self->_msg("deleting a snapshot needs its id") . "\n"
+        unless defined $id && length $id;
+
+    return $self->delete("/instances/snap/$id", %opts);
+}
+
+# NOT VERIFIED. gounity does not restore a snapshot — a CSI driver has no
+# reason to — so this is the documented form and nothing more. It is the one
+# call here that could not be read out of Dell's own code, and it is also the
+# most destructive, so the plugin's rollback path checks that nothing on this
+# node is using the device before it is reached.
+sub volume_restore {
+    my ($self, $snap_id, %opts) = @_;
+
+    die $self->_msg("restoring needs a snapshot id") . "\n"
+        unless defined $snap_id && length $snap_id;
+
+    return $self->post("/instances/snap/$snap_id/action/restore", {}, %opts);
+}
+
+# A thin clone is taken FROM A SNAPSHOT, and it is the linked-clone
+# primitive. So a template's marker snapshot has to outlive its clones,
+# exactly as on PowerVault: deleting it while a clone reads from it is what
+# the array refuses.
+sub volume_clone {
+    my ($self, $resource_id, $snap_id, $name, %opts) = @_;
+
+    my $data = $self->post(
+        "/instances/storageResource/$resource_id/action/createLunThinClone",
+        { snap => { id => $snap_id }, name => $name }, %opts);
+
+    my $content = $self->_content($data) // {};
+
+    return $self->_ref_id($content->{storageResource}) // $content->{id};
+}
+
+# ---------------------------------------------------------------------------
+# Hosts
+# ---------------------------------------------------------------------------
+
+sub host_get_by_name {
+    my ($self, $name, %opts) = @_;
+
+    return $self->_instance_by_name('host', $name, FIELDS_HOST, %opts);
+}
+
+sub host_list {
+    my ($self, %opts) = @_;
+
+    return $self->_collection('host', FIELDS_HOST, %opts);
+}
+
+sub host_create {
+    my ($self, $name, %opts) = @_;
+
+    my $data = $self->post('/types/host/instances', {
+        type        => '1',          # a manually created host
+        name        => $name,
+        description => 'Proxmox VE node (jt-pve-storage-dellemc)',
+        osType      => 'Linux',
+    }, %opts);
+
+    my $content = $self->_content($data) // {};
+
+    return $content->{id};
+}
+
+# initiatorType is a STRING: '1' is FC, '2' is iSCSI.
+sub host_add_initiator {
+    my ($self, $host_id, $wwn_or_iqn, $type, %opts) = @_;
+
+    $self->post('/types/hostInitiator/instances', {
+        host              => { id => $host_id },
+        initiatorType     => "$type",
+        initiatorWWNorIqn => $wwn_or_iqn,
+    }, %opts);
+
+    return 1;
+}
+
+sub host_initiators {
+    my ($self, %opts) = @_;
+
+    return $self->_collection('hostInitiator', FIELDS_INIT, %opts);
+}
+
+# ---------------------------------------------------------------------------
+# Mapping
+#
+# THE DANGEROUS ONE.
+#
+# hostAccess REPLACES the list; it does not add to it. Sending only this
+# node's host unmaps the volume from every other node in the cluster, and a
+# guest on one of them is then writing to a device that has gone. Dell's own
+# client shipping both ExportVolume (one host) and ModifyVolumeExport (a
+# list) is the tell.
+#
+# So both directions here read the current list first and send the union or
+# the difference. The read has to happen inside whatever retry loop wraps the
+# write, because PVE runs these in parallel: a list read before another node's
+# write and sent after it puts back exactly the state that write removed.
+# ---------------------------------------------------------------------------
+
+sub _host_access_ids {
+    my ($self, $lun) = @_;
+
+    my $access = $lun->{hostAccess};
+    return [] unless ref($access) eq 'ARRAY';
+
+    my @ids;
+    for my $entry (@$access) {
+        next unless ref($entry) eq 'HASH';
+        my $id = $self->_ref_id($entry->{host});
+        push @ids, $id if defined $id && length $id;
+    }
+
+    return \@ids;
+}
+
+sub volume_mapped_hosts {
+    my ($self, $name, %opts) = @_;
+
+    my $lun = $self->volume_get_by_name($name, %opts) // return [];
+
+    return $self->_host_access_ids($lun);
+}
+
+sub is_mapped_to {
+    my ($self, $name, $host_id, %opts) = @_;
+
+    return 0 unless defined $host_id && length $host_id;
+
+    return (grep { $_ eq $host_id }
+        @{ $self->volume_mapped_hosts($name, %opts) }) ? 1 : 0;
+}
+
+sub _write_host_access {
+    my ($self, $resource_id, $ids, %opts) = @_;
+
+    my @entries = map { { host => { id => $_ },
+                          accessMask => ACCESS_PRODUCTION } } @$ids;
+
+    $self->post("/instances/storageResource/$resource_id/action/modifyLun",
+        { lunHostAccessParameters => { hostAccess => \@entries } }, %opts);
+
+    return 1;
+}
+
+# Add this node's host WITHOUT removing anyone else's.
+sub volume_attach {
+    my ($self, $name, $host_id, %opts) = @_;
+
+    die $self->_msg("mapping a volume needs a host id") . "\n"
+        unless defined $host_id && length $host_id;
+
+    # Read now, inside the caller's retry loop, not before it.
+    my $lun = $self->volume_get_by_name($name, %opts);
+    die $self->_msg("volume '$name' is not on the array, so it cannot be"
+        . " mapped") . "\n" unless $lun;
+
+    my $current = $self->_host_access_ids($lun);
+    return 1 if grep { $_ eq $host_id } @$current;
+
+    $self->_write_host_access($lun->{id}, [ @$current, $host_id ], %opts);
+
+    return 1;
+}
+
+# Remove this node's host and leave every other one in place.
+sub volume_detach {
+    my ($self, $name, $host_id, %opts) = @_;
+
+    die $self->_msg("unmapping a volume needs a host id") . "\n"
+        unless defined $host_id && length $host_id;
+
+    my $lun = $self->volume_get_by_name($name, %opts);
+
+    # Absent is not a failure to unmap: there is nothing to unmap from. This
+    # is get_or_undef's distinction doing its job — an array that could not
+    # be reached dies inside volume_get_by_name rather than arriving here.
+    return 1 unless $lun;
+
+    my $current = $self->_host_access_ids($lun);
+    my @remaining = grep { $_ ne $host_id } @$current;
+
+    return 1 if scalar(@remaining) == scalar(@$current);
+
+    $self->_write_host_access($lun->{id}, \@remaining, %opts);
+
+    return 1;
+}
+
 1;
 
 __END__
