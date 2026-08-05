@@ -1,3 +1,19 @@
+jt-pve-storage-dellemc (0.7.77~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: a listing that contradicted itself was read as empty. An array
+    reporting entryCount 9999 while handing back an empty page was treated
+    as an empty collection - which on the orphan reaper's path reads as
+    "every volume was deleted". The contradiction is now an error after
+    exactly one request, and the page-cap backstop dies naming the
+    incomplete listing instead of silently truncating.
+  * UNITY: the health ping no longer duplicates the capacity query. Every
+    status cycle listed the pools twice; the ping now asks basicSystemInfo,
+    the cheapest thing a Unity serves, whose answer also names the model
+    for a first run's log.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 02:20:00 +0800
+
 jt-pve-storage-dellemc (0.7.76~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

@@ -343,6 +343,19 @@ sub _collection {
         last if scalar(@$batch) < PAGE_SIZE;
     }
 
+    # MAX_PAGES is a runaway backstop, not a quota, and hitting it means the
+    # listing is INCOMPLETE. Saying so is the difference between an operator
+    # reading "these are the volumes" and "these are the first hundred
+    # thousand of them" - a silent cap reads as completeness, and the callers
+    # of this include the paths that decide what may be deleted.
+    if (defined $expected && scalar(@rows) < $expected) {
+        $self->log_warn("the $type listing stopped after " . MAX_PAGES
+            . " pages with " . scalar(@rows) . " of $expected rows;"
+            . " treating it as INCOMPLETE");
+        die $self->_msg("the $type listing is incomplete ("
+            . scalar(@rows) . " of $expected rows)") . "\n";
+    }
+
     return \@rows;
 }
 
@@ -382,6 +395,21 @@ sub _instance_by_name {
 # ---------------------------------------------------------------------------
 # Pools and capacity
 # ---------------------------------------------------------------------------
+
+# The array's own identity, from the one endpoint that answers without
+# authentication. Cheap enough for the health path, and its answer - name,
+# model, software version - is what a first run's log needs when nothing
+# else works.
+sub system_info {
+    my ($self, %opts) = @_;
+
+    my $data = $self->get('/types/basicSystemInfo/instances',
+        { fields => 'name,model,softwareVersion', compact => 'true' }, %opts);
+
+    my $rows = $self->_entries($data);
+
+    return $rows->[0];
+}
 
 sub pool_list {
     my ($self, %opts) = @_;

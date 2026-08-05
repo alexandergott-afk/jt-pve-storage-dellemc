@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.76~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.77~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.77~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A Unity listing that claims 9999 rows and hands back none was read as an empty collection — which the orphan reaper reads as "everything was deleted". Contradictions and page-cap truncations are now loud errors. And the health ping stopped duplicating the capacity query.</span>
+            <span class="lang-zh">一份自稱有 9999 筆卻一筆都不給的 Unity 列舉，原本被讀成空集合 —— 孤兒回收機制會把那讀成「全部都被刪了」。矛盾與頁數上限截斷現在都是大聲的錯誤。另外健康檢查的 ping 不再與容量查詢重複。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.76~beta1</div>

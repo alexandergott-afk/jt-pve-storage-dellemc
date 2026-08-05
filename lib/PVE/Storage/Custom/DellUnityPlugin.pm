@@ -271,11 +271,13 @@ sub _to_epoch {
 sub _array_ping {
     my ($class, $scfg, %opts) = @_;
 
-    # Any authenticated read proves the array is there and the credentials
-    # work. A pool listing is also the thing most likely to be misconfigured,
-    # so its failure is worth surfacing here rather than at the first alloc.
-    my $pools = $class->_api($scfg, %opts)->pool_list(%opts);
-    die "the array reported no pools\n" unless ref($pools) eq 'ARRAY' && @$pools;
+    # basicSystemInfo, not a pool listing: the health path already lists the
+    # pools for capacity in the same cycle, and pinging with a second copy of
+    # the same request doubled the array's cost of every poll for nothing.
+    # This endpoint is also the cheapest thing a Unity serves, and its answer
+    # names the model - which is what a first run's log needs.
+    my $system = $class->_api($scfg, %opts)->system_info(%opts);
+    die "the array did not report a system object\n" unless $system;
 
     return 1;
 }

@@ -7,6 +7,25 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.77~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: a listing that contradicted itself was read as empty.** An array
+  that reports `entryCount: 9999` and hands back an empty page was treated
+  as an empty collection — which, on the orphan reaper's path, reads as
+  "every volume was deleted". The contradiction is now an error after
+  exactly one request, and the page-cap backstop (100,000 rows) now dies
+  naming the incomplete listing instead of silently truncating: a silent cap
+  reads as completeness, and the callers of this include the paths that
+  decide what may be deleted.
+
+### Changed
+- **Unity: the health ping no longer duplicates the capacity query.** Every
+  status cycle listed the pools twice — once as the ping, once for capacity.
+  The ping now asks for `basicSystemInfo`, the cheapest thing a Unity
+  serves, whose answer (name, model, software version) is also what a first
+  run's log needs when nothing else works.
+
 ## [0.7.76~beta1] - 2026-08-06
 
 ### Fixed

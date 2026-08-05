@@ -267,8 +267,11 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
 }
 
 {
-    # An empty page ends it whatever the count claims. A count that never
-    # arrives would otherwise spin to MAX_PAGES.
+    # An array that SAYS 9999 rows exist and hands back an empty page is
+    # contradicting itself, and the contradiction must not be read as "the
+    # collection is empty" - on the reaper's path that reads as "every
+    # volume was deleted". It is an error, after exactly one request, not a
+    # spin to MAX_PAGES and not a quiet [].
     my $requests = 0;
     my ($api) = make_api(handler => sub {
         my ($req, $path) = @_;
@@ -277,8 +280,21 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
         return reply({ entryCount => 9999, %{ entries() } });
     });
 
-    is_deeply($api->volume_list(), [], 'an empty first page is an empty collection');
-    is($requests, 1, '... asked for exactly once, not until the count is met');
+    ok(!eval { $api->volume_list(); 1 },
+        'a count with no rows behind it is an error, never an empty collection');
+    like($@, qr/incomplete/, '... named as the incomplete listing it is');
+    is($requests, 1, '... after exactly one request, not a spin to the page cap');
+}
+
+{
+    # A count of zero and an empty page agree: genuinely empty.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(entries({ id => '0' })) unless $path =~ m{/types/lun/instances};
+        return reply({ entryCount => 0, %{ entries() } });
+    });
+
+    is_deeply($api->volume_list(), [], 'a count of zero IS an empty collection');
 }
 
 # ---------------------------------------------------------------------------
