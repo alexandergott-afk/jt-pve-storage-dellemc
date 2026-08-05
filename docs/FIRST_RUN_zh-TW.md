@@ -100,6 +100,28 @@ multipath -ll
 
 ---
 
+### Unity XT：第一次接觸
+
+Unity 系列從未在陣列上執行過；首次執行正是用來結清
+[TESTING_zh-TW.md](TESTING_zh-TW.md) 裡 `NOT VERIFIED` 登記的。三件特別的事：
+
+```bash
+pvesm add dellunity u480 \
+    --dell-portal 192.168.1.21,192.168.1.22 \
+    --dell-username admin --dell-password '...' \
+    --dell-protocol fc --unity-pool pool_1 --content images,rootdir
+```
+
+- **把兩個 SP 的管理 IP 都列進去** —— `dell-portal` 事後不能改，而且 Unity
+  不是每種架設都有浮動管理位址。
+- **第一顆 LUN 對應之後，回報三件事**：`sg_inq /dev/sdX`（本外掛用來過濾
+  清掃範圍的 vendor／product 字串）、外掛算出的 WWID 是否與 `multipath -ll`
+  一致、以及第一次 `qm rollback` 之後，陣列上是否有名為
+  `<磁碟區>.pve-snap-pve.rollback*` 的快照（那是 `copyName` 生效的證明；
+  如果出現的反而是陣列自取名稱的快照，請立刻回報）。
+- **錯誤訊息裡的 302 是授權失敗**，不是重新導向：代表 `X-EMC-REST-CLIENT`
+  標頭沒有送達。請檢查節點與陣列之間有沒有 proxy。
+
 ## 第一台 VM
 
 ### 5. 一顆磁碟

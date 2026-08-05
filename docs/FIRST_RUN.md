@@ -123,6 +123,31 @@ is the single most likely first-run failure. Compare 2 against the WWID in
 
 ---
 
+### Unity XT: first contact
+
+The Unity family has never run against an array; a first run is what settles
+its `NOT VERIFIED` register in [TESTING.md](TESTING.md). Three specifics:
+
+```bash
+pvesm add dellunity u480 \
+    --dell-portal 192.168.1.21,192.168.1.22 \
+    --dell-username admin --dell-password '...' \
+    --dell-protocol fc --unity-pool pool_1 --content images,rootdir
+```
+
+- **List both storage processors' management IPs** — `dell-portal` cannot be
+  changed later, and Unity has no floating management address on every
+  setup.
+- **After the first LUN maps, report three things**: `sg_inq /dev/sdX`
+  (the vendor/product strings this plugin gates its cleanup sweeps on),
+  whether the plugin's WWID matches `multipath -ll`, and — after the first
+  `qm rollback` — whether the array holds a snapshot named
+  `<volume>.pve-snap-pve.rollback*` (proof that `copyName` works; an
+  array-named snapshot there instead must be reported at once).
+- **A 302 in an error message is an authorization failure**, not a redirect:
+  the `X-EMC-REST-CLIENT` header did not arrive. Look for a proxy between
+  the node and the array.
+
 ## The first VM
 
 ### 5. A disk

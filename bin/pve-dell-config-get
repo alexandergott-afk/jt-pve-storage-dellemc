@@ -212,6 +212,10 @@ if (defined $type && $type ne 'dellpowerstore') {
          ? "  PowerVault ME does not offer the config backup: it would cost one"
          . " extra volume per snapshot, and that family's volume ceiling is too"
          . " low for it.\n"
+         : $type eq 'dellunity'
+         ? "  Unity's config backup is off until the family has passed a run on"
+         . " real hardware: a family whose device discovery has never been"
+         . " confirmed should not be creating volumes nobody asked for.\n"
          : '')
       . "  Recover the VM configuration from a PVE backup, or from /etc/pve on"
       . " another node of the cluster.\n";
