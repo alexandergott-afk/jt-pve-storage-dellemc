@@ -27,6 +27,39 @@ plugins — that is why the prefixes exist.
 | `dell-config-backup-timeout` | 5–60 | no | `15` | Device wait for the config backup volume |
 | `dell-rescan-interval` | 0–3600 | no | `300` | Minimum seconds between periodic SAN rescans; 0 rescans every time |
 
+## Management-address failover: which arrays need the comma
+
+Arrays differ in how their management interface survives a controller
+failure, and it decides how to fill in `dell-portal`:
+
+| Array | Management model | What to put in `dell-portal` |
+|---|---|---|
+| **PowerVault ME4/ME5** | one fixed IP **per controller** (A and B), no virtual address. Both management controllers answer at all times, but a failed controller's IP disappears **with it** — nothing floats to the survivor | **both controllers, comma-separated**: `192.168.1.11,192.168.1.12` |
+| PowerStore | a floating cluster management IP | the cluster IP alone is enough |
+| Unity XT | **one floating management IP by design** — it follows the master SP, so a SP failover keeps the same address (management pauses for the minutes the failover takes) | the system management IP alone is enough; the comma form is accepted but not needed |
+| PowerFlex | PowerFlex Manager / gateway VIP | the VIP |
+
+This is the client-side equivalent of what a NetApp cluster-management LIF
+or a Pure `vir0` does on the array side: PowerVault simply has no such
+thing, so the plugin does the moving instead. On a connection failure it
+steps to the next address, re-authenticates (a session belongs to the
+controller that issued it), and stays on the address that answers.
+
+Three things to know:
+
+- **`dell-portal` cannot be changed after the storage is created.** On an
+  ME, list both controllers at `pvesm add` time — during an incident it is
+  too late.
+- **The data path needs none of this.** FC and iSCSI reach both controllers
+  at all times; dm-multipath and ALUA handle a controller failover on their
+  own, and running guests never notice. This section is only about
+  management: status, allocation, snapshots, deletion.
+- **The cost is bounded.** With every address dead, `pvesm status` pays one
+  short timeout per address (measured: 4.0 s at `dell-status-timeout 2` with
+  two addresses) and other storages are not delayed.
+
+To see an ME's two addresses on the array itself: `show network-parameters`.
+
 ## PowerStore options
 
 | Option | Type | Required | Default | Description |

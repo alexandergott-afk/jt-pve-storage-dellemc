@@ -135,9 +135,9 @@ pvesm add dellunity u480 \
     --dell-protocol fc --unity-pool pool_1 --content images,rootdir
 ```
 
-- **List both storage processors' management IPs** — `dell-portal` cannot be
-  changed later, and Unity has no floating management address on every
-  setup.
+- **`dell-portal` cannot be changed later.** Unity has a floating management
+  IP that follows the master SP by design; that one address is enough. For
+  extra insurance the comma form also accepts the SPs' fixed addresses.
 - **After the first LUN maps, report three things**: `sg_inq /dev/sdX`
   (the vendor/product strings this plugin gates its cleanup sweeps on),
   whether the plugin's WWID matches `multipath -ll`, and — after the first

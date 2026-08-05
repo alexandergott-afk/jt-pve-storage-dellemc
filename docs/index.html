@@ -551,12 +551,16 @@
 
     <h3 class="subsection-title">PowerVault ME4 / ME5</h3>
     <pre><span class="cmd">pvesm</span> add dellpowervault me5 \
-    <span class="flag">--dell-portal</span> 192.168.1.60 \
+    <span class="flag">--dell-portal</span> 192.168.1.60,192.168.1.61 \
     <span class="flag">--dell-username</span> manage \
     <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
     <span class="flag">--pvault-pool</span> A \
     <span class="flag">--content</span> images,rootdir \
     <span class="flag">--shared</span> 1</pre>
+    <div class="alert alert--warning">
+        <span class="lang-en"><strong>Why two addresses?</strong> An ME has no virtual management IP: controller A and B each keep their own, and a failed controller's address disappears with it. List both at creation time &mdash; <code>dell-portal</code> cannot be edited afterwards, and during an incident it is too late. Verify the pair on the array with <code>show network-parameters</code>.</span>
+        <span class="lang-zh"><strong>為什麼要填兩個位址？</strong> ME 沒有虛擬管理 IP：控制器 A 與 B 各自持有位址，故障控制器的位址會跟著它一起消失。請在建立時就把兩個都列入 &mdash; <code>dell-portal</code> 事後不能修改，事故當下才想改就來不及了。可在陣列上以 <code>show network-parameters</code> 確認這兩個位址。</span>
+    </div>
     <div class="alert alert--info">
         <span class="lang-en">PowerVault names are limited to 32 bytes, so keep the storage id short. A name that would not fit raises an error rather than being truncated into a collision.</span>
         <span class="lang-zh">PowerVault 的名稱上限是 32 bytes，所以 storage id 請取短一點。放不下的名稱會直接報錯，而不是被截斷成可能撞名的名稱。</span>
@@ -604,8 +608,8 @@
             </tr></thead>
             <tbody>
                 <tr><td><code>dell-portal</code></td><td>—</td>
-                    <td><span class="lang-en">Management address. Required, cannot be changed later</span>
-                        <span class="lang-zh">管理位址。必填，且建立後不可變更</span></td></tr>
+                    <td><span class="lang-en">Management address(es), comma-separated. Required, cannot be changed later. PowerVault ME has one fixed IP per controller and no floating address &mdash; unlike a NetApp cluster LIF or a Pure vir0, nothing moves to the surviving controller &mdash; so list both controllers up front; the plugin fails over between them. The data path needs none of this: dm-multipath handles controller failover on its own</span>
+                        <span class="lang-zh">管理位址（可逗號分隔多個）。必填，且建立後不可變更。PowerVault ME 每個控制器各有固定 IP、沒有浮動位址 &mdash; 不像 NetApp 的 cluster LIF 或 Pure 的 vir0，故障時不會有位址漂移到存活的控制器 &mdash; 所以請一開始就把兩個控制器都列入，外掛會在其間自動容錯。資料路徑完全不需要這些：dm-multipath 自己處理控制器容錯</span></td></tr>
                 <tr><td><code>dell-username</code></td><td>—</td>
                     <td><span class="lang-en">API user. Required</span><span class="lang-zh">API 帳號。必填</span></td></tr>
                 <tr><td><code>dell-password</code></td><td>—</td>

@@ -24,6 +24,34 @@ English: [CONFIGURATION.md](CONFIGURATION.md)
 | `dell-config-backup-timeout` | 5–60 | 否 | `15` | 等待 config 備份卷裝置的秒數 |
 | `dell-rescan-interval` | 0–3600 | 否 | `300` | 週期性 SAN 重新掃描的最小間隔，0 表示每次都掃 |
 
+## 管理位址容錯：哪些陣列需要逗號
+
+各陣列的管理介面在控制器故障時的行為不同，這決定 `dell-portal` 該怎麼填：
+
+| 陣列 | 管理位址模型 | `dell-portal` 該填什麼 |
+|---|---|---|
+| **PowerVault ME4/ME5** | **每個控制器**各一個固定 IP（A、B），沒有虛擬位址。兩個管理控制器平時都會回應，但故障控制器的 IP 會**跟著它一起消失** —— 不會漂移到存活的那一邊 | **兩個控制器都填，逗號分隔**：`192.168.1.11,192.168.1.12` |
+| PowerStore | 有浮動的叢集管理 IP | 填叢集 IP 即可 |
+| Unity XT | **設計上就是一個浮動管理 IP** —— 它跟著主 SP 走，SP failover 後位址不變（failover 進行的那幾分鐘管理會暫停） | 填系統管理 IP 即可；逗號寫法可用但不需要 |
+| PowerFlex | PowerFlex Manager / gateway 的 VIP | 填 VIP |
+
+這等於把 NetApp 的 cluster-management LIF 或 Pure 的 `vir0` 在陣列端做的事，
+搬到用戶端來做：PowerVault 根本沒有那種東西，所以由外掛負責移動。連線失敗時
+它會換到下一個位址、重新認證（session 屬於簽發它的那個控制器），並停留在
+答話的位址上。
+
+三件要知道的事：
+
+- **`dell-portal` 在儲存建立之後不能修改。** ME 請在 `pvesm add` 時就把兩個
+  控制器都列入 —— 事故當下才想改就來不及了。
+- **資料路徑完全不需要這些。** FC 與 iSCSI 隨時同時通到兩個控制器，
+  dm-multipath 與 ALUA 自己處理控制器容錯，執行中的 guest 毫無感覺。本節
+  只關於管理：狀態、配置、快照、刪除。
+- **代價有上界。** 所有位址都死掉時，`pvesm status` 每個位址付一次短逾時
+  （實測：`dell-status-timeout 2`、兩個位址共 4.0 秒），其他儲存不受拖累。
+
+想在陣列上確認 ME 的兩個位址：`show network-parameters`。
+
 ## PowerStore 專屬選項
 
 | 選項 | 型別 | 必填 | 預設 | 說明 |

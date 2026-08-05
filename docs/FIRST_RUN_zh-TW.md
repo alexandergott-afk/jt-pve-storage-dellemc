@@ -112,8 +112,8 @@ pvesm add dellunity u480 \
     --dell-protocol fc --unity-pool pool_1 --content images,rootdir
 ```
 
-- **把兩個 SP 的管理 IP 都列進去** —— `dell-portal` 事後不能改，而且 Unity
-  不是每種架設都有浮動管理位址。
+- **`dell-portal` 事後不能改。** Unity 設計上有一個跟著主 SP 走的浮動管理
+  IP，填它即可；若你想多一層保險，也可以逗號再列入 SP 的固定位址。
 - **第一顆 LUN 對應之後，回報三件事**：`sg_inq /dev/sdX`（本外掛用來過濾
   清掃範圍的 vendor／product 字串）、外掛算出的 WWID 是否與 `multipath -ll`
   一致、以及第一次 `qm rollback` 之後，陣列上是否有名為
