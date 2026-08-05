@@ -957,4 +957,39 @@ SKIP: {
         'and the message names the port to check');
 }
 
+# ---------------------------------------------------------------------------
+# A dead array does not get billed twice for being dead
+#
+# The login has two generations, and each inner request cycles every
+# configured management address. Without the guard, a dead array with two
+# addresses costs: v4 across both, then v3 across both, then the outer
+# retry does it all again - the multiplication that turned a 2-second
+# status timeout into 21 measured seconds on PowerVault. Once the v4
+# attempt has watched every address fail to connect, the v3 attempt is not
+# made: TCP that does not answer does not care which login it is refusing.
+# ---------------------------------------------------------------------------
+
+{
+    my %hits;
+    my $ua = FakeFlex->new(handler => sub {
+        my ($req, $path) = @_;
+        $hits{$path}++;
+        my $h = HTTP::Headers->new('Client-Warning' => 'Internal response',
+                                   'Content-Type' => 'application/json');
+        return HTTP::Response->new(500, undef, $h, '{}');
+    });
+
+    my $api = $API->new(portal => '10.0.0.7,10.0.0.8', username => 'admin',
+        password => 'secret', storeid => 'pf1', type => 'dellpowerflex',
+        ua => $ua, retries => 1);
+
+    ok(!eval { $api->volume_list(); 1 }, 'a dead array is a failure');
+    like($@, qr/no management address is answering/,
+        '... that names the real cause, not the second login generation');
+
+    ok($hits{'/rest/auth/login'}, 'the 4.x login was attempted');
+    ok(!$hits{'/api/login'},
+        'the 3.x login was NOT: both addresses had already failed to connect');
+}
+
 done_testing();

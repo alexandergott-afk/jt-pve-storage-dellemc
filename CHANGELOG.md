@@ -7,6 +7,23 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.78~beta1] - 2026-08-06
+
+### Fixed
+- **PowerFlex: a dead array was billed twice for being dead.** The
+  multi-address failover shipped in 0.7.75 capped the timeout multiplication
+  for PowerVault's two login methods — and PowerFlex's two login
+  *generations* (4.x, then 3.x) have exactly the same shape, and did not get
+  the cap. On a dead array with two addresses, the 4.x login cycled both,
+  the 3.x login cycled both again, and the outer retry repeated it all —
+  inside the bounded `status()` budget. Once the 4.x attempt has watched
+  every address fail to connect, the 3.x attempt is no longer made: TCP that
+  does not answer does not care which login it is refusing.
+
+  Lesson 40a in the transport dimension: a guard added for one family is not
+  applied to another until someone applies it. The test asserts `/api/login`
+  is never requested after both addresses failed to connect.
+
 ## [0.7.77~beta1] - 2026-08-06
 
 ### Fixed

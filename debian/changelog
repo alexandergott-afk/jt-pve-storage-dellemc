@@ -1,3 +1,18 @@
+jt-pve-storage-dellemc (0.7.78~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * POWERFLEX: a dead array was billed twice for being dead. The
+    multi-address failover capped the timeout multiplication for
+    PowerVault's two login methods, and PowerFlex's two login generations
+    (4.x then 3.x) have exactly the same shape - and did not get the cap.
+    Once the 4.x attempt has watched every address fail to connect, the 3.x
+    attempt is no longer made. Lesson 40a in the transport dimension: a
+    guard added for one family is not applied to another until someone
+    applies it. The test asserts /api/login is never requested after both
+    addresses failed to connect.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 02:40:00 +0800
+
 jt-pve-storage-dellemc (0.7.77~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

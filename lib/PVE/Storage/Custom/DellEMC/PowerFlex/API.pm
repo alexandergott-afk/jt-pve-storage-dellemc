@@ -100,6 +100,19 @@ sub _login {
 
         # A refused password is not a reason to try the other generation.
         die $v4_error if $v4_error && $v4_error =~ /HTTP 401|HTTP 403/;
+
+        # The 4.x attempt just watched every management address fail to
+        # connect. The 3.x login cannot succeed against addresses that do
+        # not answer TCP, and trying it anyway doubles the timeout on a dead
+        # array - inside the bounded status() budget. The same rule as
+        # PowerVault's two login methods, which is the point: a guard added
+        # for one family is not applied to another until someone applies it.
+        if ($self->_portals_all_dead()) {
+            chomp(my $why = $v4_error // 'no address is answering');
+            die $self->_msg("authentication failed: no management address is"
+                . " answering ($why)") . "\n";
+        }
+
         $self->{_v4_error} = $v4_error;
     }
 

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.77~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.78~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.78~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerFlex's two login generations have the same shape as PowerVault's two login methods, and the timeout cap added for one had not been applied to the other — lesson 40a in the transport dimension. A dead array is now declared dead after one cycle, whichever family is asking.</span>
+            <span class="lang-zh">PowerFlex 的兩個登入世代與 PowerVault 的兩種登入方式形狀相同，但為後者加上的逾時上限沒有套到前者 —— 教訓 40a 的傳輸層版本。現在無論哪個系列在問，死掉的陣列一輪之後就會被宣告死亡。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.77~beta1</div>
