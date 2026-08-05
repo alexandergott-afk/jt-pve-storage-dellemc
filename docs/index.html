@@ -914,9 +914,63 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">980 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears.</span>
-        <span class="lang-zh">980 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現。</span>
+        <span class="lang-en">2,426 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">2,426 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
     </p>
+
+    <h3>
+        <span class="lang-en">What has run on hardware</span>
+        <span class="lang-zh">哪些在實機上跑過</span>
+    </h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th><span class="lang-en">Family</span><span class="lang-zh">產品系列</span></th>
+                <th><span class="lang-en">Data path</span><span class="lang-zh">資料路徑</span></th>
+                <th><span class="lang-en">Hardware</span><span class="lang-zh">實機</span></th>
+                <th><span class="lang-en">On what</span><span class="lang-zh">在什麼上面</span></th>
+            </tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>PowerVault ME4 / ME5</strong></td>
+                    <td>Fibre Channel</td>
+                    <td><span class="status-badge status-badge--supported">
+                        <span class="lang-en">full first-run pass</span><span class="lang-zh">完整首次執行通過</span></span></td>
+                    <td><span class="lang-en">ME4024, firmware <code>GT280R011-01</code>, since 0.7.65</span><span class="lang-zh">ME4024，韌體 <code>GT280R011-01</code>，自 0.7.65 起</span></td>
+                </tr>
+                <tr>
+                    <td><strong>PowerVault ME4 / ME5</strong></td>
+                    <td>iSCSI, SAS</td>
+                    <td><span class="status-badge status-badge--planned">
+                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
+                    <td><span class="lang-en">the array above ran FC; these paths share the CLI client but not the data path</span><span class="lang-zh">上面那台走的是 FC；這兩條路徑共用 CLI 用戶端，但資料路徑不同</span></td>
+                </tr>
+                <tr>
+                    <td><strong>PowerStore</strong></td>
+                    <td><span class="lang-en">iSCSI, FC</span><span class="lang-zh">iSCSI、FC</span></td>
+                    <td><span class="status-badge status-badge--planned">
+                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
+                    <td><span class="lang-en">never run against an array</span><span class="lang-zh">從未在任何陣列上執行過</span></td>
+                </tr>
+                <tr>
+                    <td><strong>PowerFlex</strong></td>
+                    <td><span class="lang-en">NVMe/TCP, SDC</span><span class="lang-zh">NVMe/TCP、SDC</span></td>
+                    <td><span class="status-badge status-badge--planned">
+                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
+                    <td><span class="lang-en">never run against an array</span><span class="lang-zh">從未在任何陣列上執行過</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        <span class="lang-en">The ME4024 run covered the whole of the first-run test: capacity agreeing with the array's own GUI, several allocations with LUNs in sequence, dm-multipath with two paths, <code>dd</code> read and write verified by checksum, snapshot, rollback, snapshot delete, template, a linked clone in seconds, the array correctly refusing to delete a template with a live clone, and unmap, delete and local device cleanup. It also found three defects that reading Dell's documentation had not &mdash; each hidden behind the one before it.</span>
+        <span class="lang-zh">那次 ME4024 的測試涵蓋了整套首次執行測試：容量與陣列自己的 GUI 一致、連續數次配置且 LUN 依序遞增、dm-multipath 兩條路徑、以雜湊驗證的 <code>dd</code> 讀寫、快照、倒回、刪除快照、範本、秒級完成的連結複製、陣列正確拒絕刪除仍有存活複製的範本，以及解除對應、刪除與本機裝置清理。它同時找出三個讀 Dell 文件找不出來的缺陷 &mdash; 而且一個藏在另一個後面。</span>
+    </p>
+
+    <h3>
+        <span class="lang-en">Where the rest came from</span>
+        <span class="lang-zh">其餘的依據是什麼</span>
+    </h3>
     <div class="table-wrap">
         <table>
             <thead><tr>
@@ -925,21 +979,21 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                 <th><span class="lang-en">Hardware</span><span class="lang-zh">實機</span></th>
             </tr></thead>
             <tbody>
-                <tr><td><span class="lang-en">PowerStore REST endpoints and fields</span><span class="lang-zh">PowerStore REST 端點與欄位</span></td>
-                    <td><span class="lang-en">PowerStore 4.x documentation</span><span class="lang-zh">PowerStore 4.x 文件</span></td>
-                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
-                <tr><td><span class="lang-en">PowerVault CLI grammar</span><span class="lang-zh">PowerVault CLI 語法</span></td>
-                    <td><span class="lang-en">ME5 CLI Reference Guide</span><span class="lang-zh">ME5 CLI Reference Guide</span></td>
-                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
-                <tr><td><span class="lang-en">PowerFlex login, volume, mapping, snapshot API</span><span class="lang-zh">PowerFlex 登入、volume、對應、快照 API</span></td>
-                    <td><span class="lang-en">PowerFlex REST documentation</span><span class="lang-zh">PowerFlex REST 文件</span></td>
-                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
-                <tr><td><span class="lang-en">SCSI vendor / product strings, WWN to WWID</span><span class="lang-zh">SCSI vendor／product 字串、WWN 轉 WWID</span></td>
+                <tr><td><span class="lang-en">PowerVault CLI grammar, field names, mapping model</span><span class="lang-zh">PowerVault CLI 語法、欄位名稱、對應模型</span></td>
+                    <td><span class="lang-en">ME5 CLI Reference Guide, then corrected by the array</span><span class="lang-zh">ME5 CLI Reference Guide，之後由陣列修正</span></td>
+                    <td><span class="status-badge status-badge--supported"><span class="lang-en">verified</span><span class="lang-zh">已驗證</span></span></td></tr>
+                <tr><td><span class="lang-en">WWN to WWID, SCSI vendor / product strings</span><span class="lang-zh">WWN 轉 WWID、SCSI vendor／product 字串</span></td>
                     <td><span class="lang-en">inferred</span><span class="lang-zh">推斷</span></td>
-                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                    <td><span class="status-badge status-badge--partial"><span class="lang-en">verified on ME4 only</span><span class="lang-zh">僅在 ME4 上驗證</span></span></td></tr>
                 <tr><td><span class="lang-en">Fibre Channel path</span><span class="lang-zh">Fibre Channel 路徑</span></td>
                     <td>—</td>
-                    <td><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></td></tr>
+                    <td><span class="status-badge status-badge--partial"><span class="lang-en">verified on ME4 only</span><span class="lang-zh">僅在 ME4 上驗證</span></span></td></tr>
+                <tr><td><span class="lang-en">PowerStore REST endpoints and fields</span><span class="lang-zh">PowerStore REST 端點與欄位</span></td>
+                    <td><span class="lang-en">PowerStore 4.x documentation and Dell's own SDK</span><span class="lang-zh">PowerStore 4.x 文件與 Dell 自己的 SDK</span></td>
+                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
+                <tr><td><span class="lang-en">PowerFlex login, volume, mapping, snapshot API</span><span class="lang-zh">PowerFlex 登入、磁碟區、對應、快照 API</span></td>
+                    <td><span class="lang-en">PowerFlex REST documentation</span><span class="lang-zh">PowerFlex REST 文件</span></td>
+                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
             </tbody>
         </table>
     </div>

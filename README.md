@@ -28,21 +28,26 @@ Dell EMC storage plugins for Proxmox VE.
 > verified.
 
 One package, one shared host-side layer, and one PVE storage type per Dell EMC
-product family. The first family implemented is **PowerStore** over iSCSI or
-Fibre Channel, using direct volume provisioning (one VM disk = one array
-volume) so that array-side snapshots, thin clones, compression and replication
-all operate on a single VM disk as their natural unit.
+product family. **PowerStore** was implemented first, over iSCSI or Fibre
+Channel; **PowerVault ME** is the one that has since been proven on real
+hardware. All of them use the same model — one VM disk is one array volume —
+so the array's own snapshots, thin clones, compression and replication act on
+the unit an operator actually thinks about.
 
 ---
 
 ## Project status
 
-> **Version 0.7.67~beta1 — three storage types are code complete, and
-> has NOT been run against a PowerStore array.**
-> Every array-facing detail — REST paths and field names, the SCSI vendor and
-> product strings, the WWN to WWID conversion — is still unverified, so this
-> is a release to test with, on a non-production cluster and a non-production
-> array. 1.0.0 is the on-hardware test pass, not more code.
+> **Version 0.7.67~beta1 — three storage types are code complete. One of
+> them has passed a full run on real hardware: PowerVault ME, over Fibre
+> Channel, on an ME4024.**
+> PowerStore and PowerFlex have never been run against an array at all, and
+> neither have PowerVault's iSCSI and SAS paths — for those, every
+> array-facing detail (REST paths and field names, the SCSI vendor and
+> product strings, the WWN to WWID conversion) is still unverified. So this
+> remains a release to test with, on a non-production cluster and a
+> non-production array. 1.0.0 is an on-hardware pass for **every** family,
+> not more code.
 
 | Phase | Content | State |
 |---|---|---|

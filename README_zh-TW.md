@@ -12,14 +12,14 @@ Dell EMC 儲存陣列的 Proxmox VE 儲存外掛。
 >
 > 請使用測試用叢集、測試用陣列，並對放上去的任何資料保留獨立備份。詳見下方的[免責聲明與風險](#免責聲明與風險)，以及 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 中「哪些已驗證、哪些還沒」的完整清單。
 
-一個套件、一組共用的主機端底層，Dell EMC 每個產品系列各自對應一個 PVE storage type。第一個實作的系列是 **PowerStore**（iSCSI 或 Fibre Channel），採用直接配置 volume 的模型（一顆 VM 磁碟 = 一個陣列 volume），讓陣列端的快照、精簡複製、壓縮與複寫都以「一顆 VM 磁碟」為自然單位運作。
+一個套件、一組共用的主機端底層，Dell EMC 每個產品系列各自對應一個 PVE storage type。最早實作的系列是 **PowerStore**（iSCSI 或 Fibre Channel），而已經在實機上驗證過的是 **PowerVault ME**。所有系列都採用直接配置 volume 的模型（一顆 VM 磁碟 = 一個陣列 volume），讓陣列端的快照、精簡複製、壓縮與複寫都以「一顆 VM 磁碟」為自然單位運作。
 
 ---
 
 ## 專案狀態
 
-> **版本 0.7.67~beta1 — 三個 storage type 程式碼已完成，但尚未在任何 PowerStore 陣列上實際執行過。**
-> 所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證，因此這是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
+> **版本 0.7.67~beta1 — 三個 storage type 程式碼皆已完成，其中一個已在實機上完整跑過：PowerVault ME，走 Fibre Channel，機型 ME4024。**
+> PowerStore 與 PowerFlex 從未在任何陣列上執行過，PowerVault 這邊的 iSCSI 與 SAS 路徑也沒有 —— 對這些而言，所有面向陣列的細節（REST 路徑與欄位名稱、SCSI vendor／product 字串、WWN 轉 WWID 換算）都還沒驗證。因此這仍然是一個「拿來測試」的版本，請只在非正式環境的叢集與陣列上使用。1.0.0 的門檻是**每一個**產品系列都通過實機測試，而不是再寫更多程式。
 
 | 階段 | 內容 | 狀態 |
 |---|---|---|
