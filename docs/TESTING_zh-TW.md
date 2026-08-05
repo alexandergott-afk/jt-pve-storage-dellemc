@@ -54,7 +54,7 @@ status`（3.2 秒，容量與 GUI 一致）、連續數顆 `pvesm alloc`（LUN 4
 |---|---|---|
 | REST 端點路徑 | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 但本外掛用到的每一個路徑，都能在 Dell 自己的 `python-powerstore` SDK（`PyPowerStore/utils/constants.py`）裡逐字找到；詳見下方 |
 | 回應欄位名稱（`size`、`wwn`、`logical_used`、`protection_data`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
-| 過濾語法（`eq.`、`ilike.`、`cs.{...}`、`->>`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 比較運算子前綴與 `*` 萬用字元是從開發者指南讀來的 |
+| 過濾語法（`eq.`、`ilike.`、`cs.{...}`、`->>`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 比較運算子前置字串與 `*` 萬用字元是從開發者指南讀來的 |
 | 認證流程（`login_session`、`DELL-EMC-TOKEN`、`auth_cookie`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE —— 標頭、cookie 與「非 GET 一律需要 token」是從開發者指南讀來的 |
 | 容量來源（`space_metrics_by_cluster`） | `PowerStore/API.pm` | NOT VERIFIED ON HARDWARE |
 | multipath 比對用的 SCSI vendor／product 字串 | `DellPowerStorePlugin.pm` | NOT VERIFIED ON HARDWARE |
@@ -234,7 +234,7 @@ help create host
 | 部分結果 | 集合超過 limit 時回應 `206 Partial Content`，並帶 `Content-Range: 0-99/1000` —— 斜線之後的數字是總筆數 |
 | offset 超過結尾 | `416 Range Not Satisfiable`。分頁過程中若集合在兩頁之間變短，是有可能正常遇到的，因此它會結束分頁而不是失敗 |
 
-如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前綴列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
+如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前置字串列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
 
 以下是仍未確定的**回應**欄位名稱 —— 也就是陣列實際放進每一列的內容，這部分在 3.x 與 4.x 之間有差異。其中數項現在已由 Dell `ansible-powerstore` collection 裡的範例回應佐證，逐列註明；其餘仍屬推測。
 
@@ -319,7 +319,7 @@ make test                    # 以上全部
 | 21 | 單一路徑故障 | 拔掉一條 iSCSI 線 | I/O 持續，multipath 顯示失效路徑 | — |
 | 22 | 節點重開機 | — | 自動登入且裝置自動出現 | — |
 | 23 | Orphan 清理 | 從其他節點刪除一個 volume | 寬限期過後殘留裝置被清除，其他裝置不受影響 | — |
-| 24 | LUN ID 攀升 | 反覆掛載卸載 300 次 | ID 維持在低位且密集 | — |
+| 24 | LUN ID 攀升 | 反覆對應與解除對應 300 次 | ID 維持在低位且密集 | — |
 | 25 | Fibre Channel | FC fabric | 重跑第 1〜24 項 | — |
 | 26 | PVE 9.1 升級到 9.2 | — | 外掛仍正常，`get_identity` 正常回傳 | — |
 

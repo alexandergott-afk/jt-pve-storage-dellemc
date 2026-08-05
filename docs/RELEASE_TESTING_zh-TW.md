@@ -142,7 +142,7 @@ pve-dell-config-get nosuchstore 100
 
 ### 4.2 各系列另需確認
 
-**PowerStore** —— 反覆掛載卸載 300 次之後，LUN ID 仍維持在低位且密集（這正是外掛要迴避的 Dell 缺陷）。
+**PowerStore** —— 反覆對應與解除對應 300 次之後，LUN ID 仍維持在低位且密集（這正是外掛要迴避的 Dell 缺陷）。
 
 **PowerVault ME** —— 使用長到會超過 32 bytes 的 storage id 時，建立階段就被拒絕並指出長度限制，而不是被截斷。
 

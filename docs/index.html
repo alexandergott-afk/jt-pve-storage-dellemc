@@ -343,7 +343,7 @@
             </div>
             <div class="card__desc">
                 <span class="lang-en">Every list, delete and cleanup path filters on the pve-&lt;storeid&gt;- name prefix first. Objects on the array that do not carry it are never read, renamed or deleted.</span>
-                <span class="lang-zh">所有列舉、刪除與清理路徑都會先以 pve-&lt;storeid&gt;- 名稱前綴過濾。陣列上沒有這個前綴的物件，一律不讀取、不改名、不刪除。</span>
+                <span class="lang-zh">所有列舉、刪除與清理路徑都會先以 pve-&lt;storeid&gt;- 名稱前置字串過濾。陣列上沒有這個前置字串的物件，一律不讀取、不改名、不刪除。</span>
             </div>
         </div>
         <div class="card">
@@ -479,7 +479,7 @@
             </p>
             <p>
                 <span class="lang-en">The file name spells the version with a dot (<code>..._0.7.60.beta1-1_all.deb</code>) because GitHub will not serve an asset name containing <code>~</code>. The version inside the package is unchanged &mdash; <code>apt</code> reads the control file, not the name &mdash; and <code>SHA256SUMS</code> names the file as served, so the check works on what you downloaded.</span>
-                <span class="lang-zh">檔名中的版本是用點分隔的（<code>..._0.7.60.beta1-1_all.deb</code>），因為 GitHub 不會提供檔名含 <code>~</code> 的附件。套件內部的版本不變 &mdash; <code>apt</code> 讀的是控制檔而不是檔名 &mdash; 而 <code>SHA256SUMS</code> 記錄的就是實際提供的檔名，因此校驗可以直接對下載下來的檔案運作。</span>
+                <span class="lang-zh">檔名中的版本是用點分隔的（<code>..._0.7.60.beta1-1_all.deb</code>），因為 GitHub 不會提供檔名含 <code>~</code> 的附件。套件內部的版本不變 &mdash; <code>apt</code> 讀的是控制檔而不是檔名 &mdash; 而 <code>SHA256SUMS</code> 記錄的就是實際提供的檔名，因此驗證可以直接對下載下來的檔案運作。</span>
             </p>
         </div>
     </div>
@@ -583,7 +583,7 @@
     </h2>
     <p class="section-subtitle">
         <span class="lang-en">Options shared by every family use the dell- prefix and are declared once; family options use their own prefix. PVE registers storage properties in one shared schema, so a name may only have one definition across all plugins.</span>
-        <span class="lang-zh">所有系列共用的選項使用 dell- 前綴且只宣告一次；各系列專屬選項使用自己的前綴。PVE 的 storage property 註冊在同一份共用 schema，同一個名稱在所有外掛之間只能有一種定義。</span>
+        <span class="lang-zh">所有系列共用的選項使用 dell- 前置字串且只宣告一次；各系列專屬選項使用自己的前置字串。PVE 的 storage property 註冊在同一份共用 schema，同一個名稱在所有外掛之間只能有一種定義。</span>
     </p>
 
     <h3 class="subsection-title">
@@ -809,7 +809,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     </div>
     <p>
         <span class="lang-en">Dell notes that the E-Lab matrix does not always list every kernel a distribution has released, and gives a prefix rule: a kernel is supported if its version prefix matches a listed one — <code>4.18.0-553</code> covers <code>4.18.0-553.51.1.el8_10.x86_64</code>. Details and the commands to check a node are in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC.md">docs/POWERFLEX_SDC.md</a>.</span>
-        <span class="lang-zh">Dell 也說明 E-Lab 矩陣不一定涵蓋各發行版釋出的每一個 kernel，並給了一條前綴規則：版本前綴相符即視為支援 —— <code>4.18.0-553</code> 涵蓋 <code>4.18.0-553.51.1.el8_10.x86_64</code>。細節與節點檢查指令請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC_zh-TW.md">docs/POWERFLEX_SDC_zh-TW.md</a>。</span>
+        <span class="lang-zh">Dell 也說明 E-Lab 矩陣不一定涵蓋各發行版釋出的每一個 kernel，並給了一條前置字串規則：版本前置字串相符即視為支援 —— <code>4.18.0-553</code> 涵蓋 <code>4.18.0-553.51.1.el8_10.x86_64</code>。細節與節點檢查指令請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC_zh-TW.md">docs/POWERFLEX_SDC_zh-TW.md</a>。</span>
     </p>
     <div class="alert alert--info">
         <span class="lang-en">Whichever path is used, one VM disk is one PowerFlex volume created through the REST API. There is no LVM layer and no shared volume carved up locally — the SDC or the NVMe initiator only presents that volume as a block device.</span>
@@ -956,7 +956,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     </h2>
     <p class="section-subtitle">
         <span class="lang-en">Every message carries a [type:storeid] prefix, so one storage can be grepped out of a busy journal.</span>
-        <span class="lang-zh">每一則訊息都帶有 [type:storeid] 前綴，可以從繁忙的 journal 中過濾出單一儲存。</span>
+        <span class="lang-zh">每一則訊息都帶有 [type:storeid] 前置字串，可以從繁忙的 journal 中過濾出單一儲存。</span>
     </p>
     <pre><span class="cmd">journalctl</span> <span class="flag">-t</span> pvestatd <span class="flag">-t</span> pvedaemon | <span class="cmd">grep</span> dellpowerstore</pre>
     <div class="table-wrap">
@@ -1093,7 +1093,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-04</div>
         <div class="changelog-summary">
             <span class="lang-en">The release workflow had been failing and publishing nothing since v0.7.36: a test that needs Proxmox VE did not skip on a runner that has none, so the suite was green here and red in CI. SHA256SUMS is a checksum file and does not affect installing the package.</span>
-            <span class="lang-zh">自 v0.7.36 起 release workflow 一直失敗、什麼都沒發佈：一個需要 Proxmox VE 的測試在沒有 PVE 的 runner 上沒有 skip，於是本機是綠的、CI 是紅的。SHA256SUMS 只是雜湊校驗檔，不影響套件安裝。</span>
+            <span class="lang-zh">自 v0.7.36 起 release workflow 一直失敗、什麼都沒發佈：一個需要 Proxmox VE 的測試在沒有 PVE 的 runner 上沒有 skip，於是本機是綠的、CI 是紅的。SHA256SUMS 只是雜湊驗證檔，不影響套件安裝。</span>
         </div>
     </div>
 
@@ -1183,7 +1183,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-07-27</div>
         <div class="changelog-summary">
             <span class="lang-en">Two ways one name could have destroyed many volumes: a PowerVault name able to act as a shell wildcard in a delete, and a temporary-clone record whose only check was a prefix every VM disk shares.</span>
-            <span class="lang-zh">兩種「一個名稱毀掉多個 volume」的途徑：PowerVault 的名稱在刪除指令中可以當成 shell 萬用字元，以及暫存複製紀錄唯一的檢查是一個每個 VM 磁碟都符合的前綴。</span>
+            <span class="lang-zh">兩種「一個名稱毀掉多個 volume」的途徑：PowerVault 的名稱在刪除指令中可以當成 shell 萬用字元，以及暫存複製紀錄唯一的檢查是一個每個 VM 磁碟都符合的前置字串。</span>
         </div>
     </div>
 
@@ -1390,7 +1390,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-07-27</div>
         <div class="changelog-summary">
             <span class="lang-en">PowerStore volumes would have been invisible to PVE: the name filter used the wrong ilike wildcard, and an empty listing looks exactly like a storage with no volumes. An empty prefix listing is now rechecked locally, so the question cannot lose volumes either way.</span>
-            <span class="lang-zh">PowerStore 上的 volume 會完全看不到：名稱過濾用錯了 ilike 萬用字元，而「空的列舉」看起來就跟「沒有任何 volume 的儲存」一模一樣。現在前綴列舉若為空會在本地重新比對，因此不論答案是哪一種都不會弄丟 volume。</span>
+            <span class="lang-zh">PowerStore 上的 volume 會完全看不到：名稱過濾用錯了 ilike 萬用字元，而「空的列舉」看起來就跟「沒有任何 volume 的儲存」一模一樣。現在前置字串列舉若為空會在本地重新比對，因此不論答案是哪一種都不會弄丟 volume。</span>
         </div>
     </div>
 
