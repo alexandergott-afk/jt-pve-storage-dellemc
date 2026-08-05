@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.71~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.72~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1065,6 +1065,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.72~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The pool key on a Unity create was a Go field name, not the JSON tag that goes on the wire. And a concurrent mapping change could silently unmap a node — both attach and detach now verify their write and retry, because a lost update is visible after the fact.</span>
+            <span class="lang-zh">Unity 建立 LUN 時的儲存池鍵用的是 Go 的欄位名稱，而不是真正上線路的 JSON 標籤。另外並行的對應變更可能靜靜地把某個節點解除對應 —— attach 與 detach 現在都會在寫後驗證並重試，因為遺失的更新事後是看得見的。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.71~beta1</div>

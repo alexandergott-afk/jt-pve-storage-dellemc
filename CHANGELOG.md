@@ -7,6 +7,37 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.72~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: the pool key on a create was wrong, again in the shape of lesson
+  28.** Dell's `LunParameters` struct names its field `StoragePool`, and its
+  JSON tag — the thing that actually goes on the wire — is **`pool`**. An
+  earlier release read the field name and sent `storagePool`; every create
+  would have been refused, or worse, accepted with the pool silently
+  ignored. In Go code the `json:"..."` tag is the property name and the
+  field name is a printed one. The emulator did not catch it because it
+  accepts any body; the struct tags did.
+
+- **Unity: a concurrent mapping change could silently unmap a node.**
+  `hostAccess` is read-modify-write with no compare-and-swap, so two nodes
+  writing at once — a migration target attaching while the source detaches,
+  or two parallel activations — each read the list, each write their
+  version, and the second write discards the first. The node whose entry was
+  lost believes it is mapped and its device never appears; on a migration
+  that is the running guest's disk.
+
+  A lost update is visible after the fact — this host's id is missing from a
+  list it was just written into — so both attach and detach now verify the
+  write and retry with a fresh read, carrying whatever the competing writer
+  added. A write that never survives is an error naming the likely cause,
+  not an infinite loop and not a quiet success.
+
+### Verified
+- Resize double-checked key-for-key against Dell's own client: same URI,
+  same `{lunParameters: {size}}` wrapper, new total rather than a delta.
+  Rename's bare `{name}` body matches Dell's client too.
+
 ## [0.7.71~beta1] - 2026-08-06
 
 ### Fixed

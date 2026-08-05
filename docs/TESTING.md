@@ -265,7 +265,7 @@ rather than from documentation prose. Where the two disagreed, the code won.
 | `sizeTotal`, `sizeUsed`, `sizeAllocated` | volume size and space in use, in **bytes** — not the 512-byte blocks PowerVault reports | Dell's own `LunDisplayFields` |
 | `hostAccess` | which hosts may see a LUN. A list of `{host: {id}, accessMask}`, and writing it **REPLACES** the list | Dell's own field list; the replacement semantics are why `ExportVolume` and `ModifyVolumeExport` both exist in Dell's client |
 | `accessMask` | `'1'` production, `'2'` snapshot, `'3'` both — a **string**, not a number | Dell's client hardcodes `'1'` |
-| `pool`, `storagePool` | **not interchangeable**: `storagePool` is the key a create takes, `pool` is what a LUN reports back | Dell's own `CreateLun` body |
+| `pool` (in `lunParameters`) | the pool a create places the LUN in | the **JSON tag** on Dell's `LunParameters` struct. Its Go field NAME is `StoragePool`, and an earlier draft of this table said the key was `storagePool` from reading the field name — in Go code the `json:"..."` tag is the property name, the field name is a printed one |
 | `sizeFree`, `sizeTotal`, `sizeUsed`, `sizeSubscribed` (pool) | pool capacity, in bytes | Dell's own `StoragePoolFields` |
 | `isThinEnabled` | thin provisioning, sent as the **string** `'true'` | Dell's client uses `strconv.FormatBool` |
 | `creationTime` | snapshot date, ISO 8601 with a zone offset | documented; the offset is read and applied, which cost another family a release |

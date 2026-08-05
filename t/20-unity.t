@@ -439,10 +439,13 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
     my $body = body_of($create);
 
     is($body->{name}, 'pve-u480-100-disk0', 'the name is sent');
-    ok($body->{lunParameters}{storagePool}{id},
-        "the pool is sent as 'storagePool', which is the key a create takes");
-    ok(!exists $body->{lunParameters}{pool},
-        "... and never as 'pool', which is only what a LUN reports back");
+    # The JSON tag on Dell's own LunParameters struct is 'pool'; the Go field
+    # NAME is StoragePool, and an earlier draft sent that instead — a printed
+    # name taken for a property name.
+    ok($body->{lunParameters}{pool}{id},
+        "the pool is sent as 'pool', the JSON key on Dell's own struct");
+    ok(!exists $body->{lunParameters}{storagePool},
+        "... and never as 'storagePool', which is the Go field NAME");
     is($body->{lunParameters}{size}, 4 * 1024**3, 'the size is in bytes');
     is($body->{lunParameters}{isThinEnabled}, 'true',
         'isThinEnabled is a string, as Dell\'s own client sends it');
@@ -557,15 +560,22 @@ is($A->wwn_to_wwid({ id => 'x' }), undef, 'a structure where a string was expect
 sub mapping_api {
     my (@host_ids) = @_;
 
-    my $ua;
-    my $api;
-    ($api, $ua) = make_api(handler => sub {
+    # The fake honours writes: attach and detach now verify after writing,
+    # so a fake that never updates its list would fail every verification.
+    my @stored = @host_ids;
+
+    my ($api, $ua) = make_api(handler => sub {
         my ($req, $path) = @_;
         return reply(content({
             id          => 'sv_1',
             name        => 'pve-u480-100-disk0',
-            hostAccess  => [ map { { host => { id => $_ }, accessMask => '1' } } @host_ids ],
+            hostAccess  => [ map { { host => { id => $_ }, accessMask => '1' } } @stored ],
         })) if $path =~ m{/instances/lun/name:};
+        if ($path =~ m{action/modifyLun}) {
+            my $sent = decode_json($req->content)->{lunHostAccessParameters}{hostAccess};
+            @stored = map { $_->{host}{id} } @$sent if ref($sent) eq 'ARRAY';
+            return reply({}, 204);
+        }
         return reply(content({}));
     });
 
@@ -678,6 +688,59 @@ sub mapping_api {
         'an empty host id is refused rather than sent');
     ok(!eval { $api->volume_detach('pve-u480-100-disk0', undef); 1 },
         '... in both directions');
+}
+
+# ---------------------------------------------------------------------------
+# A lost update is retried, not believed
+#
+# hostAccess has no compare-and-swap: two writers read the list, both write,
+# and the second silently discards the first. A node whose entry was lost
+# believes it is mapped and its device never appears - so the write is
+# verified, and retried with a fresh read.
+# ---------------------------------------------------------------------------
+
+{
+    # This fake clobbers the FIRST write - as a competing node would - and
+    # honours the second.
+    my $writes = 0;
+    my @stored = ('Host_2');
+    my ($api, $ua) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        if ($path =~ m{/instances/lun/name:}) {
+            return reply(content({ id => 'sv_1', name => 'pve-u480-100-disk0',
+                hostAccess => [ map { { host => { id => $_ }, accessMask => '1' } } @stored ] }));
+        }
+        if ($path =~ m{action/modifyLun}) {
+            my $sent = decode_json($req->content)->{lunHostAccessParameters}{hostAccess};
+            $writes++;
+            # First write lost to a concurrent writer; second one lands.
+            @stored = map { $_->{host}{id} } @$sent if $writes > 1;
+            return reply({}, 204);
+        }
+        return reply(content({}));
+    });
+
+    ok($api->volume_attach('pve-u480-100-disk0', 'Host_9'),
+        'an attach whose write was clobbered retries and succeeds');
+    is($writes, 2, '... with exactly one retry');
+    is_deeply([sort @stored], ['Host_2', 'Host_9'],
+        'and the final list carries both nodes');
+}
+
+{
+    # A write that never survives is an error, not an infinite loop and not
+    # a quiet success.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply(content({ id => 'sv_1', name => 'pve-u480-100-disk0',
+            hostAccess => [] })) if $path =~ m{/instances/lun/name:};
+        return reply({}, 204) if $path =~ m{action/modifyLun};
+        return reply(content({}));
+    });
+
+    ok(!eval { $api->volume_attach('pve-u480-100-disk0', 'Host_9'); 1 },
+        'a write that never survives fails loudly');
+    like($@, qr/concurrent/, '... naming the likely cause');
 }
 
 # ---------------------------------------------------------------------------

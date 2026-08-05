@@ -1,3 +1,27 @@
+jt-pve-storage-dellemc (0.7.72~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: the pool key on a create was wrong, in the shape of lesson 28
+    again. Dell's LunParameters struct names its field StoragePool; the JSON
+    tag that actually goes on the wire is 'pool'. An earlier release read
+    the field name and sent 'storagePool' - every create would have been
+    refused, or accepted with the pool silently ignored. In Go code the
+    json tag is the property name and the field name is a printed one. The
+    emulator did not catch it because it accepts any body.
+  * UNITY: a concurrent mapping change could silently unmap a node.
+    hostAccess is read-modify-write with no compare-and-swap: two nodes
+    writing at once each read the list, each write their version, and the
+    second write discards the first. The node whose entry was lost believes
+    it is mapped and its device never appears; on a migration that is the
+    running guest's disk. Attach and detach now verify the write and retry
+    with a fresh read; a write that never survives is an error naming the
+    likely cause.
+  * UNITY: resize double-checked key-for-key against Dell's own client -
+    same URI, same lunParameters/size wrapper, new total rather than a
+    delta. Rename's bare name body matches too.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 02:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.71~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

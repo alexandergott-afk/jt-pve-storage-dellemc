@@ -228,7 +228,7 @@ help create host
 | `sizeTotal`、`sizeUsed`、`sizeAllocated` | 磁碟區大小與已用空間，單位是**位元組** —— 不是 PowerVault 的 512 位元組區塊 | Dell 自己的 `LunDisplayFields` |
 | `hostAccess` | 哪些主機可以看到這顆 LUN。是一組 `{host: {id}, accessMask}`，而且寫入時是**取代**整份清單 | Dell 自己的欄位清單；Dell 客戶端同時有 `ExportVolume` 與 `ModifyVolumeExport`，正是取代語意的證據 |
 | `accessMask` | `'1'` production、`'2'` snapshot、`'3'` 兩者 —— 是**字串**不是數字 | Dell 客戶端寫死 `'1'` |
-| `pool`、`storagePool` | **不可互換**：建立時的鍵是 `storagePool`，`pool` 是 LUN 回報時用的 | Dell 自己的 `CreateLun` 內容 |
+| `pool`（在 `lunParameters` 內） | 建立 LUN 時放進哪個儲存池 | Dell `LunParameters` 結構上的 **JSON 標籤**。它的 Go 欄位「名稱」是 `StoragePool`，本表早先的版本就是讀了欄位名稱而寫成 `storagePool` —— 在 Go 程式碼裡，`json:"..."` 標籤才是屬性名稱，欄位名稱只是印出來的名字 |
 | `sizeFree`、`sizeTotal`、`sizeUsed`、`sizeSubscribed`（儲存池） | 儲存池容量，單位位元組 | Dell 自己的 `StoragePoolFields` |
 | `isThinEnabled` | 精簡佈建，送出時是**字串** `'true'` | Dell 客戶端使用 `strconv.FormatBool` |
 | `creationTime` | 快照時間，ISO 8601 且帶時區位移 | 文件記載；位移會被讀取並套用 —— 忽略它曾讓另一個系列付出一個版本 |

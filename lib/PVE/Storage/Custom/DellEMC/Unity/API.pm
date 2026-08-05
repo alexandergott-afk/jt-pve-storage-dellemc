@@ -514,14 +514,16 @@ sub volume_create {
 
     my $aligned = $self->align_size($size);
 
-    # 'storagePool' is the key a create takes. 'pool' is what a LUN reports
-    # back afterwards; they are not interchangeable, and the array's refusal
-    # for the wrong one does not say which.
+    # The pool key inside lunParameters is 'pool' — read from the JSON tag on
+    # Dell's own LunParameters struct, not from its Go field name, which is
+    # StoragePool. An earlier draft here sent 'storagePool', having read the
+    # field name; that is a printed name being taken for a property name, the
+    # same mistake that cost PowerVault a release, in a new coat.
     my $body = {
         name          => $name,
         description   => 'Managed by Proxmox VE (jt-pve-storage-dellemc)',
         lunParameters => {
-            storagePool   => { id => $pool_id },
+            pool          => { id => $pool_id },
             size          => $aligned + 0,
             # Sent as a STRING, as Dell's own client does.
             isThinEnabled => (delete $opts{thin} // 1) ? 'true' : 'false',
@@ -829,23 +831,47 @@ sub _write_host_access {
 }
 
 # Add this node's host WITHOUT removing anyone else's.
+#
+# The read-modify-write on hostAccess is NOT atomic and Unity offers no
+# compare-and-swap: two nodes writing at once — a migration target attaching
+# while the source detaches, or two parallel activations — each read the
+# list, each write their version, and the second write silently discards the
+# first. The node whose entry was lost believes it is mapped, and its device
+# never appears; on a migration that is the running guest's disk.
+#
+# What CAN be done is to look after writing. A lost update is visible — this
+# host's id is missing from a list it was just written into — so the write is
+# verified and retried, re-reading the current list each time so the retry
+# also carries whatever the competing writer added.
 sub volume_attach {
     my ($self, $name, $host_id, %opts) = @_;
 
     die $self->_msg("mapping a volume needs a host id") . "\n"
         unless defined $host_id && length $host_id;
 
-    # Read now, inside the caller's retry loop, not before it.
-    my $lun = $self->volume_get_by_name($name, %opts);
-    die $self->_msg("volume '$name' is not on the array, so it cannot be"
-        . " mapped") . "\n" unless $lun;
+    for my $attempt (1 .. 5) {
+        # Read now, inside the loop — a list read before a competing write
+        # and sent after it puts back exactly the state that write removed.
+        my $lun = $self->volume_get_by_name($name, %opts);
+        die $self->_msg("volume '$name' is not on the array, so it cannot be"
+            . " mapped") . "\n" unless $lun;
 
-    my $current = $self->_host_access_ids($lun);
-    return 1 if grep { $_ eq $host_id } @$current;
+        my $current = $self->_host_access_ids($lun);
+        return 1 if grep { $_ eq $host_id } @$current;
 
-    $self->_write_host_access($lun->{id}, [ @$current, $host_id ], %opts);
+        $self->_write_host_access($lun->{id}, [ @$current, $host_id ], %opts);
 
-    return 1;
+        # Did the write survive? Absent means a competing writer clobbered
+        # it between our read and our write; go around with a fresh read.
+        my $after = $self->volume_get_by_name($name, %opts);
+        return 1 if $after
+            && grep { $_ eq $host_id } @{ $self->_host_access_ids($after) };
+    }
+
+    die $self->_msg("mapping volume '$name' to host '$host_id' kept being"
+        . " overwritten by concurrent mapping changes. Retry the operation;"
+        . " if it persists, check what else is editing this LUN's host"
+        . " access.") . "\n";
 }
 
 # Remove this node's host and leave every other one in place.
@@ -862,14 +888,25 @@ sub volume_detach {
     # be reached dies inside volume_get_by_name rather than arriving here.
     return 1 unless $lun;
 
-    my $current = $self->_host_access_ids($lun);
-    my @remaining = grep { $_ ne $host_id } @$current;
+    for my $attempt (1 .. 5) {
+        my $current = $self->_host_access_ids($lun);
+        my @remaining = grep { $_ ne $host_id } @$current;
 
-    return 1 if scalar(@remaining) == scalar(@$current);
+        return 1 if scalar(@remaining) == scalar(@$current);
 
-    $self->_write_host_access($lun->{id}, \@remaining, %opts);
+        $self->_write_host_access($lun->{id}, \@remaining, %opts);
 
-    return 1;
+        # Verify, for the same reason attach does: a competing write can put
+        # this host straight back. Leaving it mapped after reporting an
+        # unmap is what lets a delete proceed against a device some node
+        # still holds open.
+        $lun = $self->volume_get_by_name($name, %opts) or return 1;
+        return 1 unless grep { $_ eq $host_id }
+            @{ $self->_host_access_ids($lun) };
+    }
+
+    die $self->_msg("unmapping volume '$name' from host '$host_id' kept"
+        . " being overwritten by concurrent mapping changes") . "\n";
 }
 
 1;
