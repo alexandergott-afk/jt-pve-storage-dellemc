@@ -7,6 +7,36 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.93~beta1] - 2026-08-07
+
+### Fixed
+- **The recovery tool could not find the array password.**
+  `pve-dell-config-get` parses `/etc/pve/storage.cfg` itself rather than going
+  through PVE, because the situation it exists for is the one where PVE will
+  not start. 0.7.86 moved the password out of `storage.cfg` and into
+  `/etc/pve/priv/storage/<storeid>.pw`, and the tool was not told: for four
+  releases it answered *no credentials configured* for every storage
+  following the current convention, at the moment someone was trying to
+  recover a VM configuration. It reads the priv file now, with the same
+  precedence the plugin uses, and when it still finds nothing it names the
+  directory it looked in.
+
+- **The recovery tool ignored `dell-host-mode`.** That option decides whether
+  the plugin registers one host object per node or a single shared one for
+  the cluster, and the tool always built the per-node name. Against a storage
+  using the shared mode it looked for a host that does not exist and then
+  registered a NEW one carrying this node's initiators — and an initiator
+  belongs to one host object on these arrays, so that is refused at best and
+  at worst moves the initiator off the shared host every node's volumes are
+  mapped to. A recovery tool taking a cluster's storage down while someone is
+  recovering a VM. It reads the mode from `storage.cfg` now, accepts
+  `--host-mode` for recover mode, and prints which host object it will use
+  before it does anything with it.
+
+### Added
+- `t/22-config-get.t`, which drives the real script as a subprocess against a
+  temporary `/etc/pve`. Nothing tested this tool before.
+
 ## [0.7.92~beta1] - 2026-08-06
 
 ### Fixed

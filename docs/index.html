@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.92~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.93~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.93~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The recovery tool had been left behind by two changes: it looked for the array password where it no longer is, and it ignored dell-host-mode &mdash; against a shared-mode storage it would have registered a second host and moved this node's initiator off the one every volume is mapped to. Now tested by driving the real script.</span>
+            <span class="lang-zh">災難復原工具被兩項改動甩在後面:它到密碼已不在的地方去找,而且忽略了 dell-host-mode &mdash; 對 shared 模式的儲存,它會建立第二個 host,並把本節點的 initiator 從所有磁碟區對應的那一個上搬走。現在以驅動真正的腳本來測試。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.92~beta1</div>

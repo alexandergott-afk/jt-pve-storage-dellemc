@@ -33,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.92~beta1';
+my $VERSION = '0.7.93~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -57,6 +57,10 @@ Options:
       --password PASS    REST API password              (recover mode)
       --protocol PROTO   iscsi (default) or fc          (recover mode)
       --cluster NAME     Cluster name used in host names, default 'pve'
+      --host-mode MODE   'per-node' (default) or 'shared', matching the
+                         storage's dell-host-mode. Read from storage.cfg when
+                         it is available; get it wrong and this tool looks for
+                         the wrong host object on the array
       --insecure         Do not verify the array's TLS certificate. This is
                          already the default in recover mode, matching the
                          plugin's own dell-ssl-verify default
@@ -102,6 +106,7 @@ GetOptions(
     'password=s'   => \$opt{password},
     'protocol=s'   => \$opt{protocol},
     'cluster=s'    => \$opt{cluster},
+    'host-mode=s'  => \$opt{host_mode},
     'insecure'     => \$opt{insecure},
     'verify-ssl'   => \$opt{verify_ssl},
     'timeout=i'    => \$opt{timeout},
@@ -129,10 +134,53 @@ sub info {
 # work when the PVE stack does not.
 # ---------------------------------------------------------------------------
 
+# Where the tool looks for what PVE keeps. Overridable so the test suite can
+# drive the real script against a temporary tree; it changes nothing about
+# what the tool may do, which is whatever root may do either way.
+my $PVE_ROOT = $ENV{PVE_DELL_CONFIG_ROOT} // '/etc/pve';
+
+# The array password, which since 0.7.86 lives OUTSIDE storage.cfg.
+#
+# The plugin writes it to /etc/pve/priv/storage/<storeid>.pw, mode 0600, and
+# deletes it from storage.cfg — /etc/pve/storage.cfg is readable by the
+# www-data group and replicated to every node, and a password does not belong
+# in it. This tool parses storage.cfg itself rather than going through PVE, so
+# it has to know the same thing: without this it reported "no credentials
+# configured" for every storage created or updated on 0.7.86 or later, which
+# is to say for every storage following the current convention, at the moment
+# someone is trying to recover a VM configuration.
+#
+# Same precedence as the plugin: the priv file wins, storage.cfg is the
+# fallback for a storage that has not been updated yet.
+sub read_priv_password {
+    my ($storeid) = @_;
+
+    return undef unless defined $storeid && length $storeid;
+
+    # The plugin names the file with the storeid verbatim, and PVE's own
+    # storage-id schema already excludes anything else. This fold changes
+    # nothing for a legal id and refuses to turn a hand-typed argument into a
+    # path: this tool takes the storeid from the command line, and reading an
+    # arbitrary file as root is not something it should be able to be talked
+    # into.
+    (my $safe = $storeid) =~ s/[^A-Za-z0-9._-]/_/g;
+    return undef unless length $safe;
+
+    my $file = "$PVE_ROOT/priv/storage/$safe.pw";
+    open(my $fh, '<', $file) or return undef;
+    my $password = do { local $/; <$fh> };
+    close($fh);
+
+    return undef unless defined $password;
+    chomp $password;
+
+    return length($password) ? $password : undef;
+}
+
 sub read_storage_cfg {
     my ($want) = @_;
 
-    my $file = '/etc/pve/storage.cfg';
+    my $file = "$PVE_ROOT/storage.cfg";
     open(my $fh, '<', $file) or return undef;
 
     my ($current, %config);
@@ -177,12 +225,15 @@ if ($opt{recover}) {
 } else {
     $scfg = read_storage_cfg($storeid);
     unless ($scfg) {
-        die "Storage '$storeid' was not found in /etc/pve/storage.cfg.\n"
+        die "Storage '$storeid' was not found in $PVE_ROOT/storage.cfg.\n"
           . "If PVE is not available, use recover mode:\n"
           . "  pve-dell-config-get -r --portal <ip> --username <user>"
           . " --password <pass> $storeid"
           . (defined $vmid ? " $vmid" : '') . "\n";
     }
+    my $priv = read_priv_password($storeid);
+    $scfg->{'dell-password'} = $priv if defined $priv;
+
     # Command-line credentials still win, for the case where storage.cfg is
     # readable but its password is not the one that works.
     $scfg->{'dell-portal'}   = $opt{portal}   if defined $opt{portal};
@@ -194,8 +245,9 @@ if ($opt{recover}) {
 
 die "Storage '$storeid' has no dell-portal configured\n"
     unless $scfg->{'dell-portal'};
-die "Storage '$storeid' has no credentials configured. Pass --username and"
-  . " --password.\n"
+die "Storage '$storeid' has no credentials configured. The password is kept"
+  . " in $PVE_ROOT/priv/storage/, which this tool reads, and it is not there"
+  . " either. Pass --username and --password.\n"
     unless $scfg->{'dell-username'} && defined $scfg->{'dell-password'};
 
 # This tool speaks PowerStore REST. Pointed at another family it would send
@@ -294,7 +346,30 @@ sub nodename {
     return (POSIX::uname())[1] =~ /^([^.]+)/ ? $1 : 'unknown';
 }
 
-my $host_name = $NAMING->encode_host_name($cluster, nodename());
+# The host object this node is mapped to, named exactly as the plugin names
+# it — including 'shared'.
+#
+# BlockBase::_host_name registers one host per node by default and a single
+# shared host for the whole cluster when 'dell-host-mode shared' is set. This
+# tool read neither the option nor the mode and always built the per-node
+# name, so against a storage using the shared mode it looked for a host that
+# does not exist and then CREATED one, with this node's initiators in it. An
+# initiator belongs to one host object on these arrays: registering it again
+# under a new name is refused at best, and at worst moves it off the shared
+# host that every node's volumes are mapped to. That is a recovery tool
+# taking a cluster's storage down while someone is recovering a VM.
+my $host_mode = $opt{host_mode} // $scfg->{'dell-host-mode'} // 'per-node';
+die "--host-mode must be 'per-node' or 'shared'\n"
+    unless $host_mode eq 'per-node' || $host_mode eq 'shared';
+
+my $host_name = $NAMING->encode_host_name($cluster,
+    $host_mode eq 'shared' ? undef : nodename());
+
+# Said out loud, on stderr, before anything is done with it. Which host object
+# the tool will look for is the one thing an operator can check against the
+# array in five seconds, and getting it wrong is how this tool would create a
+# second host and move an initiator off the one in use.
+info("Host object for this node: '$host_name' ($host_mode)");
 
 # ---------------------------------------------------------------------------
 # Listing

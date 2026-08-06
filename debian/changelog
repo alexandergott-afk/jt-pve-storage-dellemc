@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.93~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: pve-dell-config-get could not find the array password. It parses
+    storage.cfg itself, and 0.7.86 moved the password to
+    /etc/pve/priv/storage/<storeid>.pw without telling it - so for four
+    releases it reported "no credentials configured" for every storage
+    following the current convention, at the moment someone was recovering a
+    VM configuration. It reads the priv file now, same precedence as the
+    plugin, and names the directory it looked in when it finds nothing.
+  * Fixed: pve-dell-config-get ignored dell-host-mode. With 'shared' the
+    plugin registers one host object for the whole cluster; the tool always
+    built the per-node name, so it looked for a host that does not exist and
+    then registered a new one carrying this node's initiators. An initiator
+    belongs to one host object on these arrays, so at worst that moves it off
+    the shared host every node's volumes are mapped to. It reads the mode,
+    accepts --host-mode in recover mode, and prints the host object it will
+    use before acting on it.
+  * Added t/22-config-get.t, which drives the real script as a subprocess
+    against a temporary /etc/pve. Nothing tested this tool before.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 00:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.92~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.
