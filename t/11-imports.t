@@ -204,4 +204,99 @@ for my $file (sort @files) {
             'undef means "could not tell" and reads as false here:', @bare));
 }
 
+# ---------------------------------------------------------------------------
+# A family's _array_* signature must fit the way BlockBase actually calls it
+#
+# Perl checks none of this. A subclass that inserts one parameter shifts
+# every argument after it - the volume name lands in a slot nothing reads,
+# $name stays undef, and the failure is silent because the method still
+# runs. That shipped once: Unity's _array_get_wwid took ($scfg, $storeid,
+# $name) where BlockBase passes ($scfg, $name), and every WWID lookup
+# answered undef - device discovery dead on arrival, invisible to the
+# lifecycle tests because they stub the device layer.
+#
+# Counting arguments cannot catch that bug: three declared covers two
+# passed. What catches it is the KIND of name at each position. BlockBase's
+# call sites name their arguments meaningfully - $scfg, $storeid, and data
+# ($array_name, $snap_name, $prefix...) - so a declaration whose position 2
+# says 'storeid' where the call passes a volume name is the shipped bug,
+# recognisable by name. The call sites are read out of BlockBase itself,
+# never remembered.
+# ---------------------------------------------------------------------------
+
+{
+    my $base = do {
+        open(my $fh, '<', 'lib/PVE/Storage/Custom/DellEMC/Common/BlockBase.pm')
+            or die "cannot read BlockBase: $!";
+        local $/; <$fh>;
+    };
+
+    # scfg and storeid are the structural parameters; everything else is
+    # data. An 'undef' placeholder in a call says "data, absent".
+    my $kind = sub {
+        my ($token) = @_;
+        return 'scfg'    if $token =~ /scfg/;
+        return 'storeid' if $token =~ /storeid/;
+        return 'data';
+    };
+
+    # The longest plain-positional call per method, with its argument names.
+    my %calls;
+    while ($base =~ /\$class->(_array_\w+)\(([^()]*)\)/g) {
+        my ($method, $args) = ($1, $2);
+        my @args = grep { length } map { s/^\s+|\s+\z//gr } split /,/, $args;
+        next if grep { !/^(?:\$\w+(?:->\{'?[\w-]+'?\})?|undef)\z/ } @args;
+        $calls{$method} = \@args
+            if !exists $calls{$method} || @args > @{ $calls{$method} };
+    }
+
+    ok(scalar(keys %calls) >= 15,
+        'the call sites were actually found in BlockBase')
+        or diag('the extraction regex no longer matches; fix the TEST');
+
+    for my $file (glob('lib/PVE/Storage/Custom/Dell*Plugin.pm')) {
+        next if $file =~ /PowerFlex/;   # not a BlockBase subclass
+
+        open(my $fh, '<', $file) or next;
+        my $source = do { local $/; <$fh> };
+        close($fh);
+
+        my @wrong;
+        while ($source =~ /^sub (_array_\w+) \{\n\s*my \(([^)]*)\)/mg) {
+            my ($method, $params) = ($1, $2);
+            my $call = $calls{$method} // next;
+
+            my @params = grep { !/^\%/ }             # %opts is not positional
+                         grep { length }
+                         map { s/^\s+|\s+\z//gr } split /,/, $params;
+            shift @params if @params && $params[0] eq '$class';
+
+            # Never shorter than the longest call...
+            if (@params < @$call) {
+                push @wrong, "$method: BlockBase passes " . scalar(@$call)
+                    . " positional argument(s), the declaration takes only "
+                    . scalar(@params);
+                next;
+            }
+
+            # ...and at every position the caller fills, the same KIND of
+            # thing. 'storeid' where the caller sends a name is the shipped
+            # bug; extra TRAILING parameters beyond the call are fine.
+            for my $i (0 .. $#$call) {
+                my $want = $kind->($call->[$i]);
+                my $have = $kind->($params[$i]);
+                next if $want eq $have;
+
+                push @wrong, "$method: position " . ($i + 1)
+                    . " receives '$call->[$i]' from BlockBase but the"
+                    . " declaration names it '$params[$i]'";
+            }
+        }
+
+        is_deeply(\@wrong, [], "$file: every _array_* signature fits how"
+            . " BlockBase calls it")
+            or diag(join("\n  ", '', @wrong));
+    }
+}
+
 done_testing();
