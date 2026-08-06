@@ -1,3 +1,18 @@
+jt-pve-storage-dellemc (0.7.83~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * POWERFLEX: an NVMe host could never have been mapped. An NVMe host and
+    an SDC are mapped by different actions, not by different parameters to
+    one action: Dell's gen2 client has addMappedHost alongside addMappedSdc,
+    with removeMappedHost mirroring it. This plugin sent hostId to
+    addMappedSdc, marked NOT VERIFIED - on NVMe/TCP, which is this family's
+    DEFAULT protocol. Both directions now choose the action by what is being
+    mapped. Same audit, same day, same family as the rollback fix: the two
+    calls that would have failed first on a real 4.x array were the two
+    resting on the weakest evidence.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 12:15:00 +0800
+
 jt-pve-storage-dellemc (0.7.82~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

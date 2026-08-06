@@ -7,6 +7,24 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.83~beta1] - 2026-08-06
+
+### Fixed
+- **PowerFlex: an NVMe host could never have been mapped.** An NVMe host
+  and an SDC are mapped by different *actions*, not by different parameters
+  to one action: Dell's gen2 client has `addMappedHost`
+  (`{hostId, nqn, allowMultipleMappings}`) alongside `addMappedSdc`
+  (`{sdcId, guid, allowMultipleMappings}`), with `removeMappedHost`
+  mirroring it. This plugin sent `hostId` to `addMappedSdc`, marked NOT
+  0.7.83~beta1IFIED — on **NVMe/TCP, which is this family's default protocol**, so
+  the default path's map call rested on a guess when Dell's own code shows
+  the action that exists for it. Both directions now choose the action by
+  what is being mapped.
+
+  Same audit, same day, same family as the rollback fix: the two calls that
+  would have failed first on a real 4.x array were the two resting on the
+  weakest evidence.
+
 ## [0.7.82~beta1] - 2026-08-06
 
 ### Fixed

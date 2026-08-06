@@ -5,6 +5,21 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.83~beta1] - 2026-08-06
+
+### 修正
+- **PowerFlex：NVMe host 原本根本對應不上。** NVMe host 與 SDC 是用**不同的
+  動作**對應的，不是同一個動作換參數：Dell 的 gen2 客戶端有 `addMappedHost`
+  （`{hostId, nqn, allowMultipleMappings}`）與 `addMappedSdc`
+  （`{sdcId, guid, allowMultipleMappings}`）並列，`removeMappedHost` 與之
+  對稱。本外掛原本把 `hostId` 送給 `addMappedSdc`、標著 NOT 0.7.83~beta1IFIED ——
+  而 **NVMe/TCP 是這個系列的預設協定**，等於預設路徑的對應呼叫建立在猜測上，
+  Dell 自己的程式碼卻早就寫著為它而存在的動作。現在兩個方向都依對應對象選擇
+  動作。
+
+  與倒回修正同一場稽核、同一天、同一系列：在真實 4.x 陣列上最先會失敗的兩個
+  呼叫,正是證據最薄弱的兩個。
+
 ## [0.7.82~beta1] - 2026-08-06
 
 ### 修正

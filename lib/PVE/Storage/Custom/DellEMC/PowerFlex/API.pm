@@ -793,19 +793,29 @@ sub nvme_targets {
 
 # allowMultipleMappings is required for a cluster: every node maps the same
 # volume, and PVE relies on that for live migration.
+#
+# An NVMe host and an SDC are mapped by DIFFERENT actions, not by different
+# parameters to one action. Dell's gen2 client has addMappedHost
+# ({hostId, nqn, allowMultipleMappings}) alongside addMappedSdc
+# ({sdcId, guid, allowMultipleMappings}), and an earlier draft here sent
+# hostId to addMappedSdc with a NOT VERIFIED note - on NVMe/TCP, which is
+# this family's DEFAULT protocol, so the default path's map call rested on
+# a guess when Dell's own code shows the action that exists for it.
 sub volume_map {
     my ($self, $volume_id, $host_id, %opts) = @_;
 
     my $body = { allowMultipleMappings => 'TRUE' };
 
+    my $action;
     if ($opts{nvme}) {
-        # NOT VERIFIED: the parameter name for an NVMe host.
+        $action = 'addMappedHost';
         $body->{hostId} = $host_id;
     } else {
+        $action = 'addMappedSdc';
         $body->{sdcId} = $host_id;
     }
 
-    return $self->post("/api/instances/Volume::$volume_id/action/addMappedSdc",
+    return $self->post("/api/instances/Volume::$volume_id/action/$action",
         $body, %opts);
 }
 
@@ -813,13 +823,16 @@ sub volume_unmap {
     my ($self, $volume_id, $host_id, %opts) = @_;
 
     my $body = {};
+    my $action;
     if ($opts{nvme}) {
+        $action = 'removeMappedHost';
         $body->{hostId} = $host_id;
     } else {
+        $action = 'removeMappedSdc';
         $body->{sdcId} = $host_id;
     }
 
-    return $self->post("/api/instances/Volume::$volume_id/action/removeMappedSdc",
+    return $self->post("/api/instances/Volume::$volume_id/action/$action",
         $body, %opts);
 }
 

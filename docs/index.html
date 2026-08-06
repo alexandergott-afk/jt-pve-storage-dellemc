@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.82~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.83~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1069,6 +1069,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.83~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">An NVMe host and an SDC are mapped by different actions, and PowerFlex's default protocol was using the wrong one — hostId sent to addMappedSdc. Dell's own client names addMappedHost/removeMappedHost; both directions now choose by what is being mapped.</span>
+            <span class="lang-zh">NVMe host 與 SDC 是用不同的動作對應的，而 PowerFlex 的預設協定用錯了 —— 把 hostId 送給 addMappedSdc。Dell 自己的客戶端寫著 addMappedHost／removeMappedHost；現在兩個方向都依對應對象選擇動作。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.82~beta1</div>

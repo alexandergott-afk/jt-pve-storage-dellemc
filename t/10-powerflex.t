@@ -1030,4 +1030,39 @@ SKIP: {
     is($ua->body_of->{srcVolumeId}, 'snap-1', '... with the same source key');
 }
 
+# ---------------------------------------------------------------------------
+# An NVMe host and an SDC are mapped by different ACTIONS
+#
+# Dell's gen2 client has addMappedHost for hosts and addMappedSdc for SDCs.
+# An earlier draft sent hostId to addMappedSdc on the NVMe path - which is
+# this family's DEFAULT protocol, so the default map call rested on a guess.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply({}) if $path =~ m{action/(?:add|remove)Mapped(?:Host|Sdc)};
+        return reply({ error => 'wrong action' }, 404);
+    });
+
+    $api->volume_map('vol-1', 'host-9', nvme => 1);
+    like($ua->last_request->uri->path, qr{action/addMappedHost\z},
+        'an NVMe host is mapped with addMappedHost');
+    is($ua->body_of->{hostId}, 'host-9', '... by hostId');
+    ok(!exists $ua->body_of->{sdcId}, '... and never by sdcId');
+
+    $api->volume_map('vol-1', 'sdc-3');
+    like($ua->last_request->uri->path, qr{action/addMappedSdc\z},
+        'an SDC keeps addMappedSdc');
+    is($ua->body_of->{sdcId}, 'sdc-3', '... by sdcId');
+
+    $api->volume_unmap('vol-1', 'host-9', nvme => 1);
+    like($ua->last_request->uri->path, qr{action/removeMappedHost\z},
+        'and the unmap mirrors it: removeMappedHost for a host');
+
+    $api->volume_unmap('vol-1', 'sdc-3');
+    like($ua->last_request->uri->path, qr{action/removeMappedSdc\z},
+        '... removeMappedSdc for an SDC');
+}
+
 done_testing();
