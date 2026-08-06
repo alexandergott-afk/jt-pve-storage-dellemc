@@ -467,29 +467,50 @@ and the PowerStore OS version in the Result column.
 | 3 | `pvesm add` validation | — | a missing required option is rejected | — |
 | 4 | Capacity reporting | — | matches PowerStore Manager within 1% | — |
 | 5 | Array unreachable | management network pulled | storage goes `inactive` within ~5s, sibling storages unaffected | — |
-| 6 | Create a VM disk | — | volume on the array, multipath device on the node | — |
-| 7 | Online grow | VM running | guest sees the new size after a rescan | — |
+| 6 | Create a VM disk | — | volume on the array, multipath device on the node | **ME4024 FC ✓** |
+| 7 | Online grow | VM running | guest sees the new size after a rescan | **ME4024 FC ✓ (VM stopped)** |
 | 8 | Shrink | — | refused, with both sizes named | — |
-| 9 | Delete a disk | VM stopped | volume gone, no device or map left behind | — |
+| 9 | Delete a disk | VM stopped | volume gone, no device or map left behind | **ME4024 FC ✓** |
 | 10 | Delete an in-use disk | VM running | refused, with the reason | — |
-| 11 | Snapshot create/list/delete | — | array snapshot matches | — |
-| 12 | Snapshot rollback | VM stopped | data restored, no stale cache | — |
+| 11 | Snapshot create/list/delete | — | array snapshot matches | **ME4024 FC ✓** |
+| 12 | Snapshot rollback | VM stopped | data restored, no stale cache | **ME4024 FC ✓ (container)** |
 | 13 | RAM snapshot (vmstate) | VM running | state volume created, VM resumes correctly | — |
 | 14 | Config backup + `pve-dell-config-get` | PowerStore | configuration is readable back; no config volume is created on PowerVault ME | — |
 | 15 | Template + linked clone | — | clone is instant | — |
 | 16 | Delete a template with clones | — | refused, dependants named | — |
 | 17 | Full clone | — | completes via qemu-img | — |
-| 18 | LXC container rootfs | — | creates and starts | — |
+| 18 | LXC container rootfs | — | creates and starts | **ME4024 FC ✓** |
 | 19 | EFI disk, TPM state, cloud-init | — | each is created | — |
 | 20 | Live migration | 2 nodes | completes with no I/O interruption | — |
 | 21 | Single path failure | pull one iSCSI link | I/O continues, multipath shows the failed path | — |
-| 22 | Node reboot | — | logs in and devices reappear automatically | — |
+| 22 | Node reboot | — | logs in and devices reappear automatically | **ME4024 FC ✓** |
 | 23 | Orphan reaper | delete a volume from another node | the stale device is removed after the grace period, others untouched | — |
 | 24 | LUN id growth | 300 attach/detach cycles | ids stay low and dense | — |
 | 25 | Fibre Channel | FC fabric | items 1–24 repeated | — |
 | 26 | PVE 9.1 to 9.2 upgrade | — | plugin still works, `get_identity` returns cleanly | — |
 | 27 | Move a disk to another storage type | VM stopped | `qm move_disk` to an LVM or ZFS storage completes and the source volume is gone | — |
 | 28 | `pvesm export` / `pvesm import` | — | the stream round-trips; a second import onto the same name is refused unless a rename is allowed | — |
+| 29 | `vzdump --mode snapshot` and `qmrestore` | — | both succeed, and no `-tmp-` or `-vc-` object is left on the array afterwards | **ME4024 FC ✓** |
+| 30 | A guest OS boots from an array volume | — | the installer reads the partition table and starts | **ME4024 FC ✓** |
+
+### What the ME4024 has actually run, and when
+
+The rows marked **ME4024 FC ✓** were confirmed by the customer running an
+ME4024 on firmware `GT280R011-01` over Fibre Channel, on **0.7.66~beta1**.
+Between them they cover the paths that are hardest to reason about without an
+array: a guest OS booting off an array volume, `expand volume`'s
+add-this-much arithmetic and the resize that follows it, `vzdump --mode
+snapshot` with the temporary clone it reads through and deletes afterwards, a
+container with the fsfreeze its snapshot needs, and a node reboot.
+
+**It is a point-in-time result, not a standing one.** Shared code has changed
+in every release since — 0.7.75 to 0.7.89 — and one of those changes is on
+the path item 30 exercised: 0.7.89 overrides `qemu_blockdev_options`, which
+is what PVE calls to attach a disk when starting a VM. Re-running the boot
+after an upgrade is worth the two minutes it takes.
+
+Still not run on this array: iSCSI, SAS, live migration between nodes, a path
+failure, and the two transfer paths added in 0.7.88.
 
 ## Soak criteria for 1.0.0
 

@@ -1651,13 +1651,12 @@ sub volume_import {
 
         my $device = $class->_transfer_device($scfg, $storeid, $allocname);
 
-        # conv=sparse skips runs of zeroes instead of writing them, which is
-        # only safe because the target was created by the alloc_image call
-        # directly above: an unwritten region of a new volume reads as zeroes,
-        # so the skipped writes are writes of what is already there. It must
-        # never be used over a volume that existed before this call.
+        # No conv=sparse: skipping a run of zeroes is only correct where the
+        # region already reads as zeroes, which a thin volume guarantees and
+        # a thick one does not — and 'pflex-thick' is an operator's choice.
+        # See the same comment in BlockBase.
         PVE::Tools::run_command(
-            ['dd', "of=$device", 'conv=sparse', 'bs=64k'],
+            ['dd', "of=$device", 'bs=64k'],
             input => '<&' . fileno($fh),
         );
     };

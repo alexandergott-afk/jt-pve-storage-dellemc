@@ -2965,14 +2965,19 @@ sub volume_import {
 
         my ($device) = $class->_transfer_device($scfg, $storeid, $allocname);
 
-        # conv=sparse skips runs of zeroes instead of writing them. That is
-        # only safe because the target was created by the alloc_image call
-        # directly above: every family creates a thin volume, an unwritten
-        # region of one reads as zeroes, and so the skipped writes are writes
-        # of what is already there. It must never be used to write over a
-        # volume that existed before this call.
+        # No conv=sparse. Skipping a run of zeroes instead of writing it is
+        # only correct if the region it skips already reads as zeroes, and
+        # that holds for a thin volume — an unmapped LBA reads as zeroes —
+        # but NOT for a thick one, whose extents are whatever the array last
+        # had there. Thin is an operator's choice on two families
+        # ('unity-thin', 'pflex-thick') and a property of the pool on
+        # PowerVault, so the guarantee is one a storage's configuration can
+        # withdraw. Writing every byte costs the volume's thinness on an
+        # import and nothing else; the other way round leaves another
+        # tenant's old data readable inside the imported disk. LVMPlugin
+        # writes every byte too.
         PVE::Tools::run_command(
-            ['dd', "of=$device", 'conv=sparse', 'bs=64k'],
+            ['dd', "of=$device", 'bs=64k'],
             input => '<&' . fileno($fh),
         );
     };

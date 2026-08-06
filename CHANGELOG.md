@@ -7,6 +7,42 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.90~beta1] - 2026-08-06
+
+### Verified on hardware
+- **The PowerVault ME4024 has run the six lifecycle items beyond the
+  first-run test, and all six passed.** On firmware `GT280R011-01` over
+  Fibre Channel, at 0.7.66: a guest OS booting off an array volume, growing
+  a disk (`expand volume`'s add-this-much arithmetic and the resize that
+  follows it — the one main path nothing had ever exercised),
+  `vzdump --mode snapshot` with a restore and no `-tmp-`/`-vc-` object left
+  behind, an LXC container including the fsfreeze its snapshot needs, and a
+  node reboot. `docs/TESTING.md` records which matrix rows that covers, on
+  what hardware and at which version — and says plainly that it is a
+  point-in-time result: shared code has changed in every release since, and
+  one of those changes is on the VM-start path.
+
+### Fixed
+- **The import wrote zeroes by skipping them, on a guarantee an operator can
+  withdraw.** `volume_import` used `dd conv=sparse`, which skips a run of
+  zeroes instead of writing it. That is only correct where the region it
+  skips already reads as zeroes — true of a thin volume, whose unmapped LBAs
+  read as zeroes, and not true of a thick one, whose extents are whatever the
+  array last had there. Thin is an operator's choice on two families
+  (`unity-thin`, `pflex-thick`) and a property of the pool on PowerVault, so
+  the correctness of the copy rested on a storage's configuration. Writing
+  every byte costs the volume's thinness on an import and nothing else; the
+  other way round leaves whatever the array had in those extents readable
+  inside the imported disk. `LVMPlugin` writes every byte too.
+
+  Found by re-reading the previous release's own new code.
+
+### Added
+- Tests driving `volume_import` end to end with the copy stubbed — the size
+  rounding, the argv of the copy, and the cleanup of a half-written volume
+  when it fails — and `qemu_blockdev_options` against the placeholder path
+  and an unconfirmed device.
+
 ## [0.7.89~beta1] - 2026-08-06
 
 ### Fixed

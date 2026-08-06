@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.7.90~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Verified on hardware: the PowerVault ME4024 (firmware GT280R011-01, FC)
+    has run the six lifecycle items beyond the first-run test, and all six
+    passed - a guest OS booting off an array volume, growing a disk,
+    vzdump --mode snapshot with a restore and no temporary object left
+    behind, an LXC container including its fsfreeze, and a node reboot.
+    Recorded in docs/TESTING.md with the version it was run at, and marked
+    as a point-in-time result.
+  * Fixed: volume_import used dd conv=sparse, which skips a run of zeroes
+    instead of writing it. That is only correct where the skipped region
+    already reads as zeroes - true of a thin volume, false of a thick one.
+    Thin is an operator's choice here (unity-thin, pflex-thick) and a
+    property of the pool on PowerVault, so the correctness of the copy
+    rested on a storage's configuration. Every byte is written now, as
+    LVMPlugin does.
+  * Added: tests driving volume_import end to end with the copy stubbed, and
+    qemu_blockdev_options against the placeholder path and an unconfirmed
+    device.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 21:45:00 +0800
+
 jt-pve-storage-dellemc (0.7.89~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

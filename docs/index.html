@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.89~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.90~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -183,8 +183,8 @@
     </h2>
     <div class="alert alert--danger">
         <strong>
-            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel. PowerStore, PowerFlex, Unity, iSCSI and SAS remain unverified. Use at your own risk.</span>
-            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
+            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel, which now also boots guests, grows disks, backs up and restores, runs containers and survives a reboot. PowerStore, PowerFlex, Unity, iSCSI and SAS remain unverified. Use at your own risk.</span>
+            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024，現在也已通過客體開機、磁碟擴充、備份與還原、容器,以及重開機。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
         </strong>
         <ul>
             <li>
@@ -251,7 +251,7 @@
                     <td><code>dellpowervault</code></td>
                     <td>iSCSI / FC / SAS (dm-multipath)</td>
                     <td><span class="status-badge status-badge--supported">
-                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
+                        <span class="lang-en">Verified on an ME4024 over FC</span><span class="lang-zh">已在 ME4024 以 FC 驗證</span>
                     </span></td>
                 </tr>
                 <tr>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.90~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The ME4024 has run the six lifecycle items beyond the first-run test &mdash; guest boot, disk growth, backup and restore, container, reboot &mdash; and all six passed. Fixed: the import skipped runs of zeroes, which is only correct on a thin volume, and thin is an operator's choice here.</span>
+            <span class="lang-zh">ME4024 跑完首次執行測試之外的六項生命週期項目 &mdash; 客體開機、磁碟擴充、備份與還原、容器、重開機 &mdash; 六項全過。並修正:匯入會跳過連續的零,而那只有在精簡磁碟區上才正確,精簡在這裡是操作者的選擇。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.89~beta1</div>

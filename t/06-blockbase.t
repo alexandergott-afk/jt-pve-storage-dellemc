@@ -1412,4 +1412,105 @@ SKIP: {
     is($wwid, '3600a0980deadbeef', '... with the WWID it was confirmed against');
 }
 
+{
+    # volume_import, driven end to end with the copy and the device layer
+    # stubbed. What is being checked is everything that decides what the copy
+    # writes and what happens when it fails.
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+
+    my @dd;
+    my $fail_dd = 0;
+
+    no warnings 'redefine', 'once';
+    local *Test::Plugin::activate_volume = sub { 1 };
+    local *Test::Plugin::_transfer_device =
+        sub { return ('/dev/mapper/3600a0980deadbeef', '3600a0980deadbeef') };
+    local *PVE::Tools::run_command = sub {
+        my ($cmd) = @_;
+        push @dd, $cmd;
+        die "dd failed\n" if $fail_dd;
+        return 0;
+    };
+
+    # 5000 bytes: not a whole number of KiB, so the rounding is visible.
+    # A real file, not an in-memory one: read_common_header uses sysread,
+    # which PerlIO::scalar does not serve.
+    my $stream = pack('Q<', 5000) . ("\0" x 32);
+    my $stream_file = "$TMP/import-stream";
+    { open my $out, '>', $stream_file or die; binmode $out; print {$out} $stream; close $out }
+    open(my $fh, '<', $stream_file) or die;
+
+    my $volid = Test::Plugin->volume_import($scfg, 't1', $fh, 'vm-100-disk-0',
+        'raw+size', undef, undef, 0, 1);
+
+    is($volid, 't1:vm-100-disk-0', 'volume_import returns the volid it used');
+    is($Test::Plugin::VOLUMES{'pve-t1-100-disk0'}{size}, 5 * 1024,
+        'the stream size is rounded UP to whole KiB — a volume one byte'
+      . ' short of the stream is filled and then fails');
+
+    is(scalar(@dd), 1, 'the copy ran once');
+    unlike(join(' ', @{ $dd[0] }), qr/conv=sparse/,
+        'the copy writes every byte: skipping zeroes is only correct on a'
+      . ' thin volume, and thin is an operator\'s choice here');
+    like(join(' ', @{ $dd[0] }), qr{of=/dev/mapper/3600a0980deadbeef},
+        '... to the confirmed device');
+
+    # And the cleanup when the copy fails.
+    Test::Plugin->reset_state();
+    @dd = ();
+    $fail_dd = 1;
+
+    open(my $fh2, '<', $stream_file) or die;
+    eval { Test::Plugin->volume_import($scfg, 't1', $fh2, 'vm-100-disk-0',
+        'raw+size', undef, undef, 0, 1) };
+    like($@, qr/dd failed/, 'a failed copy is reported, not swallowed');
+
+    my $calls = join(' | ', @{ Test::Plugin->calls() });
+    like($calls, qr/unmap[^|]*\|[^|]*delete|delete/,
+        '... and the half-written volume is freed rather than left as an'
+      . ' orphan on the array');
+    ok(!$Test::Plugin::VOLUMES{'pve-t1-100-disk0'},
+        '... so nothing is left behind');
+}
+
+{
+    # qemu_blockdev_options — the VM start path.
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $BB = 'PVE::Storage::Custom::DellEMC::Common::BlockBase';
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+
+    local *Test::Plugin::path = sub { '/dev/mapper/3600a0980deadbeef' };
+    local *{"${BB}::is_block_device"} = sub { 1 };
+
+    my $bd = Test::Plugin->qemu_blockdev_options($scfg, 't1', 'vm-100-disk-0',
+        'pc-q35-9.0', {});
+    is_deeply($bd, { driver => 'host_device',
+                     filename => '/dev/mapper/3600a0980deadbeef' },
+        'a VM is started on the device itself, with no stat of PVE\'s in'
+      . ' between — the base class reaches it through File::stat::stat,'
+      . ' which is unbounded');
+
+    local *Test::Plugin::path = sub { '/dev/mapper/unknown-pve-t1-100-disk0' };
+    eval { Test::Plugin->qemu_blockdev_options($scfg, 't1', 'vm-100-disk-0',
+        'pc-q35-9.0', {}) };
+    like($@, qr/device could not be resolved/,
+        'the placeholder path() falls back to when the array cannot be asked'
+      . ' is refused: handing it to QEMU turns an outage into I/O errors'
+      . ' inside the guest');
+
+    local *Test::Plugin::path = sub { '/dev/mapper/3600a0980deadbeef' };
+    local *{"${BB}::is_block_device"} = sub { 0 };
+    eval { Test::Plugin->qemu_blockdev_options($scfg, 't1', 'vm-100-disk-0',
+        'pc-q35-9.0', {}) };
+    like($@, qr/is not a block device/,
+        '... and so is anything the bounded check does not confirm, which'
+      . ' includes a check that timed out');
+}
+
 done_testing();
