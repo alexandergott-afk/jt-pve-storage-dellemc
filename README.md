@@ -342,6 +342,26 @@ First-time setup: [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 
 ---
 
+### Unity XT
+
+```bash
+pvesm add dellunity u480 \
+    --dell-portal 192.168.1.80 \
+    --dell-username admin \
+    --dell-password 'SecurePassword' \
+    --dell-protocol fc \
+    --unity-pool pool_1 \
+    --content images,rootdir \
+    --shared 1
+```
+
+Unity's management IP follows the master SP, so one address is enough.
+`--unity-pool` is required on an array with more than one pool. **This
+family has never run against an array** — see
+[docs/TESTING.md](docs/TESTING.md) and the Unity section of
+[docs/FIRST_RUN.md](docs/FIRST_RUN.md) before the first run.
+
+
 ## Known limitations
 
 - **Full Clone does not use array-side cloning.** PVE implements a full clone

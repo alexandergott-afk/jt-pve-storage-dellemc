@@ -231,6 +231,22 @@ pvesm add dellpowerflex pflex1 \
 
 ---
 
+### Unity XT
+
+```bash
+pvesm add dellunity u480 \
+    --dell-portal 192.168.1.80 \
+    --dell-username admin \
+    --dell-password 'SecurePassword' \
+    --dell-protocol fc \
+    --unity-pool pool_1 \
+    --content images,rootdir \
+    --shared 1
+```
+
+Unity 的管理 IP 會跟著主 SP 走，填一個位址即可。陣列有多個儲存池時 `--unity-pool` 為必填。**這個系列從未在陣列上執行過** —— 第一次執行前請先讀 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 與 [docs/FIRST_RUN_zh-TW.md](docs/FIRST_RUN_zh-TW.md) 的 Unity 節。
+
+
 ## 已知限制
 
 - **完整複製（Full Clone）不會使用陣列端的複製功能。** PVE 對完整複製的實作是 `alloc_image` 加上 `qemu-img` 逐區塊複製，根本不會呼叫外掛的 `clone_image`。這是 PVE 的架構決策，不是外掛缺陷。想用陣列的精簡複製，請改用連結複製（Linked Clone）。

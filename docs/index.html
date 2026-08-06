@@ -183,13 +183,13 @@
     </h2>
     <div class="alert alert--danger">
         <strong>
-            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel. PowerStore, PowerFlex, iSCSI and SAS remain unverified. Use at your own risk.</span>
-            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024。PowerStore、PowerFlex、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
+            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel. PowerStore, PowerFlex, Unity, iSCSI and SAS remain unverified. Use at your own risk.</span>
+            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
         </strong>
         <ul>
             <li>
-                <span class="lang-en">Every array-facing behaviour is unverified: REST endpoints and field names, the SCSI vendor and product strings that decide which devices the plugin touches, the WWN to WWID conversion, and the Fibre Channel path.</span>
-                <span class="lang-zh">所有面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定外掛會碰哪些裝置的 SCSI vendor／product 字串、WWN 轉 WWID 的換算，以及 Fibre Channel 路徑。</span>
+                <span class="lang-en">On every family except PowerVault-over-FC, the array-facing behaviour is unverified: REST endpoints and field names, the SCSI vendor and product strings that decide which devices the plugin touches, and the WWN to WWID conversion. The verification tables below name each item.</span>
+                <span class="lang-zh">除了走 FC 的 PowerVault 之外，各系列面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定外掛會碰哪些裝置的 SCSI vendor／product 字串、以及 WWN 轉 WWID 的換算。下方的驗證表逐項列出。</span>
             </li>
             <li>
                 <span class="lang-en">A storage plugin runs as root, creates and deletes volumes on the array, and manipulates block devices on every node. A defect can destroy virtual machine data, take a storage offline, or leave a node in a state that only a reboot clears.</span>
@@ -208,8 +208,8 @@
                 <span class="lang-zh">請使用非正式環境的叢集與陣列，並保留獨立備份。儲存快照不是備份。</span>
             </li>
             <li>
-                <span class="lang-en">An independent community project. Not affiliated with, endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC", "PowerStore", "PowerVault", "PowerFlex", "PowerMax" and "PowerScale" are trademarks of their respective owners.</span>
-                <span class="lang-zh">本專案為獨立的社群專案，與 Dell Technologies 無隸屬關係，亦未經其背書或提供支援。「Dell」、「Dell EMC」、「PowerStore」、「PowerVault」、「PowerFlex」、「PowerMax」、「PowerScale」為各自所有權人之商標。</span>
+                <span class="lang-en">An independent community project. Not affiliated with, endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC", "PowerStore", "PowerVault", "PowerFlex", "Unity", "PowerMax" and "PowerScale" are trademarks of their respective owners.</span>
+                <span class="lang-zh">本專案為獨立的社群專案，與 Dell Technologies 無隸屬關係，亦未經其背書或提供支援。「Dell」、「Dell EMC」、「PowerStore」、「PowerVault」、「PowerFlex」、「Unity」、「PowerMax」、「PowerScale」為各自所有權人之商標。</span>
             </li>
         </ul>
     </div>
@@ -277,8 +277,8 @@
                 <tr>
                     <td>Unity XT</td>
                     <td><code>dellunity</code></td>
-                    <td>iSCSI / FC</td>
-                    <td><span class="lang-en">Not scheduled</span><span class="lang-zh">未排入</span></td>
+                    <td>FC / iSCSI</td>
+                    <td><span class="status-badge status-badge--partial"><span class="lang-en">Code complete, no hardware run</span><span class="lang-zh">程式碼完成，尚無實機執行</span></span></td>
                 </tr>
                 <tr>
                     <td>ObjectScale, PowerProtect</td>
@@ -387,8 +387,8 @@
                 <th><span class="lang-en">Compatibility</span><span class="lang-zh">相容性</span></th>
             </tr></thead>
             <tbody>
-                <tr><td>PVE 9.1+</td><td>13</td><td><span class="status-badge status-badge--supported">
-                    <span class="lang-en">Supported</span><span class="lang-zh">支援</span>
+                <tr><td>PVE 9.1+</td><td><span class="lang-en">13&ndash;15, negotiated</span><span class="lang-zh">13&ndash;15，自動協商</span></td><td><span class="status-badge status-badge--supported">
+                    <span class="lang-en">Supported &mdash; the ME4024 run was on PVE 9.2.5 (APIVER 15)</span><span class="lang-zh">支援 &mdash; ME4024 的實測就在 PVE 9.2.5（APIVER 15）上</span>
                 </span></td></tr>
                 <tr><td>PVE 9.0</td><td>12</td><td>
                     <span class="lang-en">Untested</span><span class="lang-zh">未測試</span>
@@ -415,6 +415,7 @@
                 <tr><td>PowerStore</td><td>PowerStore OS 3.0+ (4.x targeted)</td><td>REST API v3</td></tr>
                 <tr><td>PowerVault ME</td><td>ME4 / ME5</td><td><span class="lang-en">CLI over HTTPS</span><span class="lang-zh">HTTPS 上的 CLI</span></td></tr>
                 <tr><td>PowerFlex</td><td>3.x / 4.x <span class="lang-en">(NVMe/TCP needs 4.0+)</span><span class="lang-zh">（NVMe/TCP 需 4.0 以上）</span></td><td>REST API</td></tr>
+                <tr><td>Unity XT</td><td><span class="lang-en">Unity OE 5.x targeted</span><span class="lang-zh">以 Unity OE 5.x 為目標</span></td><td><span class="lang-en">Unisphere REST API</span><span class="lang-zh">Unisphere REST API</span></td></tr>
             </tbody>
         </table>
     </div>
@@ -576,6 +577,20 @@
     <span class="flag">--content</span> images,rootdir \
     <span class="flag">--shared</span> 1</pre>
 
+    <h3 class="subsection-title">Unity XT</h3>
+    <pre><span class="cmd">pvesm</span> add dellunity u480 \
+    <span class="flag">--dell-portal</span> 192.168.1.80 \
+    <span class="flag">--dell-username</span> admin \
+    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
+    <span class="flag">--dell-protocol</span> fc \
+    <span class="flag">--unity-pool</span> pool_1 \
+    <span class="flag">--content</span> images,rootdir \
+    <span class="flag">--shared</span> 1</pre>
+    <div class="alert alert--info">
+        <span class="lang-en">Unity's management IP follows the master SP, so one address is enough. <code>--unity-pool</code> is required on an array with more than one pool. This family has never run against an array — see the verification section below.</span>
+        <span class="lang-zh">Unity 的管理 IP 會跟著主 SP 走，填一個位址即可。陣列有多個儲存池時 <code>--unity-pool</code> 為必填。這個系列從未在陣列上執行過 —— 請見下方驗證狀態。</span>
+    </div>
+
     <h3 class="subsection-title">
         <span class="lang-en">Verify</span>
         <span class="lang-zh">驗證</span>
@@ -647,6 +662,7 @@
                 <tr><td>PowerStore</td><td><code>pstore-appliance</code>, <code>pstore-volume-group</code>, <code>pstore-performance-policy</code>, <code>pstore-protection-policy</code>, <code>pstore-lun-id-base</code></td></tr>
                 <tr><td>PowerVault ME</td><td><code>pvault-pool</code>, <code>pvault-volume-group</code>, <code>pvault-tier-affinity</code>, <code>pvault-lun-id-base</code></td></tr>
                 <tr><td>PowerFlex</td><td><code>pflex-storage-pool</code> <span class="lang-en">(required)</span><span class="lang-zh">（必填）</span>, <code>pflex-protection-domain</code>, <code>pflex-thick</code></td></tr>
+                <tr><td>Unity XT</td><td><code>unity-pool</code>, <code>unity-thin</code></td></tr>
             </tbody>
         </table>
     </div>
@@ -887,25 +903,28 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                 <th>PowerStore</th>
                 <th>PowerVault ME</th>
                 <th>PowerFlex</th>
+                <th>Unity XT</th>
             </tr></thead>
             <tbody>
-                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td colspan="3" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td colspan="3" class="all-families">✓</td></tr>
+                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td colspan="4" class="all-families">✓</td></tr>
+                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td colspan="4" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td>
-                    <td colspan="3" class="all-families"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
-                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td colspan="3" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td colspan="3" class="all-families">✓</td></tr>
+                    <td colspan="4" class="all-families"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
+                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td colspan="4" class="all-families">✓</td></tr>
+                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td colspan="4" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
-                    <td colspan="3" class="all-families"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
-                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td colspan="3" class="all-families">✓</td></tr>
+                    <td colspan="4" class="all-families"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
+                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td colspan="4" class="all-families">✓</td></tr>
                 <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td>
                     <td><span class="lang-en">✓ (optional)</span><span class="lang-zh">✓（可關閉）</span></td>
-                    <td><span class="lang-en">— (volume ceiling too low)</span><span class="lang-zh">—（volume 上限太少）</span></td><td>—</td></tr>
+                    <td><span class="lang-en">— (volume ceiling too low)</span><span class="lang-zh">—（volume 上限太少）</span></td><td>—</td>
+                    <td><span class="lang-en">— (off until a hardware run)</span><span class="lang-zh">—（實機測試前先關閉）</span></td></tr>
                 <tr><td><span class="lang-en">Multipath I/O</span><span class="lang-zh">多路徑 I/O</span></td><td>dm-multipath</td><td>dm-multipath</td>
-                    <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td></tr>
-                <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td></tr>
+                    <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td>
+                    <td>dm-multipath</td></tr>
+                <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td><td>✓</td></tr>
                 <tr><td><span class="lang-en">Full clone via the array</span><span class="lang-zh">陣列端完整複製</span></td>
-                    <td colspan="3" class="all-families"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
+                    <td colspan="4" class="all-families"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
             </tbody>
         </table>
     </div>

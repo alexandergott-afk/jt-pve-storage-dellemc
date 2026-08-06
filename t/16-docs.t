@@ -269,4 +269,45 @@ SKIP: {
         or diag("missing from docs/TESTING.md: @undocumented");
 }
 
+# ---------------------------------------------------------------------------
+# Every family the code registers appears in every family enumeration
+#
+# The docs site's family table said Unity XT was "not scheduled" while the
+# same page's option table, feature matrix and disclaimer had never heard of
+# it at all - because each list was written by hand at a different time, and
+# nothing failed when a new family arrived. Now something does: every table
+# or list on the site that enumerates three of the families must name the
+# fourth, and the READMEs must carry a pvesm-add example for each type.
+# ---------------------------------------------------------------------------
+
+{
+    my @types = map { $_->type() } @PLUGINS;
+
+    my $html = slurp("$DOCS/index.html") // '';
+    ok(length $html, 'the docs site is readable');
+
+    my @stale;
+    my $n = 0;
+    while ($html =~ m{<(table|ul)[^>]*>(.*?)</\1>}gs) {
+        my $block = $2;
+        $n++;
+        next unless $block =~ /PowerStore/ && $block =~ /PowerVault/
+                 && $block =~ /PowerFlex/;
+        push @stale, "block ending at offset " . pos($html)
+            unless $block =~ /Unity/;
+    }
+    ok($n > 10, 'the block scan actually found the tables')
+        or diag('the extraction regex no longer matches; fix the TEST');
+    is_deeply(\@stale, [],
+        'every family enumeration on the site includes Unity')
+        or diag(join("\n  ", '', @stale));
+
+    for my $file ("$DOCS/../README.md", "$DOCS/../README_zh-TW.md") {
+        my $text = slurp($file) // '';
+        my @missing = grep { $text !~ /pvesm add \Q$_\E/ } @types;
+        is_deeply(\@missing, [], "$file carries a pvesm-add example for every type")
+            or diag("missing: @missing");
+    }
+}
+
 done_testing();
