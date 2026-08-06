@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.91~beta1] - 2026-08-06
+
+### Fixed
+- **Two storages on one array shared a client, and with it a password.** The
+  API client was cached under a key of management address, username, TLS
+  setting and health flag — and the object it caches carries the storeid it
+  names in every message, and the password, which since 0.7.86 is read per
+  storage from `/etc/pve/priv/storage/<storeid>.pw`. Two storages on one
+  array with the same username is an ordinary setup — two pools — and the key
+  without the storeid handed the second one the first one's client. Its
+  failures were logged under the other storage's name and throttled under the
+  other storage's `_warn_once` key, and it authenticated with the other
+  storage's password.
+
+  The credential is the half that bites. A password rotated on one storage
+  and not the other means repeated failed logins with a stale one, and an
+  array management account that locks out takes every storage on that array
+  with it. The storeid is part of the key now, in all four families.
+
+- **`get_identity` called the same array two different things.** It answers
+  whether two storages are the same storage, and it was built from
+  `dell-portal` verbatim — which has been a comma-separated list since
+  0.7.75, for the arrays whose controllers each have their own management IP.
+  The two controllers in the other order, a space after the comma, or one
+  storage listing both where another lists one, all answered "different
+  array". The addresses are treated as a set now: split, trimmed, folded to
+  lower case and sorted.
+
 ## [0.7.90~beta1] - 2026-08-06
 
 ### Verified on hardware

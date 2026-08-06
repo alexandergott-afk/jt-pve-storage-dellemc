@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.90~beta1
+VERSION = 0.7.91~beta1
 
 DESTDIR =
 PREFIX   = /usr

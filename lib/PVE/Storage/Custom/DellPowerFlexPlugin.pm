@@ -155,8 +155,15 @@ sub get_identity {
     my ($class, $scfg, $storeid) = @_;
     local $CURRENT_STOREID = $storeid;
 
+    # The addresses as a SET, not as the string someone typed: the same
+    # array can be written several ways once 'dell-portal' is a list. See
+    # BlockBase::_identity_portal, which this plugin does not inherit.
+    my @portals = grep { length }
+                  map  { lc(s/^\s+|\s+\z//gr) }
+                  split /,/, $scfg->{'dell-portal'} // '';
+
     return join(':', 'dellpowerflex',
-        $scfg->{'dell-portal'} // '',
+        join(',', sort @portals),
         $scfg->{'pflex-storage-pool'} // '');
 }
 
@@ -207,7 +214,20 @@ sub _api {
 
     my $health = $opts{status} ? 1 : 0;
 
+    # The storeid is part of the key, not only of the object.
+    #
+    # The client carries the storeid — every message it writes names it — and
+    # the PASSWORD, which since 0.7.86 is read per storage out of
+    # /etc/pve/priv/storage/<storeid>.pw. A key without the storeid therefore
+    # hands storage B the client built for storage A: B's failures are logged
+    # under A's name, _warn_once throttles them under A's key, and B
+    # authenticates with A's password. The last one is the one that bites —
+    # two storages on one array with the same username and a password that
+    # has been rotated on only one of them means repeated failed logins with
+    # a stale credential, and an array account that locks out takes every
+    # storage on that array with it.
     my $key = join("\0",
+        $opts{storeid} // '',
         $scfg->{'dell-portal'} // '',
         $scfg->{'dell-username'} // '',
         $scfg->{'dell-ssl-verify'} // 0,

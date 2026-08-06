@@ -522,4 +522,61 @@ my %BASE_DEFAULT_IS_RIGHT = (
     }
 }
 
+# ---------------------------------------------------------------------------
+# get_identity answers whether two storages are the same thing
+# ---------------------------------------------------------------------------
+
+{
+    for my $plugin (@PLUGINS) {
+        my $scfg = { 'dell-portal' => '10.0.0.1,10.0.0.2' };
+        my $swapped = { 'dell-portal' => '10.0.0.2, 10.0.0.1 ' };
+
+        is($plugin->get_identity($swapped, 's1'),
+           $plugin->get_identity($scfg, 's1'),
+            "$plugin: the same array written the other way round is the same"
+          . " identity — 'dell-portal' is a list, and a list has no order");
+
+        my $one = { 'dell-portal' => '10.0.0.1' };
+        isnt($plugin->get_identity($one, 's1'),
+             $plugin->get_identity($scfg, 's1'),
+            "$plugin: a different set of addresses is a different identity");
+
+    }
+}
+
+# ---------------------------------------------------------------------------
+# The API client cache is keyed on the storage, not only on the array
+#
+# The client carries the storeid it names in every message, and the password
+# read out of /etc/pve/priv/storage/<storeid>.pw. Two storages on one array
+# with the same username are an ordinary setup — two pools — and a key
+# without the storeid hands the second one the first one's client.
+# ---------------------------------------------------------------------------
+
+{
+    for my $plugin (@PLUGINS) {
+        my $scfg = {
+            'dell-portal'   => '10.0.0.1',
+            'dell-username' => 'admin',
+            'dell-password' => 'x',
+            'pvault-pool'   => 'A',
+            'unity-pool'    => 'A',
+            'pflex-storage-pool' => 'A',
+        };
+
+        my $a = eval { $plugin->_api($scfg, storeid => 'dell-a') };
+        my $b = eval { $plugin->_api($scfg, storeid => 'dell-b') };
+
+      SKIP: {
+            skip "$plugin: no client could be built here", 2 unless $a && $b;
+
+            isnt($a, $b, "$plugin: two storages on one array get their own"
+                       . " client");
+            like($b->log_prefix, qr/dell-b/,
+                "$plugin: and the second one names ITSELF in its messages,"
+              . " not the storage that happened to ask first");
+        }
+    }
+}
+
 done_testing();

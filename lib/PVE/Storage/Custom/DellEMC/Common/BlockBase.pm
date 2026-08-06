@@ -277,8 +277,27 @@ sub _password {
 sub get_identity {
     my ($class, $scfg, $storeid) = @_;
     local $CURRENT_STOREID = $storeid;
-    return join(':', $class->type(), $scfg->{'dell-portal'} // '',
+    return join(':', $class->type(), _identity_portal($scfg),
         $class->identity_suffix($scfg));
+}
+
+# The management addresses, as a SET rather than as the string someone typed.
+#
+# 'dell-portal' became a comma-separated list in 0.7.75, for the arrays whose
+# controllers each have their own management IP. The same array can then be
+# written several ways — the two controllers in either order, with or without
+# spaces, and one storage listing both where another lists one — and an
+# identity built from the string verbatim calls those different storages.
+# What get_identity answers is whether two storages are the same thing, so it
+# has to be the thing and not its spelling.
+sub _identity_portal {
+    my ($scfg) = @_;
+
+    my @portals = grep { length }
+                  map  { lc(s/^\s+|\s+\z//gr) }
+                  split /,/, $scfg->{'dell-portal'} // '';
+
+    return join(',', sort @portals);
 }
 
 # Families add whatever else pins a storage to one array, e.g. the appliance.

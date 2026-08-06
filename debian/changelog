@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.91~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: two storages on one array shared an API client, and with it a
+    password. The client cache was keyed on management address, username,
+    TLS setting and health flag, while the cached object carries the storeid
+    it names in every message and the password, which since 0.7.86 is read
+    per storage from /etc/pve/priv/storage/<storeid>.pw. Two storages on one
+    array with the same username - two pools - meant the second got the
+    first's client: failures logged under the wrong storage's name, and
+    authentication with the wrong storage's password. A password rotated on
+    only one of them means repeated failed logins with a stale credential,
+    and an array account that locks out takes every storage on that array
+    with it. The storeid is part of the key now, in all four families.
+  * Fixed: get_identity called the same array two different things. It was
+    built from dell-portal verbatim, which has been a comma-separated list
+    since 0.7.75; the controllers in the other order, or a space after the
+    comma, answered "different array". The addresses are a set now.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 22:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.90~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

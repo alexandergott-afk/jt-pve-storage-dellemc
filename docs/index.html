@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.90~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.91~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.91~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Two storages on one array shared an API client &mdash; and with it the storeid named in every message and the password read per storage. A rotated password on only one of them meant repeated failed logins with a stale credential. Also: get_identity called the same array two different things once dell-portal became a list.</span>
+            <span class="lang-zh">同一台陣列上的兩個儲存共用了一個 API client &mdash; 連同每則訊息指名的 storeid 與逐儲存讀取的密碼。密碼只在其中一個輪換過,就會用過期憑證反覆登入。另修正:dell-portal 成為清單後,get_identity 會把同一台陣列說成兩台。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.90~beta1</div>
