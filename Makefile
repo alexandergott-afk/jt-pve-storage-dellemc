@@ -21,7 +21,7 @@ UNIT_TESTS   = $(wildcard t/*.t)
 GUARD_PATHS = lib bin debian docs t .github Makefile \
               README.md README_zh-TW.md CHANGELOG.md CHANGELOG_zh-TW.md
 
-.PHONY: all install uninstall test syntax unit unit-nopve nopve-stub check-multipath-flush \
+.PHONY: all install uninstall test syntax unit unit-nopve nopve-stub check-multipath-flush critic \
         release-check deb deb-clean clean
 
 all:
@@ -88,6 +88,18 @@ syntax:
 	if [ "$$skipped" = "1" ]; then \
 		echo "  NOTE: some modules were skipped. Run 'make syntax' on a"; \
 		echo "        Proxmox VE node to check them."; \
+	fi
+
+# Static analysis, clean by policy: every suppression in .perlcriticrc
+# carries the audit that earned it. Not part of release-check - perlcritic
+# is not installed on the CI runner or required on nodes - but a finding
+# here is worth reading before it is worth silencing.
+critic:
+	@if command -v perlcritic >/dev/null 2>&1; then \
+		perlcritic --severity 4 lib/ bin/pve-dell-config-get \
+			&& echo "  OK: perlcritic severity 4 is clean."; \
+	else \
+		echo "  perlcritic is not installed (apt install libperl-critic-perl)"; \
 	fi
 
 unit:

@@ -1,0 +1,63 @@
+# perlcritic profile for jt-pve-storage-dellemc
+#
+# Run as:  perlcritic --severity 4 lib/ bin/pve-dell-config-get
+#
+# The suppressions below are DECIDED conventions, not unread noise. Each one
+# was audited before being silenced; the audit is what earns the entry.
+
+# 'return undef' is this project's documented contract: undef means ABSENT,
+# a die means UNREACHABLE, and the two must never be conflated (rule 21a).
+# The PBP objection is that 'return undef' in list context yields a
+# one-element true list - audited 2026-08-06: the entire lib/ contains zero
+# list-context receivers of any method call; every call site is scalar or
+# list-assignment, both of which treat undef identically. A bare 'return'
+# would make "absent" indistinguishable from "returned nothing" in list
+# assignments, which is worse than the objection.
+[-Subroutines::ProhibitExplicitReturnUndef]
+
+# One-line accessors ('sub type { 'dellunity' }') do not gain from a
+# trailing return, and this codebase has ~200 of them by design.
+[-Subroutines::RequireFinalReturn]
+
+# 'use constant' is used deliberately for compile-time values; the PBP
+# alternative (Readonly) is another dependency on nodes we do not control.
+# The one real trap constants have - they do not inherit as methods expect
+# (lesson 2, PowerFlex enforcing PowerVault's name limit) - is guarded by
+# tests, not by the pragma choice.
+[-ValuesAndExpressions::ProhibitConstantPragma]
+
+# sub-second sleeps use select(undef,undef,undef,$s) on purpose: Time::HiRes
+# is core but the four-arg select needs no import and the uses are bounded
+# retry loops, not schedulers.
+[-BuiltinFunctions::ProhibitSleepViaSelect]
+
+# String eval is never used; block eval with immediate $@ capture is the
+# error-handling idiom throughout (rule 21), enforced by t/11.
+[-ErrorHandling::RequireCheckingReturnValueOfEval]
+
+# One-line delegation stubs ('sub type { $_[0]->_abstract(...) }' and the
+# abstract-method table) read $_[0] directly by design; unpacking would
+# triple their length for nothing.
+[-Subroutines::RequireArgUnpacking]
+
+# Audited 2026-08-06, two hit classes, both correct as written:
+#  - 'for my $b (@blocks)' declares a LEXICAL $b shadowing nothing that
+#    matters (sort localises its own $a/$b);
+#  - '$ENV{LC_ALL} = "C"' in a child immediately before exec() MUST be a
+#    real assignment - it is the child's environment for the exec'd command
+#    (rule 32), and 'local' would be exactly wrong.
+[-Variables::RequireLocalizedPunctuationVars]
+
+# The long-lived filehandle at the cleanup path IS the flock lock; closing
+# it "as soon as possible" would release the lock mid-critical-section. The
+# slurp-in-do blocks close at scope exit two lines later.
+[-InputOutput::RequireBriefOpen]
+
+# 0700 is a permission MODE for mkdir/make_path - the octal literal is the
+# clearest spelling a permission has, and both hits are exactly that.
+[-ValuesAndExpressions::ProhibitLeadingZeros]
+
+# get/post/put/patch/delete are the HTTP-verb methods of the REST client.
+# A method call never collides with the builtin, and renaming one verb of
+# five would be the confusing choice.
+[-Subroutines::ProhibitBuiltinHomonyms]
