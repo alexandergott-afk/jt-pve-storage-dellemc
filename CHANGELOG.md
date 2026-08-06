@@ -7,6 +7,31 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.85~beta1] - 2026-08-06
+
+### Fixed
+- **PowerFlex: the 4.x-only mapping action no longer carries 3.x baggage.**
+  `addMappedHost` — an action that exists only on 4.x — was sent
+  `allowMultipleMappings: 'TRUE'`, the ScaleIO 3.x reference's *string*
+  spelling of a boolean. Dell's gen2 client sends a JSON boolean there. The
+  4.x path now does too; the SDC path keeps the documented string form,
+  since gen1 arrays are the ones that documented it.
+- **The readback question a 4.x array must answer is now registered:**
+  after the first NVMe map, which field of the volume carries the host
+  mapping? Dell's public code never reads it back, so `mappedHostInfo`
+  remains this plugin's registered guess (read at no cost when absent); if
+  the real field is named otherwise, the symptom is a volume that maps
+  again on every activation — the ME lesson-21 symptom, pre-registered.
+
+### Changed
+- The multipath built-in comparison now spans all families, in code
+  comments where the next reader needs it: Unity follows the kernel's DGC
+  entry (0.7.84); PowerStore's and ME's deviations from their built-ins are
+  same-category tuning choices, ME's block hardware-proven on the ME4024.
+  The 0.7.84 mechanism wording is corrected: conf.d attributes override the
+  built-in *per attribute* — verified on this node by reading the merged
+  `multipath -t` — rather than replacing the entry wholesale.
+
 ## [0.7.84~beta1] - 2026-08-06
 
 ### Fixed

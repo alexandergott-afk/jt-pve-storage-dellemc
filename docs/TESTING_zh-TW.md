@@ -343,6 +343,11 @@ PowerStore 上乾淨收場的那一輪掃描,在這個系列找到了兩個證�
 | 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的陣列,在那裡仍未驗證 |
 | NVMe host 對應／解除 —— **預設協定** | 把 `hostId` 送給 `addMappedSdc` | 改用 **`addMappedHost`／`removeMappedHost`**,Dell 客戶端與 SDC 那對並列的動作 |
 
+只有 4.x 陣列能回答的一個問題：**第一次 NVMe 對應之後，GET 該磁碟區並回報
+host 對應出現在哪個欄位** —— Dell 的公開程式碼從不讀回它，所以 `mappedHostInfo`
+是本外掛已登記的猜測，與 `mappedSdcInfo` 並讀、欄位不存在時零成本。若真正的
+欄位另有其名，症狀會是磁碟區在每次 activation 都被重新對應一次。
+
 同場稽核一併確認：`volumeSizeInKb`／`volumeSizeInGb` 雙拼法（既有的文件化備援
 已同時涵蓋）、`snapshotDefs` 元素鍵、`setVolumeSize` 的 `sizeInGB`、
 `removeVolume` 的 `removeMode`。

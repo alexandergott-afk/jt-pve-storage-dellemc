@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.85~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * POWERFLEX: the 4.x-only addMappedHost action was sent
+    allowMultipleMappings 'TRUE' - the ScaleIO 3.x reference's string
+    spelling of a boolean. Dell's gen2 client sends a JSON boolean; the 4.x
+    path now does too, while the SDC path keeps the string form the 3.x
+    reference documents. Registered the readback question only a 4.x array
+    can answer: which volume field carries an NVMe host mapping - with its
+    symptom (remap on every activation) pre-registered.
+  * Multipath built-in comparison swept across all families, recorded in
+    code comments: Unity follows the kernel's DGC entry; PowerStore's and
+    ME's deviations are same-category tuning, ME's hardware-proven. The
+    0.7.84 mechanism wording corrected to per-attribute override, verified
+    on this node via the merged multipath -t.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 13:55:00 +0800
+
 jt-pve-storage-dellemc (0.7.84~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

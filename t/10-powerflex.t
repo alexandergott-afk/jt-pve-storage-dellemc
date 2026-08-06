@@ -1050,11 +1050,15 @@ SKIP: {
         'an NVMe host is mapped with addMappedHost');
     is($ua->body_of->{hostId}, 'host-9', '... by hostId');
     ok(!exists $ua->body_of->{sdcId}, '... and never by sdcId');
+    ok(JSON::is_bool($ua->body_of->{allowMultipleMappings}),
+        '... with a JSON boolean, as the 4.x client sends');
 
     $api->volume_map('vol-1', 'sdc-3');
     like($ua->last_request->uri->path, qr{action/addMappedSdc\z},
         'an SDC keeps addMappedSdc');
     is($ua->body_of->{sdcId}, 'sdc-3', '... by sdcId');
+    is($ua->body_of->{allowMultipleMappings}, 'TRUE',
+        "... with the 3.x reference's string spelling, which that path documents");
 
     $api->volume_unmap('vol-1', 'host-9', nvme => 1);
     like($ua->last_request->uri->path, qr{action/removeMappedHost\z},

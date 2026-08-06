@@ -804,15 +804,23 @@ sub nvme_targets {
 sub volume_map {
     my ($self, $volume_id, $host_id, %opts) = @_;
 
-    my $body = { allowMultipleMappings => 'TRUE' };
-
+    my $body = {};
     my $action;
     if ($opts{nvme}) {
+        # A 4.x-only action gets 4.x conventions: Dell's gen2 client sends a
+        # JSON boolean here. The 'TRUE' string below is the ScaleIO 3.x
+        # reference's spelling, and a 4.x-only path has no reason to carry
+        # 3.x baggage into a body nothing has ever tested.
         $action = 'addMappedHost';
         $body->{hostId} = $host_id;
+        $body->{allowMultipleMappings} = JSON::true;
     } else {
+        # The 3.x-documented string form, kept for the SDC path that both
+        # generations serve: the ScaleIO reference spells booleans as 'TRUE'
+        # strings, and gen1 arrays are the ones most likely to mean it.
         $action = 'addMappedSdc';
         $body->{sdcId} = $host_id;
+        $body->{allowMultipleMappings} = 'TRUE';
     }
 
     return $self->post("/api/instances/Volume::$volume_id/action/$action",

@@ -397,6 +397,13 @@ Dell's own gen2 client:
 | snapshot rollback | `overwriteVolumeContent` sent to every generation | 4.x sends the **`restore`** action (`{srcVolumeId}`); the 3.x form is kept only for arrays that answered the 3.x login, and stays unverified there |
 | NVMe host map/unmap — **the default protocol** | `hostId` sent to `addMappedSdc` | **`addMappedHost` / `removeMappedHost`**, the actions Dell's client carries beside the SDC pair |
 
+One question only a 4.x array can answer: **after the first NVMe map, GET
+the volume and report which field carries the host mapping** — Dell's
+public code never reads it back, so `mappedHostInfo` is this plugin's
+registered guess, read alongside `mappedSdcInfo` at no cost when absent.
+If the real field is named otherwise, the symptom is a volume that maps
+again on every activation.
+
 Also confirmed in the same audit: `volumeSizeInKb`/`volumeSizeInGb` dual
 spelling (our documented fallback already covers both), `snapshotDefs`
 element keys, `setVolumeSize`'s `sizeInGB`, `removeVolume`'s `removeMode`,
