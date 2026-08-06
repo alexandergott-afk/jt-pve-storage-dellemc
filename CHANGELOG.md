@@ -7,6 +7,28 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.81~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: the array's error number never reached the operator.**
+  `error_code_of` was added in 0.7.70, tested, and called by nothing —
+  lesson 36's exact shape, found by grepping for its callers. It is now
+  wired into the error translation, so every Unity refusal carries
+  `(errorCode NNNN)` the way PowerVault's messages carry
+  `(return code -10389)`. The ME4024's first hardware run proved what that
+  is worth: every one of the customer's reports quoted the number, and the
+  numbers are what turned symptoms into diagnoses.
+
+### Added
+- `make critic`: perlcritic severity 4, clean by policy. 340 findings were
+  audited class by class down to zero; every suppression in `.perlcriticrc`
+  carries the audit that earned it, including the list-context audit of all
+  143 `return undef` sites (zero list-context receivers exist in `lib/`).
+- The `_array_*` calling convention is guarded in the suite: each family's
+  signatures are compared position-by-position against BlockBase's actual
+  call sites, by the KIND of name — an arity-only draft provably missed the
+  0.7.80 bug, and the kind-of-name version names it precisely.
+
 ## [0.7.80~beta1] - 2026-08-06
 
 ### Fixed

@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.81~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: the array's error number never reached the operator.
+    error_code_of was added in 0.7.70, tested, and called by nothing -
+    lesson 36's exact shape, found by grepping for its callers. It is now
+    wired into the error translation, so every Unity refusal carries
+    (errorCode NNNN) the way PowerVault's messages carry their return code.
+    The ME4024's first hardware run proved what that is worth: every one of
+    the customer's reports quoted the number.
+  * Added make critic: perlcritic severity 4, audited class by class from
+    340 findings down to zero, every suppression carrying its audit.
+  * The _array_* calling convention is guarded in the suite by the KIND of
+    name at each position, compared against BlockBase's actual call sites;
+    an arity-only draft provably missed the 0.7.80 bug.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 10:56:00 +0800
+
 jt-pve-storage-dellemc (0.7.80~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

@@ -234,6 +234,27 @@ sub error_hint {
 # PowerVault's return-code is. The messages are localised (the manual lists
 # nine locales), so they are for a human to read and never for this plugin to
 # match on.
+# Unity's refusal, with its NUMBER in front of the operator.
+#
+# The ME4024's first hardware run proved what this is for: every one of the
+# customer's reports quoted the "(return code -10389)" the messages carried,
+# and those numbers are what turned symptoms into diagnoses. Unity's
+# messages carried no number until this - error_code_of existed, was
+# tested, and was called by nothing, which is lesson 36's exact shape.
+sub translate_error {
+    my ($self, $code, $body, $data) = @_;
+
+    my $message = $self->SUPER::translate_error($code, $body, $data);
+
+    my $array_code = $self->error_code_of($data);
+    # The raw body dump may contain the substring already; what the guard
+    # must prevent is doubling THIS normalised tail, nothing else.
+    $message .= " (errorCode $array_code)"
+        if defined $array_code && index($message, "(errorCode ") < 0;
+
+    return $message;
+}
+
 sub error_code_of {
     my ($self, $body) = @_;
 

@@ -348,6 +348,27 @@ ok(!$U->is_pve_managed_volume('pve-u480-not-a-real-name', 'u480'),
     is($api->error_code_of(undef), undef, 'nor nothing at all');
 }
 
+{
+    # And the code is not merely readable - it reaches the operator. The
+    # ME4024's first run proved the value: every customer report quoted the
+    # numeric code the message carried.
+    my ($api) = make_api(handler => sub {
+        my ($req, $path) = @_;
+        return reply({ error => { errorCode => 108007744, httpStatusCode => 422,
+            messages => [ { 'en-US' => 'The name is already in use.' } ] } }, 422)
+            if $path =~ m{action/createLun};
+        return reply(content({ id => 'pool_1', name => 'A',
+                               sizeTotal => 10**12, sizeFree => 10**12 }))
+            if $path =~ m{/instances/pool/name:};
+        return reply(content({}));
+    });
+
+    ok(!eval { $api->volume_create('pve-u480-100-disk0', 4 * 1024**3, pool => 'A'); 1 },
+        'a refused create fails');
+    like($@, qr/errorCode 108007744/,
+        "... and the message carries the array's own number, as PowerVault's do");
+}
+
 # ---------------------------------------------------------------------------
 # Capacity is bytes, not blocks
 # ---------------------------------------------------------------------------
