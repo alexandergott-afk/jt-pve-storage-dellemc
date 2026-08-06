@@ -70,7 +70,7 @@ status`（3.2 秒，容量與 GUI 一致）、連續數顆 `pvesm alloc`（LUN 4
 
 ### 該去哪裡確認
 
-陣列本身就會提供自己的 API 參考。PowerStore 是 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，本外掛用到的每一個路徑都列在那裡，而且會直接產生對應的 `curl` 指令；請在信任任何端點之前先逐一比對。Dell 已公開的文件中，對於有文件的物件型別顯示的是相同的形狀 —— `POST /volume_group/{id}/clone`、`POST /file_system/{id}/snapshot` —— 與這裡使用的 `/volume/{id}/clone`、`/volume/{id}/snapshot` 一致，但「與同類物件的寫法一致」並不等於已驗證。
+陣列本身就會提供自己的 API 參考。PowerStore 是 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，本外掛用到的每一個路徑都列在那裡，而且會直接產生對應的 `curl` 指令；請在信任任何端點之前先逐一比對。Dell 已公開的文件中，對於有文件的物件型別顯示的是相同的結構 —— `POST /volume_group/{id}/clone`、`POST /file_system/{id}/snapshot` —— 與這裡使用的 `/volume/{id}/clone`、`/volume/{id}/snapshot` 一致，但「與同類物件的寫法一致」並不等於已驗證。
 
 PowerVault 的參考則是 ME4／ME5 Series CLI Reference Guide，而且可以先透過 SSH 逐條試跑指令，再交給外掛以 HTTPS 送出。
 
@@ -236,7 +236,7 @@ help create host
 | `fcHostInitiators`、`iscsiHostInitiators` | 已註冊到某個 host 的 initiator | Dell 自己的 `HostDisplayFields` |
 | `initiatorId`、`parentHost` | initiator 的 WWPN／IQN，以及它所屬的 host | Dell 自己的 `HostInitiatorsDisplayFields` |
 | `initiatorType` | `'1'` 是 FC、`'2'` 是 iSCSI —— **字串** | Dell 自己的常數 |
-| `entries[].content`、`content` | 兩種回應形狀 | 文件記載 |
+| `entries[].content`、`content` | 兩種回應結構 | 文件記載 |
 
 欄位是 **opt-in**：不帶 `?fields=` 的請求，回來幾乎什麼都沒有。所以第一個要預期
 的失敗模式是「物件看起來是**空的**」而不是「**不存在**」，而那是兩個不同的答案。
@@ -256,7 +256,7 @@ help create host
 ### 沒有 Unity 也能測 Unity
 
 `github.com/mackayd/Unity-API-Emulator` 是一個單一 Python 檔，它會說 Unity 的
-REST 信封格式：`entries`／`content` 兩種形狀、`?fields=`、篩選、分頁、`name:`
+REST 信封格式：`entries`／`content` 兩種結構、`?fields=`、篩選、分頁、`name:`
 查詢，以及兩條認證規則 —— 缺少 `X-EMC-REST-CLIENT` 時回 **302**，寫入時缺少
 `EMC-CSRF-TOKEN` 則回 **403**。
 
@@ -271,7 +271,7 @@ python3 Unity_RestAPI_Emulator.py --port 18443 \
 
 **它不是 Dell 的產品，也不會模擬儲存行為。** 它無法告訴你刪除是否真的刪掉了、
 WWID 是否對得上一顆裝置、對應是否真的送達主機。它能做的是在**真實 HTTP** 上
-驗證傳輸層、認證、回應形狀與請求內容 —— 而在有硬體之前，這裡沒有其他東西做得到。
+驗證傳輸層、認證、回應結構與請求內容 —— 而在有硬體之前，這裡沒有其他東西做得到。
 
 它已經證明了自己的價值：這個模擬器對 `createLun` 回的是 204 且沒有內容，而那讓
 `volume_create` 靜靜回傳了 `undef`。某些韌體的真實陣列可能也是如此，或以非同步
@@ -285,7 +285,7 @@ drop-in、發出全節點 reconfigure。對它跑一條端到端路徑，應納�
 
 ### PowerStore（出自 4.x REST 文件）
 
-請求的形狀有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：
+請求的結構有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：
 
 | 從指南讀到的 | 內容 |
 |---|---|
