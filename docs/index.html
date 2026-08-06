@@ -918,8 +918,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">2,426 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">2,426 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
+        <span class="lang-en">2,756 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">2,756 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
     </p>
 
     <h3>
@@ -963,6 +963,13 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                         <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
                     <td><span class="lang-en">never run against an array</span><span class="lang-zh">從未在任何陣列上執行過</span></td>
                 </tr>
+                <tr>
+                    <td><strong>Unity XT</strong></td>
+                    <td><span class="lang-en">FC, iSCSI</span><span class="lang-zh">FC、iSCSI</span></td>
+                    <td><span class="status-badge status-badge--planned">
+                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
+                    <td><span class="lang-en">never run against an array; a customer's Unity 480 (FC) is the intended first. The transport has been driven over real HTTP against an API emulator, which proves shapes, not storage</span><span class="lang-zh">從未在任何陣列上執行過；預定的第一台是客戶的 Unity 480（FC）。傳輸層已對 API 模擬器以真實 HTTP 驗證 —— 那證明的是結構，不是儲存行為</span></td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -993,10 +1000,13 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
                     <td>—</td>
                     <td><span class="status-badge status-badge--partial"><span class="lang-en">verified on ME4 only</span><span class="lang-zh">僅在 ME4 上驗證</span></span></td></tr>
                 <tr><td><span class="lang-en">PowerStore REST endpoints and fields</span><span class="lang-zh">PowerStore REST 端點與欄位</span></td>
-                    <td><span class="lang-en">PowerStore 4.x documentation and Dell's own SDK</span><span class="lang-zh">PowerStore 4.x 文件與 Dell 自己的 SDK</span></td>
+                    <td><span class="lang-en">PowerStore 4.x documentation and Dell's own SDK, audited key-for-key 2026-08-06: all eight request bodies match</span><span class="lang-zh">PowerStore 4.x 文件與 Dell 自己的 SDK，2026-08-06 逐鍵稽核：八組請求內容全數相符</span></td>
                     <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
                 <tr><td><span class="lang-en">PowerFlex login, volume, mapping, snapshot API</span><span class="lang-zh">PowerFlex 登入、磁碟區、對應、快照 API</span></td>
-                    <td><span class="lang-en">PowerFlex REST documentation</span><span class="lang-zh">PowerFlex REST 文件</span></td>
+                    <td><span class="lang-en">Dell's own <code>python-powerflex</code>, audited key-for-key; the 3.x rollback form alone remains documentation-only</span><span class="lang-zh">Dell 自己的 <code>python-powerflex</code>，已逐鍵稽核；僅 3.x 的倒回寫法仍只有文件依據</span></td>
+                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
+                <tr><td><span class="lang-en">Unity URIs, request bodies, field lists</span><span class="lang-zh">Unity 的 URI、請求內容、欄位清單</span></td>
+                    <td><span class="lang-en">Dell's own <code>gounity</code> client and the Unisphere Programmer's Guide; multipath settings follow the kernel's own DGC entry</span><span class="lang-zh">Dell 自己的 <code>gounity</code> 客戶端與 Unisphere Programmer's Guide；multipath 設定跟隨核心自己的 DGC 條目</span></td>
                     <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
             </tbody>
         </table>
