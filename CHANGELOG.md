@@ -7,6 +7,32 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.87~beta1] - 2026-08-06
+
+### Security
+- **The login hash was written to the journal in full.** PowerVault's
+  documented login puts `sha256("user_password")` **in the URL**, so every
+  failed login wrote that hash into the node's journal verbatim — and it is
+  unsalted, uniterated SHA-256 over a string whose first half is usually the
+  known username, which a dictionary attack chews through at millions of
+  guesses a second. The journal is readable by more people than
+  `/etc/pve/priv` is, and it travels in every support bundle.
+
+  Every message this client emits now passes through a redactor: a long hex
+  run in a path segment after a login-ish word, and any `Basic` blob, are
+  cut to a six-character prefix plus `[redacted]` — enough to correlate two
+  log lines, not enough to crack. Redaction is by **shape**, so it covers
+  the other families' login forms without each having to remember.
+
+  Diagnostics survive deliberately: a WWID is a long hex run too, and losing
+  it would trade one problem for another. The tests assert both halves —
+  hashes and Basic blobs gone, WWIDs, volume names and array return codes
+  intact — and the fix was confirmed by driving a real failed login and
+  reading the journal.
+
+  Found by re-examining yesterday's password fix for the leaks it did not
+  cover.
+
 ## [0.7.86~beta1] - 2026-08-06
 
 ### Security

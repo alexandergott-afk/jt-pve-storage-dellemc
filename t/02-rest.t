@@ -583,4 +583,58 @@ like($@, qr/password is required/, 'password is mandatory');
     is($api->{portal}, '10.0.0.5', '... without inventing a second address');
 }
 
+# ---------------------------------------------------------------------------
+# A credential never reaches the journal
+#
+# PowerVault's documented login puts sha256("user_password") IN THE URL, so
+# a failed login wrote that hash into the node's journal verbatim - unsalted,
+# uniterated SHA-256 over a string whose first half is usually the known
+# username, which a dictionary attack chews through at millions of guesses a
+# second. The journal is read by more people than /etc/pve/priv is, and it
+# travels in every support bundle.
+#
+# Redaction is by SHAPE rather than by remembering every call site: a long
+# hex run in a path segment after a login-ish word is a credential whatever
+# produced it. Diagnostics must survive it - a WWID is also a long hex run,
+# and losing it would trade one problem for another.
+# ---------------------------------------------------------------------------
+
+{
+    my $R = 'PVE::Storage::Custom::DellEMC::Common::REST';
+
+    my $hash = 'a' x 64;
+    my $out = $R->_redact("GET /login/$hash failed: timeout");
+    unlike($out, qr/\Q$hash\E/, 'a login hash never appears in full');
+    like($out, qr/redacted/, '... it is named as redacted, not silently dropped');
+    like($out, qr/^GET \/login\/a{4,8}/,
+        '... with a prefix left, so two log lines can still be correlated');
+
+    unlike($R->_redact('Authorization: Basic bWFuYWdlOnNlY3JldA=='),
+        qr/bWFuYWdlOnNlY3JldA/, 'a Basic blob is redacted');
+    like($R->_redact('Authorization: Basic bWFuYWdlOnNlY3JldA=='),
+        qr/Basic \[redacted\]/, '... and says so');
+
+    # What must NOT be redacted, because it is the diagnosis.
+    my $wwid = '3600c0ff000446ebe2901736a01000000';
+    like($R->_redact("wwid $wwid not found"), qr/\Q$wwid\E/,
+        'a WWID survives - it is a long hex run too, and it is the evidence');
+    like($R->_redact('GET /api/instances/lun/name:pve-u480-100-disk0 failed'),
+        qr/pve-u480-100-disk0/, 'a volume name survives');
+    like($R->_redact('command failed: (return code -10389)'),
+        qr/-10389/, "the array's own return code survives");
+
+    is($R->_redact(undef), undef, 'nothing stays nothing');
+}
+
+{
+    # And it applies to what the client actually emits, not just to the
+    # helper: every message goes out through _msg.
+    my ($api) = make_api(handler => sub {
+        return json_response(500, { error => 'nope' });
+    }, retries => 0);
+
+    my $msg = $api->_msg('GET /login/' . ('f' x 64) . ' failed');
+    unlike($msg, qr/f{20}/, 'the message builder redacts too');
+}
+
 done_testing();

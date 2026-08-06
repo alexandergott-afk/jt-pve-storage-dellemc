@@ -178,9 +178,38 @@ sub log_prefix {
     return "[$type$id]";
 }
 
+# Every message this client produces goes through here, which makes it the
+# one place a credential can be kept out of the journal.
+#
+# PowerVault's documented login puts sha256("user_password") IN THE URL, so
+# a failed login wrote the hash into the node's journal verbatim - and that
+# hash is unsalted, uniterated SHA-256 over a string whose first half is
+# usually known, which a dictionary attack chews through at millions of
+# guesses a second. The journal is readable by more people than
+# /etc/pve/priv is, and it travels in every support bundle.
+#
+# Redaction by SHAPE, not by remembering every call site: a path segment
+# after a login-ish word that is a long hex run is a credential whatever
+# family produced it, and so is a Basic authorization blob.
+sub _redact {
+    my ($class, $text) = @_;
+
+    return $text unless defined $text;
+
+    # /login/<64 hex> and friends - keep enough to correlate two log lines,
+    # lose enough that nothing can be cracked from it.
+    $text =~ s{((?:login|auth|token|session)[^\s/]*/)([0-9a-fA-F]{16,})}
+              {$1 . substr($2, 0, 6) . '...[redacted]'}gie;
+
+    # Authorization: Basic <base64> and bare tokens in headers we echo.
+    $text =~ s{(Basic\s+)([A-Za-z0-9+/=]{8,})}{$1 . '[redacted]'}gie;
+
+    return $text;
+}
+
 sub _msg {
     my ($self, $text) = @_;
-    return $self->log_prefix . " $text";
+    return $self->log_prefix . " " . $self->_redact($text);
 }
 
 sub log_warn {
