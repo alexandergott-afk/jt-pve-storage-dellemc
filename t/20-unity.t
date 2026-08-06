@@ -805,4 +805,41 @@ sub mapping_api {
         'a hostAccess that is not a list reads as no hosts, not as a crash');
 }
 
+# ---------------------------------------------------------------------------
+# The multipath settings follow the kernel's own DGC entry
+#
+# A conf.d device section REPLACES the built-in entry wholesale, and the
+# built-in encodes CLARiiON-family behaviour that generic ALUA gets wrong:
+# the emc_clariion checker, the 'emc' prio that judges both failover modes,
+# and NO hardware handler. An earlier draft shipped the generic ALUA block
+# copied from PowerVault; on a PNR-mode Unity that scores both SPs equally
+# and the LUN trespasses back and forth between controllers.
+# ---------------------------------------------------------------------------
+
+SKIP: {
+    skip 'PVE::Storage::Plugin is not available', 8
+        unless eval { require PVE::Storage::Plugin;
+                      require PVE::Storage::Custom::DellUnityPlugin; 1 };
+
+    my $P = 'PVE::Storage::Custom::DellUnityPlugin';
+    my $mp = $P->multipath_defaults();
+
+    is($mp->{path_checker}, 'emc_clariion',
+        'the family checker, which knows a passive SP when it sees one');
+    is($mp->{detect_checker}, 'no',
+        '... pinned, exactly as upstream pins it, so detection cannot swap it');
+    is($mp->{prio}, 'emc',
+        "prio 'emc' judges ALUA and PNR both; 'alua' on PNR causes trespass ping-pong");
+    ok(!exists $mp->{hardware_handler},
+        'no hardware handler - the built-in deliberately sets none for DGC');
+
+    isnt($mp->{no_path_retry}, 'queue', 'no_path_retry stays a number');
+    isnt($mp->{dev_loss_tmo}, 'infinity', 'dev_loss_tmo stays bounded');
+
+    like($P->multipath_product(), qr/VRAID/,
+        'the product pattern covers VRAID');
+    like($P->multipath_product(), qr/RAID\|DISK|DISK\|VRAID/,
+        "... and the built-in's RAID and DISK variants");
+}
+
 done_testing();

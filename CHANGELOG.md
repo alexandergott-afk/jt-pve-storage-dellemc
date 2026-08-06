@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.84~beta1] - 2026-08-06
+
+### Fixed
+- **Unity: the multipath settings would have replaced thirty years of
+  CLARiiON tuning with a generic guess.** A `conf.d` device section
+  *replaces* the kernel's built-in entry wholesale for matching devices,
+  and Unity's drop-in carried the generic ALUA block copied from
+  PowerVault. The built-in for `^DGC` is deliberately different, and every
+  difference matters:
+
+  - `path_checker emc_clariion`, with `detect_checker no` pinned — the
+    family checker recognises a passive SP and an inactive snapshot LU;
+    TUR does not, and upstream pins it precisely so detection cannot swap
+    it out.
+  - `prio emc`, not `alua` — a Unity can run ALUA or PNR, and `emc` judges
+    both. `alua` on a PNR array scores both SPs equally, I/O lands on the
+    non-owning SP, and the LUN *trespasses* back and forth between
+    controllers: a performance collapse that looks like a fabric problem.
+  - **no** `hardware_handler` — the built-in sets none for DGC, and
+    forcing `1 alua` onto a PNR-mode array breaks its failover handling.
+
+  The drop-in now follows the built-in and adds only the bounded-recovery
+  settings on top (`no_path_retry 60` — the built-in's own number —
+  `fast_io_fail_tmo`, `dev_loss_tmo`). The product pattern widens to the
+  built-in's `^(RAID|DISK|VRAID)`. Config version 2: nodes with the old
+  drop-in upgrade it automatically on the next activation.
+
 ## [0.7.83~beta1] - 2026-08-06
 
 ### Fixed

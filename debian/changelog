@@ -1,3 +1,23 @@
+jt-pve-storage-dellemc (0.7.84~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * UNITY: the multipath settings would have replaced the kernel's
+    CLARiiON-family tuning with a generic guess. A conf.d device section
+    replaces the built-in entry wholesale, and Unity's drop-in carried the
+    generic ALUA block copied from PowerVault. The built-in for ^DGC is
+    deliberately different: path_checker emc_clariion with detect_checker
+    no pinned (the family checker recognises a passive SP; TUR does not),
+    prio emc rather than alua (a Unity can run ALUA or PNR and emc judges
+    both - alua on PNR scores both SPs equally and the LUN trespasses back
+    and forth between controllers), and NO hardware_handler (forcing
+    "1 alua" onto a PNR array breaks its failover). The drop-in now follows
+    the built-in and adds only bounded-recovery settings; the product
+    pattern widens to ^(RAID|DISK|VRAID); config version 2 upgrades old
+    drop-ins automatically. TESTING.md gains the on-hardware check: two
+    prio groups in multipath -ll, and no trespass ping-pong in Unisphere.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 12:40:00 +0800
+
 jt-pve-storage-dellemc (0.7.83~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

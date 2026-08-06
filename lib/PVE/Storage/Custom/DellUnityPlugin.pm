@@ -41,33 +41,50 @@ sub type { 'dellunity' }
 
 sub naming { 'PVE::Storage::Custom::DellEMC::Unity::Naming' }
 
-# NOT VERIFIED. Unity reports SCSI vendor 'DGC' - the inquiry string it
-# inherited from CLARiiON - rather than 'DellEMC'. This gate decides which
-# devices the plugin will ever touch, so confirm it on the first run with
-#   sg_inq /dev/sdX
-# and narrow the product string before relying on it.
+# NOT VERIFIED against a device, but no longer guessed either: the vendor
+# is 'DGC' - the inquiry string Unity inherited from CLARiiON - and the
+# product pattern below is multipath-tools' own for that family. Confirm on
+# the first run with 'sg_inq /dev/sdX'.
 sub multipath_vendor  { 'DGC' }
-sub multipath_product { 'VRAID' }
+sub multipath_product { '^(RAID|DISK|VRAID)' }
 
+# These FOLLOW multipath-tools' built-in entry for "^DGC" instead of the
+# generic ALUA settings the other families use, because a conf.d device
+# section REPLACES the built-in entry wholesale for matching devices - and
+# the built-in encodes CLARiiON-family behaviour that generic ALUA gets
+# dangerously wrong:
+#
+#   - path_checker emc_clariion, with detect_checker explicitly 'no': the
+#     family checker knows a passive SP and an inactive snapshot LU when it
+#     sees one; TUR does not, and upstream pins the checker precisely so
+#     autodetection cannot swap it out.
+#   - prio 'emc', not 'alua': a Unity can run ALUA (failover mode 4) or
+#     PNR, and 'emc' judges both. 'alua' on a PNR array scores both SPs
+#     equally, I/O lands on the non-owning SP, and the LUN trespasses back
+#     and forth between controllers - a performance collapse that looks
+#     like a fabric problem.
+#   - NO hardware_handler: the built-in deliberately sets none for DGC, and
+#     forcing '1 alua' onto a PNR-mode array breaks its failover handling.
+#
+# What this plugin adds on top are only the bounded-recovery settings the
+# built-in leaves at defaults, and they are additive, not corrective.
 sub multipath_defaults {
     return {
-        path_selector        => 'queue-length 0',
         path_grouping_policy => 'group_by_prio',
-        prio                 => 'alua',
-        hardware_handler     => '1 alua',
+        path_checker         => 'emc_clariion',
+        detect_checker       => 'no',
+        prio                 => 'emc',
         failback             => 'immediate',
         # Never 'queue': with every path down, queued I/O that can never
-        # complete puts processes into uninterruptible sleep.
-        no_path_retry        => 30,
+        # complete puts processes into uninterruptible sleep. 60 matches
+        # the built-in's own bounded value.
+        no_path_retry        => 60,
         fast_io_fail_tmo     => 5,
         dev_loss_tmo         => 60,
-        detect_prio          => 'yes',
-        rr_min_io_rq         => 1,
-        max_sectors_kb       => 1024,
     };
 }
 
-sub multipath_config_version { 1 }
+sub multipath_config_version { 2 }
 
 # Off until an array has run this. The config backup writes a small
 # filesystem onto a volume of its own, and a family whose device discovery

@@ -251,6 +251,7 @@ help create host
 | 一個 base resource 支援多少個精簡複製、一個 LUN family 能帶多少快照 | Dell 白皮書顯示兩者都有上限；連結複製數超過上限的範本會被陣列拒絕。用戶端不做強制 —— 陣列的拒絕才是權威 |
 | 快照 restore 的 `copyName` 是否真的為自動備份快照命名 | Dell 白皮書記載每次 restore 都會產生一個備份快照；若 `copyName` 被忽略，備份會拿到陣列自取的名稱，快照清理認不得它，磁碟區從此刪不掉。**第一次 `qm rollback` 之後，請檢查有沒有名為 `<磁碟區>.pve-snap-rollback*` 的快照** |
 | HLU 能不能指定 | 沒有任何東西依賴它；Unity 自行配發 |
+| 陣列跑的是哪種 failover 模式（ALUA／PNR）。multipath 設定跟隨核心的 DGC 條目 —— `prio emc`、checker `emc_clariion` —— 兩種模式都能判，但 `multipath -ll` 裡的兩個優先權群組才是證明 | 第一顆 LUN 對應之後，`multipath -ll` 必須顯示兩個不同優先權的路徑群組、I/O 落在擁有 SP 的那組；若 Unisphere 裡看到 LUN 在兩個 SP 之間不斷 *trespass*，表示設定沒有生效 |
 | iSCSI portal 查詢：`iscsiPortal` 型別、`ipAddress` 與 `iscsiNode` 欄位、以及 node 名稱是否就是目標 IQN | 客戶的陣列走 FC，所以這條路徑會是最晚遇到實機的；在那之前，iSCSI 的 Unity 儲存會在 portal 探索階段以可讀的錯誤失敗，而不是錯誤地登入 |
 
 ### 沒有 Unity 也能測 Unity

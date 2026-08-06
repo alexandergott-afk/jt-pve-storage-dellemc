@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.83~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.84~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1069,6 +1069,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.84~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Unity's multipath drop-in would have replaced the kernel's CLARiiON-family tuning with a generic ALUA guess — wrong checker, wrong prio, a hardware handler the built-in deliberately omits. It now follows the kernel's own DGC entry and adds only bounded-recovery settings.</span>
+            <span class="lang-zh">Unity 的 multipath drop-in 原本會把核心的 CLARiiON 家族調校換成通用的 ALUA 猜測 —— checker 錯、prio 錯、還強加了內建刻意不設的 hardware handler。現在它跟隨核心自己的 DGC 條目，只追加有界復原設定。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.83~beta1</div>

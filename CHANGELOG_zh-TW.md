@@ -5,6 +5,28 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.84~beta1] - 2026-08-06
+
+### 修正
+- **Unity：multipath 設定原本會把三十年的 CLARiiON 調校換成一個通用的猜測。**
+  `conf.d` 的 device 區段對比對到的裝置是**整段取代**核心內建條目的，而 Unity
+  的 drop-in 帶著從 PowerVault 抄來的通用 ALUA 區塊。核心為 `^DGC` 寫的內建
+  條目是刻意不同的，而且每一處差異都要命：
+
+  - `path_checker emc_clariion`，且 `detect_checker no` 釘死 —— 家族專用
+    checker 認得 passive SP 與 inactive snapshot LU；TUR 不認得，上游釘死它
+    正是為了不讓自動偵測把它換掉。
+  - `prio emc` 而非 `alua` —— Unity 可跑 ALUA 或 PNR 模式，`emc` 兩種都能判。
+    `alua` 在 PNR 陣列上會把兩個 SP 打成同分，I/O 落到非擁有的 SP，LUN 在兩個
+    控制器之間不斷 *trespass* —— 一場看起來像 fabric 問題的效能崩塌。
+  - **不設** `hardware_handler` —— 內建條目對 DGC 刻意不設，把 `1 alua` 強加在
+    PNR 模式的陣列上會破壞它的 failover 處理。
+
+  drop-in 現在跟隨內建條目，只在其上追加有界復原設定（`no_path_retry 60` ——
+  內建自己的數字 —— `fast_io_fail_tmo`、`dev_loss_tmo`）。product 樣式放寬為
+  內建的 `^(RAID|DISK|VRAID)`。設定版本 2：帶著舊 drop-in 的節點會在下次
+  activation 自動升級。
+
 ## [0.7.83~beta1] - 2026-08-06
 
 ### 修正
