@@ -1,2054 +1,1309 @@
-<!DOCTYPE html>
-<html lang="en" data-lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>jt-pve-storage-dellemc -- Dell EMC Storage Plugins for Proxmox VE</title>
-<meta name="description" content="Open-source Dell EMC storage plugins for Proxmox VE. PowerStore, PowerVault ME4/ME5 and PowerFlex. Direct volume provisioning, array snapshots, thin clones, multipath, live migration. MIT License.">
-
-<!-- Open Graph -->
-<meta property="og:type" content="website">
-<meta property="og:title" content="jt-pve-storage-dellemc">
-<meta property="og:description" content="Dell EMC Storage Plugins for Proxmox VE. PowerStore, PowerVault ME, PowerFlex. Snapshots, thin clones, multipath, live migration. Open source, MIT License.">
-<meta property="og:url" content="https://jasoncheng7115.github.io/jt-pve-storage-dellemc/">
-<meta property="og:site_name" content="jt-pve-storage-dellemc">
-
-<!-- Twitter Card -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="jt-pve-storage-dellemc">
-<meta name="twitter:description" content="Dell EMC Storage Plugins for Proxmox VE. Open source, MIT License.">
-
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<!-- ======== Top Nav ======== -->
-<header class="top-nav">
-    <div class="top-nav__brand">
-        <div class="top-nav__brand-icon">DE</div>
-        <span>
-            <span>jt-pve-storage-dellemc</span>
-        </span>
-    </div>
-    <div class="top-nav__actions">
-        <button class="lang-toggle" onclick="toggleLang()" title="Switch Language">
-            <span class="lang-en">繁體中文</span>
-            <span class="lang-zh">English</span>
-        </button>
-        <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc" class="github-link" target="_blank" rel="noopener">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            <span>GitHub</span>
-        </a>
-        <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-        </button>
-    </div>
-</header>
-
-<!-- ======== Sidebar ======== -->
-<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
-<nav class="sidebar" id="sidebar">
-    <div class="sidebar__search">
-        <input type="text" class="sidebar__search-input" id="sidebarSearch" placeholder="Search..." oninput="filterSidebar(this.value)">
-    </div>
-    <div class="sidebar__section">
-        <div class="sidebar__heading">
-            <span class="lang-en">Getting Started</span>
-            <span class="lang-zh">快速開始</span>
-        </div>
-        <a href="#hero" class="sidebar__link">
-            <span class="lang-en">Overview</span>
-            <span class="lang-zh">概覽</span>
-        </a>
-        <a href="#disclaimer" class="sidebar__link">
-            <span class="lang-en">Disclaimer &amp; Risk</span>
-            <span class="lang-zh">免責聲明與風險</span>
-        </a>
-        <a href="#families" class="sidebar__link">
-            <span class="lang-en">Product Families</span>
-            <span class="lang-zh">產品系列</span>
-        </a>
-        <a href="#features" class="sidebar__link">
-            <span class="lang-en">Features</span>
-            <span class="lang-zh">功能特性</span>
-        </a>
-        <a href="#requirements" class="sidebar__link">
-            <span class="lang-en">Requirements</span>
-            <span class="lang-zh">系統需求</span>
-        </a>
-    </div>
-    <div class="sidebar__section">
-        <div class="sidebar__heading">
-            <span class="lang-en">Setup</span>
-            <span class="lang-zh">安裝設定</span>
-        </div>
-        <a href="#installation" class="sidebar__link">
-            <span class="lang-en">Installation</span>
-            <span class="lang-zh">安裝</span>
-        </a>
-        <a href="#quickstart" class="sidebar__link">
-            <span class="lang-en">Quick Start</span>
-            <span class="lang-zh">快速入門</span>
-        </a>
-        <a href="#configuration" class="sidebar__link">
-            <span class="lang-en">Configuration</span>
-            <span class="lang-zh">設定選項</span>
-        </a>
-    </div>
-    <div class="sidebar__section">
-        <div class="sidebar__heading">
-            <span class="lang-en">Architecture</span>
-            <span class="lang-zh">架構</span>
-        </div>
-        <a href="#architecture" class="sidebar__link">
-            <span class="lang-en">System Architecture</span>
-            <span class="lang-zh">系統架構</span>
-        </a>
-        <a href="#powerflex-access" class="sidebar__link">
-            <span class="lang-en">PowerFlex: SDC vs NVMe/TCP</span>
-            <span class="lang-zh">PowerFlex：SDC 與 NVMe/TCP</span>
-        </a>
-        <a href="#multipath-safety" class="sidebar__link">
-            <span class="lang-en">Multipath Safety</span>
-            <span class="lang-zh">Multipath 安全規則</span>
-        </a>
-        <a href="#supported-features" class="sidebar__link">
-            <span class="lang-en">Supported Features</span>
-            <span class="lang-zh">功能支援表</span>
-        </a>
-    </div>
-    <div class="sidebar__section">
-        <div class="sidebar__heading">
-            <span class="lang-en">Reference</span>
-            <span class="lang-zh">參考資料</span>
-        </div>
-        <a href="#verification" class="sidebar__link">
-            <span class="lang-en">Verification Status</span>
-            <span class="lang-zh">驗證狀態</span>
-        </a>
-        <a href="#troubleshooting" class="sidebar__link">
-            <span class="lang-en">Troubleshooting</span>
-            <span class="lang-zh">疑難排解</span>
-        </a>
-        <a href="#changelog" class="sidebar__link">
-            <span class="lang-en">Changelog</span>
-            <span class="lang-zh">變更紀錄</span>
-        </a>
-        <a href="#acknowledgments" class="sidebar__link">
-            <span class="lang-en">Acknowledgments</span>
-            <span class="lang-zh">致謝</span>
-        </a>
-    </div>
-</nav>
-
-<!-- ======== Main Content ======== -->
-<main class="main-content">
-
-<!-- ---- Hero ---- -->
-<section class="hero" id="hero">
-    <div class="hero__grid-bg"></div>
-    <div class="hero__glow"></div>
-    <div class="hero__glow-left"></div>
-    <div class="hero__content">
-        <div class="hero__badge">v0.7.87~beta1 <span class="hero__badge-sep"></span> MIT License</div>
-        <h1 class="hero__title">jt-pve-storage-dellemc</h1>
-        <p class="hero__project-desc">
-            <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
-            <span class="lang-zh">Dell EMC 儲存陣列的 Proxmox VE 儲存外掛</span>
-        </p>
-        <p class="hero__subtitle">
-            <span class="lang-en">One package, one shared host-side layer, and one PVE storage type per Dell EMC product family: PowerStore over iSCSI or Fibre Channel, PowerVault ME4/ME5, and PowerFlex over NVMe/TCP or SDC. Direct volume provisioning — one VM disk is one array volume — so array snapshots, thin clones, compression and replication all act on a single VM disk as their natural unit.</span>
-            <span class="lang-zh">一個套件、一組共用的主機端底層，Dell EMC 每個產品系列各自對應一個 PVE storage type：PowerStore（iSCSI 或 Fibre Channel）、PowerVault ME4／ME5，以及 PowerFlex（NVMe/TCP 或 SDC）。採用直接配置 volume 的模型 —— 一顆 VM 磁碟就是一個陣列 volume —— 讓陣列端的快照、精簡複製、壓縮與複寫都以「一顆 VM 磁碟」為自然單位運作。</span>
-        </p>
-        <div class="hero__actions">
-            <a href="#installation" class="btn btn--primary">
-                <span class="lang-en">Install Guide</span>
-                <span class="lang-zh">安裝指南</span>
-            </a>
-            <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc" class="btn btn--outline" target="_blank" rel="noopener">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-                GitHub
-            </a>
-        </div>
-    </div>
-</section>
-
-<div class="content-wrap">
-
-<!-- ---- Disclaimer ---- -->
-<section class="doc-section" id="disclaimer">
-    <h2 class="section-title">
-        <span class="lang-en">Disclaimer &amp; Risk</span>
-        <span class="lang-zh">免責聲明與風險</span>
-    </h2>
-    <div class="alert alert--danger">
-        <strong>
-            <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel. PowerStore, PowerFlex, Unity, iSCSI and SAS remain unverified. Use at your own risk.</span>
-            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
-        </strong>
-        <ul>
-            <li>
-                <span class="lang-en">On every family except PowerVault-over-FC, the array-facing behaviour is unverified: REST endpoints and field names, the SCSI vendor and product strings that decide which devices the plugin touches, and the WWN to WWID conversion. The verification tables below name each item.</span>
-                <span class="lang-zh">除了走 FC 的 PowerVault 之外，各系列面向陣列的行為都尚未驗證：REST 端點與欄位名稱、決定外掛會碰哪些裝置的 SCSI vendor／product 字串、以及 WWN 轉 WWID 的換算。下方的驗證表逐項列出。</span>
-            </li>
-            <li>
-                <span class="lang-en">A storage plugin runs as root, creates and deletes volumes on the array, and manipulates block devices on every node. A defect can destroy virtual machine data, take a storage offline, or leave a node in a state that only a reboot clears.</span>
-                <span class="lang-zh">儲存外掛以 root 權限執行，會在陣列上建立與刪除 volume，並在每台節點上操作區塊裝置。缺陷可能毀掉虛擬機資料、讓儲存離線，或讓節點進入只能重開機才能恢復的狀態。</span>
-            </li>
-            <li>
-                <span class="lang-en">Multipath and SCSI state is shared across the whole node, so the damage is not necessarily limited to this plugin's own storage.</span>
-                <span class="lang-zh">multipath 與 SCSI 狀態是全節點共用的，因此受害範圍不一定只限於本外掛自己的儲存。</span>
-            </li>
-            <li>
-                <span class="lang-en">Provided under the MIT license, AS IS and without warranty of any kind. In no event shall the author be liable for any claim or damages, including data loss or business interruption.</span>
-                <span class="lang-zh">以 MIT 授權提供，依現狀（AS IS）提供且不附帶任何形式的保固。在任何情況下，作者均不對任何主張或損害負責，包括資料遺失與營運中斷。</span>
-            </li>
-            <li>
-                <span class="lang-en">Use a non-production cluster and a non-production array, and keep independent backups. A storage snapshot is not a backup.</span>
-                <span class="lang-zh">請使用非正式環境的叢集與陣列，並保留獨立備份。儲存快照不是備份。</span>
-            </li>
-            <li>
-                <span class="lang-en">An independent community project. Not affiliated with, endorsed by, or supported by Dell Technologies. "Dell", "Dell EMC", "PowerStore", "PowerVault", "PowerFlex", "Unity", "PowerMax" and "PowerScale" are trademarks of their respective owners.</span>
-                <span class="lang-zh">本專案為獨立的社群專案，與 Dell Technologies 無隸屬關係，亦未經其背書或提供支援。「Dell」、「Dell EMC」、「PowerStore」、「PowerVault」、「PowerFlex」、「Unity」、「PowerMax」、「PowerScale」為各自所有權人之商標。</span>
-            </li>
-        </ul>
-    </div>
-    <p>
-        <span class="lang-en">1.0.0 is the on-hardware test pass, not more code. What has and has not been verified is tracked in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>.</span>
-        <span class="lang-zh">1.0.0 的門檻是實機測試通過，而不是再寫更多程式。哪些已驗證、哪些還沒，記錄在 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING_zh-TW.md">docs/TESTING_zh-TW.md</a>。</span>
-    </p>
-</section>
-
-<!-- ---- Product families ---- -->
-<section class="doc-section" id="families">
-    <h2 class="section-title">
-        <span class="lang-en">Product Families</span>
-        <span class="lang-zh">產品系列</span>
-    </h2>
-    <p class="section-subtitle">
-        <span class="lang-en">Dell EMC's product lines differ too much to share one PVE storage type, so each family gets its own. They share the host-side layer, so adding a family is a plugin file and an API client rather than a restructuring.</span>
-        <span class="lang-zh">Dell EMC 各產品線的差異太大，無法共用同一個 PVE storage type，因此每個系列各自對應一個。它們共用主機端底層，所以新增一個系列只需要一個 plugin 檔加一個 API 客戶端，不必重構。</span>
-    </p>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
-                <th><span class="lang-en">Storage type</span><span class="lang-zh">Storage type</span></th>
-                <th><span class="lang-en">Data path</span><span class="lang-zh">資料路徑</span></th>
-                <th><span class="lang-en">Status</span><span class="lang-zh">狀態</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><strong>PowerStore</strong></td>
-                    <td><code>dellpowerstore</code></td>
-                    <td>iSCSI / FC (dm-multipath)</td>
-                    <td><span class="status-badge status-badge--supported">
-                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
-                    </span></td>
-                </tr>
-                <tr>
-                    <td><strong>PowerVault ME4 / ME5</strong></td>
-                    <td><code>dellpowervault</code></td>
-                    <td>iSCSI / FC / SAS (dm-multipath)</td>
-                    <td><span class="status-badge status-badge--supported">
-                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
-                    </span></td>
-                </tr>
-                <tr>
-                    <td><strong>PowerFlex</strong></td>
-                    <td><code>dellpowerflex</code></td>
-                    <td>NVMe/TCP or SDC</td>
-                    <td><span class="status-badge status-badge--supported">
-                        <span class="lang-en">Implemented</span><span class="lang-zh">已實作</span>
-                    </span></td>
-                </tr>
-                <tr>
-                    <td>PowerMax</td>
-                    <td><code>dellpowermax</code></td>
-                    <td>FC / iSCSI, NVMe/FC, NVMe/TCP</td>
-                    <td><span class="lang-en">Planned</span><span class="lang-zh">規劃中</span></td>
-                </tr>
-                <tr>
-                    <td>PowerScale</td>
-                    <td><code>dellpowerscale</code></td>
-                    <td>NFS</td>
-                    <td><span class="lang-en">Not scheduled</span><span class="lang-zh">未排入</span></td>
-                </tr>
-                <tr>
-                    <td>Unity XT</td>
-                    <td><code>dellunity</code></td>
-                    <td>FC / iSCSI</td>
-                    <td><span class="status-badge status-badge--partial"><span class="lang-en">Code complete, no hardware run</span><span class="lang-zh">程式碼完成，尚無實機執行</span></span></td>
-                </tr>
-                <tr>
-                    <td>ObjectScale, PowerProtect</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td><span class="lang-en">Out of scope</span><span class="lang-zh">不列入範圍</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">Why not one plugin with a type option: PVE asks a plugin for its content types and disk formats <em>before</em> any configuration is parsed, so one type cannot describe families that differ in what they can hold. The type string is also a permanent contract — changing it later invalidates every existing storage.cfg.</span>
-        <span class="lang-zh">為什麼不做成單一 plugin 加型號參數：PVE 會在解析任何設定<em>之前</em>就向 plugin 詢問支援的 content type 與磁碟格式，因此單一 type 無法描述「能放的東西不同」的系列。而且 type 字串一旦公開就不能再改 —— 日後修改會讓所有既有的 storage.cfg 失效。</span>
-    </p>
-</section>
-
-<!-- ---- Features ---- -->
-<section class="doc-section" id="features">
-    <h2 class="section-title">
-        <span class="lang-en">Features</span>
-        <span class="lang-zh">功能特性</span>
-    </h2>
-    <div class="card-grid">
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z"/><path d="M4 12h16"/><path d="M12 4v16"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">1 VM disk = 1 array volume</span>
-                <span class="lang-zh">1 顆 VM 磁碟 = 1 個陣列 volume</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">No LVM layer and no shared large LUN carved up locally. The array's snapshots, thin clones, compression and replication act on a single VM disk as their natural unit.</span>
-                <span class="lang-zh">沒有 LVM 層，也不會切一顆大 LUN 再在本地分割。陣列的快照、精簡複製、壓縮與複寫都以一顆 VM 磁碟為自然單位運作。</span>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-6.219-8.56"/><path d="M12 7v5l3 3"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">Snapshots keep the VM configuration</span>
-                <span class="lang-zh">快照連同 VM 設定一起保存</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">A storage snapshot restores the disk; the configuration lives in /etc/pve. On PowerStore, every snapshot also writes the VM config to a 1 MB volume, readable back by pve-dell-config-get even when /etc/pve is gone. Not offered on PowerVault ME, whose volume ceiling is too low to spend one volume per snapshot; set <code>dell-config-backup 0</code> to turn it off on PowerStore too.</span>
-                <span class="lang-zh">儲存快照只還原磁碟，設定放在 /etc/pve。因此在 PowerStore 上，每次快照都會另外把 VM 設定寫進一個 1 MB 的 volume，即使 /etc/pve 已不存在，也能用 pve-dell-config-get 讀回來。PowerVault ME 系列不提供此功能，因為它的 volume 數量上限太少，無法為每個快照再多花一個 volume；在 PowerStore 上也可以用 <code>dell-config-backup 0</code> 關閉。</span>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">Instant linked clones</span>
-                <span class="lang-zh">即時連結複製</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">Templates and linked clones use the array's thin clone or writable snapshot, so nothing is copied. Full Clone remains a PVE-side block copy — a PVE architectural decision, not a plugin limitation.</span>
-                <span class="lang-zh">範本與連結複製使用陣列的精簡複製或可寫快照，完全不複製資料。完整複製仍是 PVE 端的逐區塊複製 —— 那是 PVE 的架構決策，不是外掛的限制。</span>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">Ownership boundary</span>
-                <span class="lang-zh">歸屬邊界</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">Every list, delete and cleanup path filters on the pve-&lt;storeid&gt;- name prefix first. Objects on the array that do not carry it are never read, renamed or deleted.</span>
-                <span class="lang-zh">所有列舉、刪除與清理路徑都會先以 pve-&lt;storeid&gt;- 名稱前置字串過濾。陣列上沒有這個前置字串的物件，一律不讀取、不改名、不刪除。</span>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">Cluster-aware mapping</span>
-                <span class="lang-zh">叢集感知的對應</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">Volumes are mapped to every node at creation, so live migration does not have to remap first. Unmapping always precedes deletion, so an in-flight rescan cannot rebuild the device behind the delete.</span>
-                <span class="lang-zh">volume 在建立時就對應到所有節點，讓線上遷移不必先重新對應。解除對應一律在刪除之前，避免進行中的重新掃描在刪除的背後又把裝置建回來。</span>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card__icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
-            <div class="card__title">
-                <span class="lang-en">Orphan device reaping</span>
-                <span class="lang-zh">殘留裝置自動清理</span>
-            </div>
-            <div class="card__desc">
-                <span class="lang-en">A volume deleted from another node leaves this one with a device pointing at storage that no longer answers. It is removed only after a grace period, three consecutive absences and an idle check — reaping a device in use destroys a running VM's disk.</span>
-                <span class="lang-zh">從其他節點刪除的 volume，會在本節點留下一個指向已不存在儲存的裝置。它只會在通過寬限期、連續三次未出現、且裝置閒置之後才被移除 —— 清掉使用中的裝置等於毀掉執行中 VM 的磁碟。</span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- ---- Requirements ---- -->
-<section class="doc-section" id="requirements">
-    <h2 class="section-title">
-        <span class="lang-en">Requirements</span>
-        <span class="lang-zh">系統需求</span>
-    </h2>
-
-    <h3 class="subsection-title">Proxmox VE</h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">PVE Version</span><span class="lang-zh">PVE 版本</span></th>
-                <th>Storage API</th>
-                <th><span class="lang-en">Compatibility</span><span class="lang-zh">相容性</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td>PVE 9.1+</td><td><span class="lang-en">13&ndash;15, negotiated</span><span class="lang-zh">13&ndash;15，自動協商</span></td><td><span class="status-badge status-badge--supported">
-                    <span class="lang-en">Supported &mdash; the ME4024 run was on PVE 9.2.5 (APIVER 15)</span><span class="lang-zh">支援 &mdash; ME4024 的實測就在 PVE 9.2.5（APIVER 15）上</span>
-                </span></td></tr>
-                <tr><td>PVE 9.0</td><td>12</td><td>
-                    <span class="lang-en">Untested</span><span class="lang-zh">未測試</span>
-                </td></tr>
-                <tr><td>PVE 8.x</td><td>10–11</td><td>
-                    <span class="lang-en">Not supported</span><span class="lang-zh">不支援</span>
-                </td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Arrays</span>
-        <span class="lang-zh">陣列</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
-                <th><span class="lang-en">Version</span><span class="lang-zh">版本</span></th>
-                <th><span class="lang-en">Management interface</span><span class="lang-zh">管理介面</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td>PowerStore</td><td>PowerStore OS 3.0+ (4.x targeted)</td><td>REST API v3</td></tr>
-                <tr><td>PowerVault ME</td><td>ME4 / ME5</td><td><span class="lang-en">CLI over HTTPS</span><span class="lang-zh">HTTPS 上的 CLI</span></td></tr>
-                <tr><td>PowerFlex</td><td>3.x / 4.x <span class="lang-en">(NVMe/TCP needs 4.0+)</span><span class="lang-zh">（NVMe/TCP 需 4.0 以上）</span></td><td>REST API</td></tr>
-                <tr><td>Unity XT</td><td><span class="lang-en">Unity OE 5.x targeted</span><span class="lang-zh">以 Unity OE 5.x 為目標</span></td><td><span class="lang-en">Unisphere REST API</span><span class="lang-zh">Unisphere REST API</span></td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Node packages</span>
-        <span class="lang-zh">節點套件</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Package</span><span class="lang-zh">套件</span></th>
-                <th><span class="lang-en">Purpose</span><span class="lang-zh">用途</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td><code>libwww-perl</code>, <code>libjson-perl</code>, <code>liburi-perl</code></td>
-                    <td><span class="lang-en">REST client</span><span class="lang-zh">REST 客戶端</span></td></tr>
-                <tr><td><code>open-iscsi</code></td>
-                    <td><span class="lang-en">iSCSI initiator (SAN families)</span><span class="lang-zh">iSCSI initiator（SAN 系列）</span></td></tr>
-                <tr><td><code>multipath-tools</code></td>
-                    <td><span class="lang-en">dm-multipath (SAN families)</span><span class="lang-zh">dm-multipath（SAN 系列）</span></td></tr>
-                <tr><td><code>sg3-utils</code>, <code>psmisc</code></td>
-                    <td><span class="lang-en">SCSI inquiry, in-use detection</span><span class="lang-zh">SCSI 查詢、使用中偵測</span></td></tr>
-                <tr><td><code>nvme-cli</code></td>
-                    <td><span class="lang-en">PowerFlex over NVMe/TCP</span><span class="lang-zh">PowerFlex 走 NVMe/TCP 時需要</span></td></tr>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<!-- ---- Installation ---- -->
-<section class="doc-section" id="installation">
-    <h2 class="section-title">
-        <span class="lang-en">Installation</span>
-        <span class="lang-zh">安裝</span>
-    </h2>
-    <div class="alert alert--warning">
-        <span class="lang-en">Install on <strong>every node</strong> of the cluster. A node without the package answers "Parameter verification failed (400)" or "No such storage", and cannot be a live migration target.</span>
-        <span class="lang-zh">叢集內<strong>每一台節點</strong>都必須安裝。沒有安裝的節點會回應「Parameter verification failed (400)」或「No such storage」，也無法成為線上遷移的目的地。</span>
-    </div>
-
-    <div class="step">
-        <div class="step__number">1</div>
-        <div class="step__content">
-            <div class="step__title">
-                <span class="lang-en">Download the release package</span>
-                <span class="lang-zh">下載發行版套件</span>
-            </div>
-            <p>
-                <span class="lang-en">Every
-                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
-                    carries a prebuilt <code>.deb</code> and a <code>SHA256SUMS</code> beside it. This is the package to install; it is the same build that was tested for that release.</span>
-                <span class="lang-zh">每個
-                    <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases" target="_blank" rel="noopener">release</a>
-                    都附有預先建置的 <code>.deb</code> 與 <code>SHA256SUMS</code>。請安裝這一份 —— 它就是該版本測試時所用的建置。</span>
-            </p>
-            <pre><span class="comment"># always the newest build; this URL never has to be edited</span>
-<span class="cmd">curl</span> -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
-<span class="cmd">curl</span> -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/SHA256SUMS
-<span class="cmd">sha256sum</span> -c SHA256SUMS --ignore-missing <span class="comment"># must say OK before installing</span>
-
-<span class="comment"># which version did that fetch?</span>
-<span class="cmd">dpkg-deb</span> -f jt-pve-storage-dellemc_all.deb Version</pre>
-            <p>
-                <span class="lang-en">Check the sum before installing: this package writes to <code>/etc/multipath/conf.d</code> and talks to your array.</span>
-                <span class="lang-zh">安裝前先核對雜湊值：這個套件會寫入 <code>/etc/multipath/conf.d</code>，也會與你的陣列通訊。</span>
-            </p>
-            <p>
-                <span class="lang-en">The version is inside the package, not in that file name, so the command above never goes stale. Each release also carries a versioned copy &mdash; <code>..._0.7.66.beta1-1_all.deb</code>, spelled with a dot because GitHub will not serve an asset name containing <code>~</code> &mdash; and that is the name to quote in a bug report. <code>SHA256SUMS</code> lists both, which is why the check above passes <code>--ignore-missing</code>.</span>
-                <span class="lang-zh">版本在套件裡面，不在那個檔名上，所以上面那道指令永遠不會過期。每一版同時也附一份帶版號的副本 &mdash; <code>..._0.7.66.beta1-1_all.deb</code>，版本用點分隔是因為 GitHub 不會提供檔名含 <code>~</code> 的附件 &mdash; 回報問題時請引用那個檔名。<code>SHA256SUMS</code> 兩份都列，這就是上面要加 <code>--ignore-missing</code> 的原因。</span>
-            </p>
-        </div>
-    </div>
-
-    <div class="step">
-        <div class="step__number">2</div>
-        <div class="step__content">
-            <div class="step__title">
-                <span class="lang-en">Install on every node</span>
-                <span class="lang-zh">在每台節點上安裝</span>
-            </div>
-            <pre><span class="cmd">apt</span> install ./jt-pve-storage-dellemc_all.deb</pre>
-            <p>
-                <span class="lang-en">Use <code>apt install ./file.deb</code> rather than <code>dpkg -i</code>: dpkg does not install dependencies, and the missing binaries only surface much later as failures inside the plugin.</span>
-                <span class="lang-zh">請用 <code>apt install ./file.deb</code> 而不是 <code>dpkg -i</code>：dpkg 不會安裝相依套件，缺少的執行檔要到很後面才會以外掛內部的錯誤浮現。</span>
-            </p>
-        </div>
-    </div>
-
-    <div class="step">
-        <div class="step__number">3</div>
-        <div class="step__content">
-            <div class="step__title">
-                <span class="lang-en">After an upgrade</span>
-                <span class="lang-zh">升級之後</span>
-            </div>
-            <pre><span class="cmd">systemctl</span> restart pvestatd</pre>
-            <p>
-                <span class="lang-en">A reload does not reliably replace Perl modules that are already loaded. Run this on every node.</span>
-                <span class="lang-zh">reload 無法可靠地替換已載入記憶體的 Perl 模組。請在每台節點上執行。</span>
-            </p>
-        </div>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Building from source</span>
-        <span class="lang-zh">從原始碼建置</span>
-    </h3>
-    <p>
-        <span class="lang-en">Only needed to work on the plugin, or to run the test suite against your own PVE version. For installing it, use the release package above &mdash; that is the build the release was tested with.</span>
-        <span class="lang-zh">只有在要修改這個外掛、或想針對你自己的 PVE 版本跑測試套件時才需要。單純安裝請用上面的發行版套件 &mdash; 那才是該版本測試時所用的建置。</span>
-    </p>
-    <pre><span class="cmd">git</span> clone https://github.com/jasoncheng7115/jt-pve-storage-dellemc.git
-<span class="cmd">cd</span> jt-pve-storage-dellemc
-<span class="cmd">make</span> test    <span class="comment"># syntax checks, unit tests, safety guard</span>
-<span class="cmd">make</span> deb</pre>
-</section>
-
-<!-- ---- Quick start ---- -->
-<section class="doc-section" id="quickstart">
-    <h2 class="section-title">
-        <span class="lang-en">Quick Start</span>
-        <span class="lang-zh">快速入門</span>
-    </h2>
-
-    <h3 class="subsection-title">PowerStore</h3>
-    <pre><span class="cmd">pvesm</span> add dellpowerstore ps1 \
-    <span class="flag">--dell-portal</span> 192.168.1.50 \
-    <span class="flag">--dell-username</span> pveadmin \
-    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
-    <span class="flag">--dell-protocol</span> iscsi \
-    <span class="flag">--content</span> images,rootdir \
-    <span class="flag">--shared</span> 1</pre>
-
-    <h3 class="subsection-title">PowerVault ME4 / ME5</h3>
-    <pre><span class="cmd">pvesm</span> add dellpowervault me5 \
-    <span class="flag">--dell-portal</span> 192.168.1.60,192.168.1.61 \
-    <span class="flag">--dell-username</span> manage \
-    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
-    <span class="flag">--pvault-pool</span> A \
-    <span class="flag">--content</span> images,rootdir \
-    <span class="flag">--shared</span> 1</pre>
-    <div class="alert alert--warning">
-        <span class="lang-en"><strong>Why two addresses?</strong> An ME has no virtual management IP: controller A and B each keep their own, and a failed controller's address disappears with it. List both at creation time &mdash; <code>dell-portal</code> cannot be edited afterwards, and during an incident it is too late. Verify the pair on the array with <code>show network-parameters</code>.</span>
-        <span class="lang-zh"><strong>為什麼要填兩個位址？</strong> ME 沒有虛擬管理 IP：控制器 A 與 B 各自持有位址，故障控制器的位址會跟著它一起消失。請在建立時就把兩個都列入 &mdash; <code>dell-portal</code> 事後不能修改，事故當下才想改就來不及了。可在陣列上以 <code>show network-parameters</code> 確認這兩個位址。</span>
-    </div>
-    <div class="alert alert--info">
-        <span class="lang-en">PowerVault names are limited to 32 bytes, so keep the storage id short. A name that would not fit raises an error rather than being truncated into a collision.</span>
-        <span class="lang-zh">PowerVault 的名稱上限是 32 bytes，所以 storage id 請取短一點。放不下的名稱會直接報錯，而不是被截斷成可能撞名的名稱。</span>
-    </div>
-
-    <h3 class="subsection-title">PowerFlex</h3>
-    <pre><span class="cmd">pvesm</span> add dellpowerflex pflex1 \
-    <span class="flag">--dell-portal</span> 192.168.1.70 \
-    <span class="flag">--dell-username</span> admin \
-    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
-    <span class="flag">--dell-protocol</span> nvme \
-    <span class="flag">--pflex-storage-pool</span> pool1 \
-    <span class="flag">--content</span> images,rootdir \
-    <span class="flag">--shared</span> 1</pre>
-
-    <h3 class="subsection-title">Unity XT</h3>
-    <pre><span class="cmd">pvesm</span> add dellunity u480 \
-    <span class="flag">--dell-portal</span> 192.168.1.80 \
-    <span class="flag">--dell-username</span> admin \
-    <span class="flag">--dell-password</span> <span class="string">'SecurePassword'</span> \
-    <span class="flag">--dell-protocol</span> fc \
-    <span class="flag">--unity-pool</span> pool_1 \
-    <span class="flag">--content</span> images,rootdir \
-    <span class="flag">--shared</span> 1</pre>
-    <div class="alert alert--info">
-        <span class="lang-en">Unity's management IP follows the master SP, so one address is enough. <code>--unity-pool</code> is required on an array with more than one pool. This family has never run against an array — see the verification section below.</span>
-        <span class="lang-zh">Unity 的管理 IP 會跟著主 SP 走，填一個位址即可。陣列有多個儲存池時 <code>--unity-pool</code> 為必填。這個系列從未在陣列上執行過 —— 請見下方驗證狀態。</span>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Verify</span>
-        <span class="lang-zh">驗證</span>
-    </h3>
-    <pre><span class="cmd">pvesm</span> status
-<span class="cmd">journalctl</span> <span class="flag">-t</span> pvestatd | <span class="cmd">grep</span> dellpowerstore</pre>
-</section>
-
-<!-- ---- Configuration ---- -->
-<section class="doc-section" id="configuration">
-    <h2 class="section-title">
-        <span class="lang-en">Configuration</span>
-        <span class="lang-zh">設定選項</span>
-    </h2>
-    <p class="section-subtitle">
-        <span class="lang-en">Options shared by every family use the dell- prefix and are declared once; family options use their own prefix. PVE registers storage properties in one shared schema, so a name may only have one definition across all plugins.</span>
-        <span class="lang-zh">所有系列共用的選項使用 dell- 前置字串且只宣告一次；各系列專屬選項使用自己的前置字串。PVE 的 storage property 註冊在同一份共用 schema，同一個名稱在所有外掛之間只能有一種定義。</span>
-    </p>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Common options</span>
-        <span class="lang-zh">共通選項</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Option</span><span class="lang-zh">選項</span></th>
-                <th><span class="lang-en">Default</span><span class="lang-zh">預設</span></th>
-                <th><span class="lang-en">Description</span><span class="lang-zh">說明</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td><code>dell-portal</code></td><td>—</td>
-                    <td><span class="lang-en">Management address(es), comma-separated. Required, cannot be changed later. PowerVault ME has one fixed IP per controller and no floating address &mdash; unlike a NetApp cluster LIF or a Pure vir0, nothing moves to the surviving controller &mdash; so list both controllers up front; the plugin fails over between them. The data path needs none of this: dm-multipath handles controller failover on its own</span>
-                        <span class="lang-zh">管理位址（可逗號分隔多個）。必填，且建立後不可變更。PowerVault ME 每個控制器各有固定 IP、沒有浮動位址 &mdash; 不像 NetApp 的 cluster LIF 或 Pure 的 vir0，故障時不會有位址漂移到存活的控制器 &mdash; 所以請一開始就把兩個控制器都列入，外掛會在其間自動容錯。資料路徑完全不需要這些：dm-multipath 自己處理控制器容錯</span></td></tr>
-                <tr><td><code>dell-username</code></td><td>—</td>
-                    <td><span class="lang-en">API user. Required</span><span class="lang-zh">API 帳號。必填</span></td></tr>
-                <tr><td><code>dell-password</code></td><td>—</td>
-                    <td><span class="lang-en">API password. Required</span><span class="lang-zh">API 密碼。必填</span></td></tr>
-                <tr><td><code>dell-protocol</code></td><td><code>iscsi</code></td>
-                    <td><span class="lang-en">iscsi or fc on the SAN families; sdc or nvme on PowerFlex</span>
-                        <span class="lang-zh">SAN 系列為 iscsi 或 fc；PowerFlex 為 sdc 或 nvme</span></td></tr>
-                <tr><td><code>dell-host-mode</code></td><td><code>per-node</code></td>
-                    <td><span class="lang-en">One host object per node, or one for the cluster</span>
-                        <span class="lang-zh">每節點一個 host 物件，或整個叢集共用一個</span></td></tr>
-                <tr><td><code>dell-status-timeout</code></td><td><code>5</code></td>
-                    <td><span class="lang-en">Health-path timeout. PVE polls storages sequentially, so a slow array delays every storage after it</span>
-                        <span class="lang-zh">健康路徑逾時。PVE 依序輪詢儲存，因此慢的陣列會拖累排在後面的每一個儲存</span></td></tr>
-                <tr><td><code>dell-device-timeout</code></td><td><code>60</code></td>
-                    <td><span class="lang-en">Seconds to wait for a volume's device</span>
-                        <span class="lang-zh">等待 volume 裝置出現的秒數</span></td></tr>
-                <tr><td><code>dell-rescan-interval</code></td><td><code>300</code></td>
-                    <td><span class="lang-en">Rate limit for the periodic SAN rescan. A new portal login always rescans immediately</span>
-                        <span class="lang-zh">週期性 SAN 掃描的頻率限制。登入新 portal 時一律立即掃描</span></td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Family options</span>
-        <span class="lang-zh">系列專屬選項</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Family</span><span class="lang-zh">系列</span></th>
-                <th><span class="lang-en">Options</span><span class="lang-zh">選項</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td>PowerStore</td><td><code>pstore-appliance</code>, <code>pstore-volume-group</code>, <code>pstore-performance-policy</code>, <code>pstore-protection-policy</code>, <code>pstore-lun-id-base</code></td></tr>
-                <tr><td>PowerVault ME</td><td><code>pvault-pool</code>, <code>pvault-volume-group</code>, <code>pvault-tier-affinity</code>, <code>pvault-lun-id-base</code></td></tr>
-                <tr><td>PowerFlex</td><td><code>pflex-storage-pool</code> <span class="lang-en">(required)</span><span class="lang-zh">（必填）</span>, <code>pflex-protection-domain</code>, <code>pflex-thick</code></td></tr>
-                <tr><td>Unity XT</td><td><code>unity-pool</code>, <code>unity-thin</code></td></tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">Full reference: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION.md">docs/CONFIGURATION.md</a>.</span>
-        <span class="lang-zh">完整說明：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/CONFIGURATION_zh-TW.md">docs/CONFIGURATION_zh-TW.md</a>。</span>
-    </p>
-</section>
-
-<!-- ---- Architecture ---- -->
-<section class="doc-section" id="architecture">
-    <h2 class="section-title">
-        <span class="lang-en">System Architecture</span>
-        <span class="lang-zh">系統架構</span>
-    </h2>
-    <pre>DellPowerStorePlugin / DellPowerVaultPlugin      <span class="comment"># SAN families</span>
-        |
-        v
-DellEMC::Common::BlockBase           <span class="comment"># activation, allocation, device</span>
-        |                            <span class="comment"># discovery, snapshots, clones,</span>
-        |                            <span class="comment"># multipath drop-in, orphan reaper</span>
-        +-- Common::REST             <span class="comment"># retries, timeouts, sessions</span>
-        +-- Common::ISCSI            <span class="comment"># initiator, portals, rescan</span>
-        +-- Common::FC               <span class="comment"># HBA discovery, WWN handling</span>
-        +-- Common::Multipath        <span class="comment"># SCSI lifecycle, dm-multipath</span>
-        +-- Common::Naming           <span class="comment"># PVE names &lt;-&gt; array objects</span>
-        +-- Common::WwidState        <span class="comment"># WWID tracking, reap guards</span>
-        +-- Common::Health           <span class="comment"># outage and capacity reporting</span>
-        +-- Common::Schema           <span class="comment"># the shared dell-* options</span>
-
-DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no multipath</span>
-        +-- PowerFlex::Host          <span class="comment"># SDC or NVMe/TCP device access</span></pre>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Why the plugin is careful about the host</span>
-        <span class="lang-zh">為什麼外掛在主機端如此謹慎</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Failure mode</span><span class="lang-zh">故障模式</span></th>
-                <th><span class="lang-en">What the plugin does about it</span><span class="lang-zh">外掛的因應</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><span class="lang-en">Uninterruptible sleep (D state)</span><span class="lang-zh">不可中斷睡眠（D state）</span></td>
-                    <td><span class="lang-en">Reading an unresponsive device puts a process into a state no signal clears. Every sysfs access runs in a forked, timeout-bounded child; every command under an alarm.</span>
-                        <span class="lang-zh">讀取沒有回應的裝置會讓行程進入任何訊號都無法清除的狀態。所有 sysfs 存取都在有逾時限制的子行程中進行，所有外部指令都有 alarm 保護。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Blast radius</span><span class="lang-zh">影響範圍</span></td>
-                    <td><span class="lang-en">The system-wide multipath flush is never issued, and neither is an FC LIP. Destructive operations are vendor-gated and act on one object at a time.</span>
-                        <span class="lang-zh">絕不執行全系統的 multipath flush，也不發 FC LIP。具破壞性的操作都有 vendor 過濾，且一次只處理一個物件。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">The sequential poll</span><span class="lang-zh">依序輪詢</span></td>
-                    <td><span class="lang-en">PVE polls storages one after another, so a slow array starves its neighbours. The health path uses a short timeout and a single attempt; expensive periodic work is rate-limited and detached.</span>
-                        <span class="lang-zh">PVE 一個接一個輪詢儲存，慢的陣列會餓死鄰居。健康路徑採短逾時且只嘗試一次；昂貴的週期性工作有頻率限制並丟到背景執行。</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<!-- ---- PowerFlex access ---- -->
-<section class="doc-section" id="powerflex-access">
-    <h2 class="section-title">
-        <span class="lang-en">PowerFlex: SDC vs NVMe/TCP</span>
-        <span class="lang-zh">PowerFlex：SDC 與 NVMe/TCP</span>
-    </h2>
-    <p class="section-subtitle">
-        <span class="lang-en">PowerFlex volumes do not arrive as SCSI LUNs. There are two ways a node can see them, and the choice outlives this plugin.</span>
-        <span class="lang-zh">PowerFlex 的 volume 不是以 SCSI LUN 出現。節點有兩種方式看到它們，而這個選擇的影響會比這個外掛活得更久。</span>
-    </p>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th></th>
-                <th>SDC</th>
-                <th>NVMe/TCP</th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><span class="lang-en">Host component</span><span class="lang-zh">主機端元件</span></td>
-                    <td><span class="lang-en">Dell's <code>scini</code> kernel module</span><span class="lang-zh">Dell 的 <code>scini</code> kernel module</span></td>
-                    <td><span class="lang-en">in-kernel <code>nvme_tcp</code></span><span class="lang-zh">kernel 內建的 <code>nvme_tcp</code></span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">PowerFlex version</span><span class="lang-zh">PowerFlex 版本</span></td>
-                    <td>3.x / 4.x</td>
-                    <td><span class="lang-en">4.0+ (needs SDT)</span><span class="lang-zh">4.0 以上（需要 SDT）</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Devices</span><span class="lang-zh">裝置</span></td>
-                    <td><code>/dev/disk/by-id/emc-vol-*</code></td>
-                    <td><code>/dev/nvme*n*</code></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Survives a kernel upgrade</span><span class="lang-zh">kernel 升級後仍可用</span></td>
-                    <td><span class="lang-en">only if the module rebuilds</span><span class="lang-zh">只有模組成功重建時</span></td>
-                    <td><span class="status-badge status-badge--supported"><span class="lang-en">yes</span><span class="lang-zh">是</span></span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Installed by this plugin</span><span class="lang-zh">由本外掛安裝</span></td>
-                    <td><strong><span class="lang-en">no</span><span class="lang-zh">否</span></strong></td>
-                    <td><span class="lang-en">nothing to install</span><span class="lang-zh">無需安裝</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="alert alert--warning">
-        <strong>
-            <span class="lang-en">What Dell says about the SDC on Proxmox VE</span>
-            <span class="lang-zh">Dell 對「在 Proxmox VE 上使用 SDC」的說法</span>
-        </strong>
-        <ul>
-            <li><span class="lang-en"><strong>Dell ships the packages and documents the procedure.</strong> KB 000462918 covers installing the SDC on &ldquo;Debian and Ubuntu operating systems, including Proxmox Virtual Environment&rdquo;, names Debian 12 / Proxmox VE 8.x directly, and the SDC tarball contains a <code>Debian13_SDC</code> variant &mdash; Debian 13 is what Proxmox VE 9 is built on. PowerFlex 5.1.x documentation is published.</span>
-                <span class="lang-zh"><strong>Dell 有提供套件，也有寫操作步驟。</strong>KB 000462918 說明如何在「Debian 與 Ubuntu 作業系統，包含 Proxmox Virtual Environment」上安裝 SDC，並直接點名 Debian 12／Proxmox VE 8.x；SDC 的 tarball 裡也包含 <code>Debian13_SDC</code> 變體 —— Debian 13 正是 Proxmox VE 9 的基底。PowerFlex 5.1.x 的文件也已發布。</span></li>
-            <li><span class="lang-en"><strong>Proxmox VE is not in the official OS support matrix.</strong> KB 000272738 lists Ubuntu LTS, RHEL, Oracle Linux, SLES, CentOS and AIX. Debian is not there, and neither is Proxmox VE, at any PowerFlex version.</span>
-                <span class="lang-zh"><strong>但 Proxmox VE 並不在官方的作業系統支援矩陣裡。</strong>KB 000272738 列出的是 Ubuntu LTS、RHEL、Oracle Linux、SLES、CentOS 與 AIX。Debian 不在其中，Proxmox VE 也不在，任何 PowerFlex 版本皆然。</span></li>
-            <li><span class="lang-en">So the SDC here is something Dell publishes instructions for, not something its support matrix commits to. What that means for a support case is a question for your Dell account team. Separately: Dell ships no prebuilt <code>scini</code> for the Proxmox kernel, so it is compiled on the node and a kernel upgrade can leave that node with no storage until it rebuilds. That is why <code>dell-protocol nvme</code> is the default.</span>
-                <span class="lang-zh">也就是說，在這裡使用 SDC 是 Dell 有發布安裝說明的事，但不是它的支援矩陣所承諾的事。這對一張支援案件單代表什麼，是要問您的 Dell 業務窗口的問題。另外一件事：Dell 未為 Proxmox kernel 提供預編譯的 <code>scini</code>，必須在節點上編譯，因此一次 kernel 升級就可能讓該節點在模組重建之前沒有儲存。這就是 <code>dell-protocol nvme</code> 是預設值的原因。</span></li>
-            <li><span class="lang-en">Checked 2026-07-27. Both KBs change; read them rather than trusting this page.</span>
-                <span class="lang-zh">查證日期 2026-07-27。兩份 KB 都會變動，請以它們為準，不要相信這一頁。</span></li>
-        </ul>
-    </div>
-
-    <h3 class="subsection-title">
-        <span class="lang-en">Official Dell references</span>
-        <span class="lang-zh">Dell 官方資料</span>
-    </h3>
-    <p>
-        <span class="lang-en">Bookmark these; they are the authority on what is supported, and they change.</span>
-        <span class="lang-zh">請加入書籤；支援範圍以它們為準，而且內容會變動。</span>
-    </p>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">What</span><span class="lang-zh">內容</span></th>
-                <th><span class="lang-en">Link</span><span class="lang-zh">連結</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><strong><span class="lang-en">SDC on Proxmox VE</span><span class="lang-zh">在 Proxmox VE 上設定 SDC</span></strong></td>
-                    <td><a href="https://www.dell.com/support/kbdoc/zh-tw/000466868/powerflex-%E5%A6%82%E4%BD%95%E5%9C%A8-proxmox-ve-%E4%B8%8A%E8%A8%AD%E5%AE%9A-powerflex-sdc" target="_blank" rel="noopener">KB 000466868</a></td>
-                </tr>
-                <tr>
-                    <td><strong><span class="lang-en">Support matrix (OS and kernels)</span><span class="lang-zh">支援矩陣（OS 與 kernel）</span></strong></td>
-                    <td><a href="https://elabnavigator.dell.com/vault/pdf/PowerFlex_OS.pdf" target="_blank" rel="noopener">E-Lab Navigator: PowerFlex_OS.pdf</a></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Is my kernel supported?</span><span class="lang-zh">我的 kernel 有支援嗎？</span></td>
-                    <td><a href="https://www.dell.com/support/kbdoc/en-us/000332118/powerflex-sdc-how-to-determine-kernel-version-is-supported" target="_blank" rel="noopener">KB 000332118</a></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">On-demand driver compilation</span><span class="lang-zh">驅動程式隨選編譯</span></td>
-                    <td><a href="https://www.dell.com/support/kbdoc/en-us/000224134/how-to-on-demand-compilation-of-the-powerflex-sdc-driver" target="_blank" rel="noopener">KB 000224134</a></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Prebuilt .ko files by OS and version</span><span class="lang-zh">依 OS 與版本分類的預編譯 .ko</span></td>
-                    <td><a href="https://mft.dell.com/" target="_blank" rel="noopener">mft.dell.com</a></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">NVMe/TCP overview</span><span class="lang-zh">NVMe/TCP 概觀</span></td>
-                    <td><a href="https://www.dell.com/support/manuals/en-us/scaleio/flex-software-to-45x/nvme-over-tcp-overview" target="_blank" rel="noopener">PowerFlex 4.5.x Technical Overview</a></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">Dell notes that the E-Lab matrix does not always list every kernel a distribution has released, and gives a prefix rule: a kernel is supported if its version prefix matches a listed one — <code>4.18.0-553</code> covers <code>4.18.0-553.51.1.el8_10.x86_64</code>. Details and the commands to check a node are in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC.md">docs/POWERFLEX_SDC.md</a>.</span>
-        <span class="lang-zh">Dell 也說明 E-Lab 矩陣不一定涵蓋各發行版釋出的每一個 kernel，並給了一條前置字串規則：版本前置字串相符即視為支援 —— <code>4.18.0-553</code> 涵蓋 <code>4.18.0-553.51.1.el8_10.x86_64</code>。細節與節點檢查指令請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/POWERFLEX_SDC_zh-TW.md">docs/POWERFLEX_SDC_zh-TW.md</a>。</span>
-    </p>
-    <div class="alert alert--info">
-        <span class="lang-en">Whichever path is used, one VM disk is one PowerFlex volume created through the REST API. There is no LVM layer and no shared volume carved up locally — the SDC or the NVMe initiator only presents that volume as a block device.</span>
-        <span class="lang-zh">無論使用哪一條路徑，一顆 VM 磁碟就是一個透過 REST API 建立的 PowerFlex volume。中間沒有 LVM 層，也不會切一顆大 volume 再在本地分割 —— SDC 或 NVMe initiator 只負責把那個 volume 呈現成區塊裝置。</span>
-    </div>
-</section>
-
-<!-- ---- Multipath safety ---- -->
-<section class="doc-section" id="multipath-safety">
-    <h2 class="section-title">
-        <span class="lang-en">Multipath Safety</span>
-        <span class="lang-zh">Multipath 安全規則</span>
-    </h2>
-    <div class="alert alert--danger">
-        <strong>
-            <span class="lang-en">These rules are not stylistic. Breaking any of them can take a whole node out of service, including storage that has nothing to do with this plugin.</span>
-            <span class="lang-zh">以下規則不是風格偏好。違反任何一條都可能讓整台節點失去服務能力，包括與本外掛完全無關的其他儲存。</span>
-        </strong>
-    </div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Rule</span><span class="lang-zh">規則</span></th>
-                <th><span class="lang-en">Why</span><span class="lang-zh">原因</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><span class="lang-en">Never run the system-wide multipath flush (capital F). Flush one map: <code>multipath -f /dev/mapper/&lt;wwid&gt;</code></span>
-                        <span class="lang-zh">絕不執行全系統的 multipath flush（大寫 F）。只清單一 map：<code>multipath -f /dev/mapper/&lt;wwid&gt;</code></span></td>
-                    <td><span class="lang-en">It removes every unused map on the node, including other vendors' storage that happens to be idle. The build fails if that form appears anywhere in this repository.</span>
-                        <span class="lang-zh">它會清掉節點上所有未使用的 map，包含當下剛好閒置的其他廠商儲存。只要該指令出現在本專案任何檔案中，建置就會失敗。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Use <code>systemctl restart multipathd</code>, never <code>reload</code></span>
-                        <span class="lang-zh">用 <code>systemctl restart multipathd</code>，不要用 <code>reload</code></span></td>
-                    <td><span class="lang-en">Reload only re-reads the file; restart is what reapplies device-mapper state.</span>
-                        <span class="lang-zh">reload 只會重讀檔案，restart 才會重新套用 device-mapper 狀態。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Avoid <code>no_path_retry queue</code> and <code>dev_loss_tmo infinity</code></span>
-                        <span class="lang-zh">避免 <code>no_path_retry queue</code> 與 <code>dev_loss_tmo infinity</code></span></td>
-                    <td><span class="lang-en">With every path down, queued I/O that can never complete puts processes into uninterruptible sleep and the node has to be power-cycled. Use 30 / 5 / 60.</span>
-                        <span class="lang-zh">所有路徑失效時，永遠無法完成的排隊 I/O 會讓行程進入不可中斷睡眠，該節點只能斷電重開。請用 30 / 5 / 60。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">The plugin never rewrites a multipath file it did not create</span>
-                        <span class="lang-zh">外掛不會改寫非它建立的 multipath 設定檔</span></td>
-                    <td><span class="lang-en">Its own drop-in carries a version marker; a file without one is treated as operator-owned and left untouched.</span>
-                        <span class="lang-zh">它自己的 drop-in 帶有版本標記；沒有標記的檔案視為管理者自有，完全不動。</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<!-- ---- Supported features ---- -->
-<section class="doc-section" id="supported-features">
-    <h2 class="section-title">
-        <span class="lang-en">Supported Features</span>
-        <span class="lang-zh">功能支援表</span>
-    </h2>
-    <div class="table-wrap">
-        <table class="feature-matrix">
-            <thead><tr>
-                <th><span class="lang-en">Feature</span><span class="lang-zh">功能</span></th>
-                <th>PowerStore</th>
-                <th>PowerVault ME</th>
-                <th>PowerFlex</th>
-                <th>Unity XT</th>
-            </tr></thead>
-            <tbody>
-                <tr><td><span class="lang-en">VM disks and container root filesystems</span><span class="lang-zh">VM 磁碟與容器根檔案系統</span></td><td colspan="4" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Snapshots</span><span class="lang-zh">快照</span></td><td colspan="4" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Snapshot rollback</span><span class="lang-zh">快照還原</span></td>
-                    <td colspan="4" class="all-families"><span class="lang-en">✓ — to the most recent snapshot; rolling back past newer ones is refused unless <code>dell-rollback-any-snapshot 1</code></span><span class="lang-zh">✓ —— 僅限最新的快照；除非設定 <code>dell-rollback-any-snapshot 1</code>，否則會拒絕跨過較新快照的還原</span></td></tr>
-                <tr><td><span class="lang-en">Templates and linked clones</span><span class="lang-zh">範本與連結複製</span></td><td colspan="4" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Online grow</span><span class="lang-zh">線上擴充</span></td><td colspan="4" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">Shrink</span><span class="lang-zh">縮小</span></td>
-                    <td colspan="4" class="all-families"><span class="lang-en">Refused on all families — it would truncate the guest filesystem</span><span class="lang-zh">所有系列都拒絕 —— 會截斷客體的檔案系統</span></td></tr>
-                <tr><td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span></td><td colspan="4" class="all-families">✓</td></tr>
-                <tr><td><span class="lang-en">VM config backup volume</span><span class="lang-zh">VM 設定備份卷</span></td>
-                    <td><span class="lang-en">✓ (optional)</span><span class="lang-zh">✓（可關閉）</span></td>
-                    <td><span class="lang-en">— (volume ceiling too low)</span><span class="lang-zh">—（volume 上限太少）</span></td><td>—</td>
-                    <td><span class="lang-en">— (off until a hardware run)</span><span class="lang-zh">—（實機測試前先關閉）</span></td></tr>
-                <tr><td><span class="lang-en">Multipath I/O</span><span class="lang-zh">多路徑 I/O</span></td><td>dm-multipath</td><td>dm-multipath</td>
-                    <td><span class="lang-en">SDC or NVMe ANA</span><span class="lang-zh">SDC 或 NVMe ANA</span></td>
-                    <td>dm-multipath</td></tr>
-                <tr><td><span class="lang-en">Orphan device reaping</span><span class="lang-zh">殘留裝置清理</span></td><td>✓</td><td>✓</td><td>—</td><td>✓</td></tr>
-                <tr><td><span class="lang-en">Full clone via the array</span><span class="lang-zh">陣列端完整複製</span></td>
-                    <td colspan="4" class="all-families"><span class="lang-en">Not possible: PVE implements it as a qemu-img block copy and never calls the plugin</span><span class="lang-zh">無法做到：PVE 以 qemu-img 逐區塊複製實作，完全不呼叫外掛</span></td></tr>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<!-- ---- Verification ---- -->
-<section class="doc-section" id="verification">
-    <h2 class="section-title">
-        <span class="lang-en">Verification Status</span>
-        <span class="lang-zh">驗證狀態</span>
-    </h2>
-    <p class="section-subtitle">
-        <span class="lang-en">2,756 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">2,756 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
-    </p>
-
-    <h3>
-        <span class="lang-en">What has run on hardware</span>
-        <span class="lang-zh">哪些在實機上跑過</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Family</span><span class="lang-zh">產品系列</span></th>
-                <th><span class="lang-en">Data path</span><span class="lang-zh">資料路徑</span></th>
-                <th><span class="lang-en">Hardware</span><span class="lang-zh">實機</span></th>
-                <th><span class="lang-en">On what</span><span class="lang-zh">在什麼上面</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><strong>PowerVault ME4 / ME5</strong></td>
-                    <td>Fibre Channel</td>
-                    <td><span class="status-badge status-badge--supported">
-                        <span class="lang-en">full first-run pass</span><span class="lang-zh">完整首次執行通過</span></span></td>
-                    <td><span class="lang-en">ME4024, firmware <code>GT280R011-01</code>, since 0.7.65</span><span class="lang-zh">ME4024，韌體 <code>GT280R011-01</code>，自 0.7.65 起</span></td>
-                </tr>
-                <tr>
-                    <td><strong>PowerVault ME4 / ME5</strong></td>
-                    <td>iSCSI, SAS</td>
-                    <td><span class="status-badge status-badge--planned">
-                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
-                    <td><span class="lang-en">the array above ran FC; these paths share the CLI client but not the data path</span><span class="lang-zh">上面那台走的是 FC；這兩條路徑共用 CLI 用戶端，但資料路徑不同</span></td>
-                </tr>
-                <tr>
-                    <td><strong>PowerStore</strong></td>
-                    <td><span class="lang-en">iSCSI, FC</span><span class="lang-zh">iSCSI、FC</span></td>
-                    <td><span class="status-badge status-badge--planned">
-                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
-                    <td><span class="lang-en">never run against an array</span><span class="lang-zh">從未在任何陣列上執行過</span></td>
-                </tr>
-                <tr>
-                    <td><strong>PowerFlex</strong></td>
-                    <td><span class="lang-en">NVMe/TCP, SDC</span><span class="lang-zh">NVMe/TCP、SDC</span></td>
-                    <td><span class="status-badge status-badge--planned">
-                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
-                    <td><span class="lang-en">never run against an array</span><span class="lang-zh">從未在任何陣列上執行過</span></td>
-                </tr>
-                <tr>
-                    <td><strong>Unity XT</strong></td>
-                    <td><span class="lang-en">FC, iSCSI</span><span class="lang-zh">FC、iSCSI</span></td>
-                    <td><span class="status-badge status-badge--planned">
-                        <span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td>
-                    <td><span class="lang-en">never run against an array; a customer's Unity 480 (FC) is the intended first. The transport has been driven over real HTTP against an API emulator, which proves shapes, not storage</span><span class="lang-zh">從未在任何陣列上執行過；預定的第一台是客戶的 Unity 480（FC）。傳輸層已對 API 模擬器以真實 HTTP 驗證 —— 那證明的是結構，不是儲存行為</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">The ME4024 run covered the whole of the first-run test: capacity agreeing with the array's own GUI, several allocations with LUNs in sequence, dm-multipath with two paths, <code>dd</code> read and write verified by checksum, snapshot, rollback, snapshot delete, template, a linked clone in seconds, the array correctly refusing to delete a template with a live clone, and unmap, delete and local device cleanup. It also found three defects that reading Dell's documentation had not &mdash; each hidden behind the one before it.</span>
-        <span class="lang-zh">那次 ME4024 的測試涵蓋了整套首次執行測試：容量與陣列自己的 GUI 一致、連續數次配置且 LUN 依序遞增、dm-multipath 兩條路徑、以雜湊驗證的 <code>dd</code> 讀寫、快照、倒回、刪除快照、範本、秒級完成的連結複製、陣列正確拒絕刪除仍有存活複製的範本，以及解除對應、刪除與本機裝置清理。它同時找出三個讀 Dell 文件找不出來的缺陷 &mdash; 而且一個藏在另一個後面。</span>
-    </p>
-
-    <h3>
-        <span class="lang-en">Where the rest came from</span>
-        <span class="lang-zh">其餘的依據是什麼</span>
-    </h3>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Area</span><span class="lang-zh">項目</span></th>
-                <th><span class="lang-en">Source</span><span class="lang-zh">來源</span></th>
-                <th><span class="lang-en">Hardware</span><span class="lang-zh">實機</span></th>
-            </tr></thead>
-            <tbody>
-                <tr><td><span class="lang-en">PowerVault CLI grammar, field names, mapping model</span><span class="lang-zh">PowerVault CLI 語法、欄位名稱、對應模型</span></td>
-                    <td><span class="lang-en">ME5 CLI Reference Guide, then corrected by the array</span><span class="lang-zh">ME5 CLI Reference Guide，之後由陣列修正</span></td>
-                    <td><span class="status-badge status-badge--supported"><span class="lang-en">verified</span><span class="lang-zh">已驗證</span></span></td></tr>
-                <tr><td><span class="lang-en">WWN to WWID, SCSI vendor / product strings</span><span class="lang-zh">WWN 轉 WWID、SCSI vendor／product 字串</span></td>
-                    <td><span class="lang-en">inferred</span><span class="lang-zh">推斷</span></td>
-                    <td><span class="status-badge status-badge--partial"><span class="lang-en">verified on ME4 only</span><span class="lang-zh">僅在 ME4 上驗證</span></span></td></tr>
-                <tr><td><span class="lang-en">Fibre Channel path</span><span class="lang-zh">Fibre Channel 路徑</span></td>
-                    <td>—</td>
-                    <td><span class="status-badge status-badge--partial"><span class="lang-en">verified on ME4 only</span><span class="lang-zh">僅在 ME4 上驗證</span></span></td></tr>
-                <tr><td><span class="lang-en">PowerStore REST endpoints and fields</span><span class="lang-zh">PowerStore REST 端點與欄位</span></td>
-                    <td><span class="lang-en">PowerStore 4.x documentation and Dell's own SDK, audited key-for-key 2026-08-06: all eight request bodies match</span><span class="lang-zh">PowerStore 4.x 文件與 Dell 自己的 SDK，2026-08-06 逐鍵稽核：八組請求內容全數相符</span></td>
-                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
-                <tr><td><span class="lang-en">PowerFlex login, volume, mapping, snapshot API</span><span class="lang-zh">PowerFlex 登入、磁碟區、對應、快照 API</span></td>
-                    <td><span class="lang-en">Dell's own <code>python-powerflex</code>, audited key-for-key; the 3.x rollback form alone remains documentation-only</span><span class="lang-zh">Dell 自己的 <code>python-powerflex</code>，已逐鍵稽核；僅 3.x 的倒回寫法仍只有文件依據</span></td>
-                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
-                <tr><td><span class="lang-en">Unity URIs, request bodies, field lists</span><span class="lang-zh">Unity 的 URI、請求內容、欄位清單</span></td>
-                    <td><span class="lang-en">Dell's own <code>gounity</code> client and the Unisphere Programmer's Guide; multipath settings follow the kernel's own DGC entry</span><span class="lang-zh">Dell 自己的 <code>gounity</code> 客戶端與 Unisphere Programmer's Guide；multipath 設定跟隨核心自己的 DGC 條目</span></td>
-                    <td><span class="status-badge status-badge--planned"><span class="lang-en">not verified</span><span class="lang-zh">未驗證</span></span></td></tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">The full matrix, including what came from official documentation and what did not, is in <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md">docs/TESTING.md</a>.</span>
-        <span class="lang-zh">完整矩陣（包含哪些來自官方文件、哪些不是）請見 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING_zh-TW.md">docs/TESTING_zh-TW.md</a>。</span>
-    </p>
-    <p>
-        <span class="lang-en">Before the first run against an array, work through <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/FIRST_RUN.md">docs/FIRST_RUN.md</a>: the order to do it in, what to check after each step, and what each failure most likely means.</span>
-        <span class="lang-zh">第一次接上陣列之前，請照著 <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/FIRST_RUN_zh-TW.md">docs/FIRST_RUN_zh-TW.md</a> 走一遍：該用什麼順序做、每一步之後要看什麼，以及每種失敗最可能代表什麼。</span>
-    </p>
-</section>
-
-<!-- ---- Troubleshooting ---- -->
-<section class="doc-section" id="troubleshooting">
-    <h2 class="section-title">
-        <span class="lang-en">Troubleshooting</span>
-        <span class="lang-zh">疑難排解</span>
-    </h2>
-    <p class="section-subtitle">
-        <span class="lang-en">Every message carries a [type:storeid] prefix, so one storage can be grepped out of a busy journal.</span>
-        <span class="lang-zh">每一則訊息都帶有 [type:storeid] 前置字串，可以從繁忙的 journal 中過濾出單一儲存。</span>
-    </p>
-    <pre><span class="cmd">journalctl</span> <span class="flag">-t</span> pvestatd <span class="flag">-t</span> pvedaemon | <span class="cmd">grep</span> dellpowerstore</pre>
-    <div class="table-wrap">
-        <table>
-            <thead><tr>
-                <th><span class="lang-en">Symptom</span><span class="lang-zh">症狀</span></th>
-                <th><span class="lang-en">Most likely cause</span><span class="lang-zh">最可能的原因</span></th>
-            </tr></thead>
-            <tbody>
-                <tr>
-                    <td><code>Parameter verification failed (400)</code></td>
-                    <td><span class="lang-en">The package is not installed on that node. Install it everywhere.</span>
-                        <span class="lang-zh">該節點沒有安裝套件。請在每台節點安裝。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Storage shows <code>inactive</code></span><span class="lang-zh">儲存顯示 <code>inactive</code></span></td>
-                    <td><span class="lang-en">Credentials, the management network, or a slow array. If other storages went inactive at the same time, suspect this one was slow — PVE polls sequentially.</span>
-                        <span class="lang-zh">帳密、管理網路，或陣列太慢。若其他儲存同時變 inactive，請懷疑是這個儲存慢 —— PVE 是依序輪詢的。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">New disks stop appearing</span><span class="lang-zh">新磁碟掃不到</span></td>
-                    <td><span class="lang-en">On PowerStore, the REST-side LUN id sequence climbing past what the host scans. The plugin assigns LUN ids itself to avoid it.</span>
-                        <span class="lang-zh">在 PowerStore 上，是 REST 端的 LUN ID 序列爬過主機掃描範圍。外掛改為自行配發 LUN ID 以迴避。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Cannot delete: device still in use</span><span class="lang-zh">無法刪除：裝置仍在使用中</span></td>
-                    <td><span class="lang-en">Usually host LVM having auto-activated a volume group that lives inside a guest disk. Deactivate it and add an LVM global_filter.</span>
-                        <span class="lang-zh">通常是主機端 LVM 自動啟用了客體磁碟內部的 volume group。請停用它並設定 LVM global_filter。</span></td>
-                </tr>
-                <tr>
-                    <td><span class="lang-en">Processes stuck in D state</span><span class="lang-zh">行程卡在 D state</span></td>
-                    <td><span class="lang-en">Queued I/O to a device with no working path. Check for no_path_retry queue, then restart multipathd.</span>
-                        <span class="lang-zh">對沒有可用路徑的裝置持續排隊 I/O。請檢查 no_path_retry queue，然後 restart multipathd。</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <p>
-        <span class="lang-en">Full guide: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING.md">docs/TROUBLESHOOTING.md</a>.</span>
-        <span class="lang-zh">完整指南：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TROUBLESHOOTING_zh-TW.md">docs/TROUBLESHOOTING_zh-TW.md</a>。</span>
-    </p>
-</section>
-
-<!-- ---- Changelog ---- -->
-<section class="doc-section" id="changelog">
-    <h2 class="section-title">
-        <span class="lang-en">Changelog</span>
-        <span class="lang-zh">變更紀錄</span>
-    </h2>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.87~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">SECURITY: PowerVault's login puts sha256("user_password") in the URL, so a failed login wrote a crackable hash into the journal in full. Every message now passes a shape-based redactor — credentials cut to a correlatable prefix, WWIDs and volume names untouched.</span>
-            <span class="lang-zh">安全性：PowerVault 的登入把 sha256(「帳號_密碼」) 放在 URL 裡，因此登入失敗會把一個可破解的雜湊完整寫進 journal。現在每則訊息都會經過依形狀判斷的遮蔽 —— 憑證截成可對照的前綴，WWID 與磁碟區名稱完好保留。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.86~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">SECURITY: the array password was stored in clear text in /etc/pve/storage.cfg — group-readable by www-data, replicated to every node, and echoed back by the API. It now lives in /etc/pve/priv at mode 0600. Existing storages keep working; one pvesm set per storage completes the move.</span>
-            <span class="lang-zh">安全性：陣列密碼原本以明文存放在 /etc/pve/storage.cfg —— www-data 群組讀得到、複製到每個節點、API 還會原樣回傳。現在改存於 /etc/pve/priv，權限 0600。既有儲存照常運作；每個儲存執行一次 pvesm set 即可完成搬移。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.85~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The 4.x-only NVMe mapping action no longer spells its boolean the 3.x way, the readback question only an array can answer is pre-registered with its symptom, and every family's multipath deviations from the kernel built-ins now carry their justification in code.</span>
-            <span class="lang-zh">4.x 專屬的 NVMe 對應動作不再用 3.x 的方式拼布林，只有陣列能回答的讀回問題已連同症狀先行登記，各系列對核心內建 multipath 條目的偏離也都在程式碼中寫明理由。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.84~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Unity's multipath drop-in would have replaced the kernel's CLARiiON-family tuning with a generic ALUA guess — wrong checker, wrong prio, a hardware handler the built-in deliberately omits. It now follows the kernel's own DGC entry and adds only bounded-recovery settings.</span>
-            <span class="lang-zh">Unity 的 multipath drop-in 原本會把核心的 CLARiiON 家族調校換成通用的 ALUA 猜測 —— checker 錯、prio 錯、還強加了內建刻意不設的 hardware handler。現在它跟隨核心自己的 DGC 條目，只追加有界復原設定。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.83~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">An NVMe host and an SDC are mapped by different actions, and PowerFlex's default protocol was using the wrong one — hostId sent to addMappedSdc. Dell's own client names addMappedHost/removeMappedHost; both directions now choose by what is being mapped.</span>
-            <span class="lang-zh">NVMe host 與 SDC 是用不同的動作對應的，而 PowerFlex 的預設協定用錯了 —— 把 hostId 送給 addMappedSdc。Dell 自己的客戶端寫著 addMappedHost／removeMappedHost；現在兩個方向都依對應對象選擇動作。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.82~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex's most destructive call - the snapshot rollback - was resting on a 3.x form Dell's client never implemented. On 4.x it now uses the 'restore' action read from Dell's own gen2 client, chosen after the login has told us which generation the array speaks.</span>
-            <span class="lang-zh">PowerFlex 最具破壞性的呼叫 —— 快照倒回 —— 原本建立在一個 Dell 客戶端從未實作的 3.x 寫法上。在 4.x 上它現在改用讀自 Dell gen2 客戶端的 restore 動作，並在登入告訴我們陣列說哪一代語言之後才做選擇。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.81~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every Unity refusal now carries the array's own errorCode, the way PowerVault's messages carry their return code — the numbers the ME4024's tester quoted in every report. Plus a signature-convention guard in the suite and a perlcritic gate audited down to zero.</span>
-            <span class="lang-zh">每個 Unity 拒絕現在都帶著陣列自己的 errorCode，一如 PowerVault 訊息裡的 return code —— 那正是 ME4024 測試者每份回報都引用的數字。另外測試套件新增簽名慣例守衛，perlcritic 閘門逐類稽核至零。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.80~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">One extra parameter in Unity's WWID lookup swallowed the volume name, so every lookup answered undef — device discovery dead on arrival. All 22 array-method signatures are now compared against BlockBase's actual call sites; this was the only mismatch.</span>
-            <span class="lang-zh">Unity 的 WWID 查詢多宣告了一個參數，磁碟區名稱被吞掉，每次查詢都回 undef —— 裝置探索一上機就陣亡。22 個 array 方法的簽名已全數與 BlockBase 實際呼叫點比對，只有這一個不匹配。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.79~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Running pvesm add end-to-end against the emulator found that a REFUSED add had already written the multipath drop-in and reconfigured every vendor's maps node-wide. The drop-in now waits until the protocol activation has actually succeeded.</span>
-            <span class="lang-zh">把 pvesm add 對模擬器端到端跑了一次，發現被「拒絕」的 add 早已寫入 multipath drop-in 並做了全節點的重讀。drop-in 現在會等到協定啟用真正成功之後才寫入。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.78~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex's two login generations have the same shape as PowerVault's two login methods, and the timeout cap added for one had not been applied to the other — lesson 40a in the transport dimension. A dead array is now declared dead after one cycle, whichever family is asking.</span>
-            <span class="lang-zh">PowerFlex 的兩個登入世代與 PowerVault 的兩種登入方式如出一轍，但為後者加上的逾時上限沒有套到前者 —— 教訓 40a 的傳輸層版本。現在無論哪個系列在問，死掉的陣列一輪之後就會被宣告死亡。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.77~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A Unity listing that claims 9999 rows and hands back none was read as an empty collection — which the orphan reaper reads as "everything was deleted". Contradictions and page-cap truncations are now loud errors. And the health ping stopped duplicating the capacity query.</span>
-            <span class="lang-zh">一份自稱有 9999 筆卻一筆都不給的 Unity 列舉，原本被讀成空集合 —— 孤兒回收機制會把那讀成「全部都被刪了」。矛盾與頁數上限截斷現在都是大聲的錯誤。另外健康檢查的 ping 不再與容量查詢重複。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.76~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Real sockets caught what fake user agents could not: the failover rotated the portal and then sent the request to the address it had just abandoned, because the URL was built before the login that discovers the dead controller. The adverse suite now attacks Unity too.</span>
-            <span class="lang-zh">真實 socket 抓到了假 UA 看不見的問題：容錯轉了位址，請求卻送回剛拋棄的那一個 —— 因為 URL 建在「發現控制器死掉」的登入之前。adverse 測試套件現在也攻擊 Unity。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.75~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">dell-portal now takes both controllers' management addresses, comma-separated, and fails over between them — asked by the ME4024's tester, whose array has no floating management IP. The data path never needed help; management does, and now has it.</span>
-            <span class="lang-zh">dell-portal 現在可以逗號分隔填入兩個控制器的管理位址並自動容錯 —— 由 ME4024 的測試者提出，他們的陣列沒有浮動管理 IP。資料路徑從來不需要幫忙；管理路徑需要，現在有了。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.74~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The rollback backup snapshot carried two traps of its own: being the newest, it blocked every second rollback; and its name was one a user could type, putting their snapshot in the cleanup's path. Now hidden from PVE, named with a dot no user can type, and capped at one.</span>
-            <span class="lang-zh">倒回的備份快照自己帶著兩個陷阱：它永遠最新，因此擋住每一次第二次倒回；而它的名字使用者打得出來，使用者的快照會落入清理範圍。現在它對 PVE 隱藏、改用使用者打不出來的帶點名稱，且永遠只保留一份。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.73~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">"Absent" on a Unity delete now gets a listing's second opinion — a firmware without by-name lookups would otherwise have turned every delete into a reported success that deleted nothing. And linked clones map back to their template, so qm rescan does not duplicate them.</span>
-            <span class="lang-zh">Unity 刪除路徑上的「不存在」現在要經過列舉的第二意見 —— 否則不支援以名稱查詢的韌體，會把每一次刪除都變成「回報成功但什麼都沒刪」。另外連結複製會對應回它的範本，qm rescan 不會再把它加成兩份。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.72~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The pool key on a Unity create was a Go field name, not the JSON tag that goes on the wire. And a concurrent mapping change could silently unmap a node — both attach and detach now verify their write and retry, because a lost update is visible after the fact.</span>
-            <span class="lang-zh">Unity 建立 LUN 時的儲存池鍵用的是 Go 的欄位名稱，而不是真正上線路的 JSON 標籤。另外並行的對應變更可能靜靜地把某個節點解除對應 —— attach 與 detach 現在都會在寫後驗證並重試，因為遺失的更新事後是看得見的。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.71~beta1</div>
-        <div class="changelog-date">2026-08-06</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Unity creates a backup snapshot on every restore whether asked or not; unnamed, it made the volume undeletable days after the rollback that caused it. It now gets this plugin's own name. And an EFI disk (4 MiB) is rounded up past the array's minimum LUN size, so 'qm create' survives.</span>
-            <span class="lang-zh">Unity 在每次 restore 時都會自動建立備份快照；沒有命名的話，磁碟區會在倒回的幾天後變得刪不掉。現在它會拿到本外掛自己的名稱。另外 EFI disk（4 MiB）會被向上補足到陣列的最小 LUN 容量，讓 qm create 得以成功。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.70~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Reading Dell's Programmer's Guide corrected two things no amount of reading Dell's code could: on Unity a 302 is an authorization error rather than a redirect, and paging has a real total to work from instead of a guess about short pages.</span>
-            <span class="lang-zh">讀 Dell 的 Programmer's Guide 修正了兩件「讀再多 Dell 程式碼也看不出來」的事：在 Unity 上 302 是授權錯誤而不是重新導向，以及分頁其實有真正的總數可用，不必靠「短頁即結束」的猜測。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.69~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Driving the Unity client against a REST API emulator found a create that returned undef in silence when the array answered with no body — the volume exists and nothing points at it, which is how a second one gets created on top. Every create now resolves itself by name or fails loudly.</span>
-            <span class="lang-zh">把 Unity 客戶端接上一個 REST API 模擬器，找出了一個「陣列回應沒有內容時就靜靜回傳 undef」的建立動作 —— 磁碟區存在、卻沒有任何東西指向它，而那正是第二顆被建在第一顆之上的原因。現在每個建立動作都會以名稱自行確認，否則大聲失敗。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.68~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A fourth storage type: Unity XT. Written from Dell's own CSI client rather than documentation prose, which corrected the name limit before a single line depended on it. 120 tests, none needing an array.</span>
-            <span class="lang-zh">第四個 storage type：Unity XT。是依 Dell 自己的 CSI 客戶端寫的，而不是文件敘述 —— 那也在任何一行程式依賴它之前，先修正了名稱長度上限。120 個測試，全部不需要陣列。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.67~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The newest release is now the one people find, instead of the green "Latest" badge sitting on a build three weeks behind. And every release carries a copy under a name that does not change, so the documented install URL is right forever.</span>
-            <span class="lang-zh">別人現在會找到最新的那一版，而不是讓綠色的「Latest」標記掛在一個落後三個星期的建置上。另外每一版都會附一份檔名固定不變的副本，因此文件裡的安裝網址永遠正確。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.66~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every successful delete printed a multipath failure that had not happened — the map was removed by name a moment earlier, so flushing it exits non-zero. And the project stopped claiming no hardware has ever run it, in the five places that still said so.</span>
-            <span class="lang-zh">每次成功的刪除都會印出一則其實沒有發生的 multipath 失敗 —— map 在前一刻已經以名稱移除，再去 flush 它自然以非零狀態結束。另外，本專案不再宣稱「從未在硬體上執行過」，先前仍這樣寫的五個地方都已更正。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.65~beta1</div>
-        <div class="changelog-date">2026-08-05</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The first end-to-end run on real hardware. Three defects sat between a storage that came up and a disk that worked, each hidden by the one before it: a host addressed as an initiator, a mapping list that nested by volume, and a placeholder row for a default mapping that does not exist. All three fixed; the whole of FIRST_RUN then passed on a PowerVault ME4024 over Fibre Channel.</span>
-            <span class="lang-zh">第一次在實體硬體上端到端跑完。從儲存能夠啟用、到真的有一顆可用的磁碟之間，卡著三個缺陷，而且一個被前一個擋著看不到：host 被當成 initiator 定址、對應清單依磁碟區巢狀、以及一列描述「不存在的 default mapping」的佔位資料。三者全部修正後，FIRST_RUN 的每一項都在一台走 Fibre Channel 的 PowerVault ME4024 上通過。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.64~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The ME4024 payloads behind the previous release are now on file and read by the test suite verbatim, confirming both fixes against what the array actually sends. A host belonging to no host group is now identified by the type the array gives it, not by the key it arrived under.</span>
-            <span class="lang-zh">上一版兩項修正背後的 ME4024 實機回應已經歸檔，測試套件直接逐字讀取，確認兩項修正與陣列實際送出的內容相符。不屬於任何 host group 的 host，現在改以陣列自己標示的型別辨識，而不是靠它掛在哪個鍵底下。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.63~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Three defects reported from a PowerVault ME4024: the plugin could not find the host it had just created, so the storage went inactive; every pool read as 100% full, so PVE would refuse every allocation; and a healthy FC fabric was reported as unzoned on every poll.</span>
-            <span class="lang-zh">一台 PowerVault ME4024 回報的三個缺陷：外掛找不到自己剛建立的 host，儲存因此進入 inactive；每個儲存池都讀成 100% 已用，PVE 於是拒絕所有配置；以及一組正常的 FC fabric，每次輪詢都被回報成沒有 zoning。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.62~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The first defect found on real hardware: a PowerVault ME4024 could not be added at all, because one non-ASCII character in its /show/system response met a JSON decoder being handed characters where it wanted bytes.</span>
-            <span class="lang-zh">第一個在實體硬體上找到的缺陷：一台 PowerVault ME4024 完全無法建立儲存 —— 它 /show/system 回應裡的一個非 ASCII 字元，遇上了一個「被餵入字元、卻期待位元組」的 JSON 解析器。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.61~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">SHA256SUMS named a file that does not exist after download, because GitHub rewrites "~" in an asset name. Found by following the install instructions rather than reading them.</span>
-            <span class="lang-zh">SHA256SUMS 記錄的檔名在下載後根本不存在，因為 GitHub 會改寫附件名稱中的「~」。這是靠實際照著安裝說明做一次才發現的，不是靠閱讀。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.60~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The release pipeline works again. Every release since v0.7.36 failed at the syntax check and published nothing — perl 5.38 words a missing base class differently from perl 5.40, and only one wording was tolerated.</span>
-            <span class="lang-zh">發佈流程恢復正常。自 v0.7.36 起每一次發佈都在語法檢查失敗、什麼都沒發佈 —— perl 5.38 對「基底類別不存在」的措辭與 5.40 不同，而只有其中一種被容忍。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.59~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A failing syntax check is echoed as an annotation, which the public API exposes even though logs are not.</span>
-            <span class="lang-zh">失敗的語法檢查會輸出成 annotation —— 即使記錄檔不公開，公開 API 仍讀得到它。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.58~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A CI job ran its checks without installing anything they depend on, and failed on every run for months. One check per step now, because a job's step list is public while its logs are not.</span>
-            <span class="lang-zh">一個 CI job 在沒有安裝任何相依套件的情況下執行檢查，連續數個月每次都失敗。現在改為每項檢查一個步驟 —— 因為 job 的步驟清單是公開的，記錄檔不是。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.57~beta1</div>
-        <div class="changelog-date">2026-08-04</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The release workflow had been failing and publishing nothing since v0.7.36: a test that needs Proxmox VE did not skip on a runner that has none, so the suite was green here and red in CI. SHA256SUMS is a checksum file and does not affect installing the package.</span>
-            <span class="lang-zh">自 v0.7.36 起 release workflow 一直失敗、什麼都沒發佈：一個需要 Proxmox VE 的測試在沒有 PVE 的 runner 上沒有 skip，於是本機是綠的、CI 是紅的。SHA256SUMS 只是雜湊驗證檔，不影響套件安裝。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.56~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The three family columns of the feature table are centred, headings and values together — the feature-name column stays left, because that is the one the eye reads down.</span>
-            <span class="lang-zh">功能支援表的三個系列欄位改為置中，標題與值一起 —— 功能名稱欄維持靠左，因為那是眼睛由上往下讀的一欄。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.55~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The tables have column separators as well as row ones, so a value can be read against its heading rather than by counting across.</span>
-            <span class="lang-zh">表格除了橫向分隔線之外也加上了直向的欄位分隔線，可以直接對著欄位標題讀值，不必橫著數過去。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.54~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">In the feature table, a value that is the same for every family now spans the three columns and is centred. A merged row means "the same everywhere"; a split row means the families differ.</span>
-            <span class="lang-zh">功能支援表中，三個系列相同的值改為跨欄置中。合併的列代表「三者相同」，分欄的列代表「有差異」。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.53~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Install from the release package; building from source is for working on the plugin. Checking the live release also showed the documented verification step could not be carried out — SHA256SUMS is on no release — and that a URL built from the version number 404s.</span>
-            <span class="lang-zh">請安裝發行版套件；從原始碼建置是給要修改這個外掛的人用的。實際檢查線上 release 也發現文件寫的驗證步驟根本無法執行 —— 沒有任何 release 附上 SHA256SUMS —— 而且用版本號拼出來的網址會 404。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.52~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A snapshot named "before-s-after" — a name PVE accepts — belonged to a volume that does not exist, so it was invisible to the listing and to the purge that runs before a volume can be deleted.</span>
-            <span class="lang-zh">名為「before-s-after」的快照 —— 一個 PVE 會接受的名字 —— 會被歸給一個不存在的 volume，因而對列表、以及刪除 volume 前必須執行的清除都隱形。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.51~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Storages named "dell-1" and "dell_1" on one array shared every volume name: each listed the other's disks, and deleting from one deleted from the other. The second storage is now refused when it is created.</span>
-            <span class="lang-zh">同一台陣列上名為「dell-1」與「dell_1」的兩個儲存，會共用每一個 volume 名稱：彼此列出對方的磁碟，從其中一個刪除就等於從另一個刪除。第二個儲存現在會在建立時就被拒絕。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.50~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A PowerStore could be configured for a PowerFlex protocol, and the SAN families silently used iSCSI instead of saying so. Configuration is now checked when it is written, not when it is first used.</span>
-            <span class="lang-zh">PowerStore 可以被設定成 PowerFlex 的協定，而 SAN 系列不會說什麼，只是安靜地改用 iSCSI。設定現在在寫入當下就會被檢查，而不是等到第一次使用。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.49~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Two things PVE asks a storage plugin that this one never answered: container snapshots were taken without freezing the filesystem, and moving a disk to another storage type was refused before any code here ran.</span>
-            <span class="lang-zh">PVE 會向儲存外掛詢問、而本外掛從未回答的兩件事：容器快照未凍結檔案系統就擷取，以及把磁碟搬到另一種型別的儲存在任何程式碼執行前就被拒絕。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.48~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex does not inherit the shared base class, and none of the safety guards the other two families have had reached it: a delete, a template and a rollback all ran without testing whether a guest was using the volume.</span>
-            <span class="lang-zh">PowerFlex 不繼承共用的基底類別，而另外兩個系列具備的安全守衛沒有任何一項套用到它：刪除、建立範本與還原，全都在未檢查「是否有 guest 正在使用」的情況下執行。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.47~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Two ways one name could have destroyed many volumes: a PowerVault name able to act as a shell wildcard in a delete, and a temporary-clone record whose only check was a prefix every VM disk shares.</span>
-            <span class="lang-zh">兩種「一個名稱毀掉多個 volume」的途徑：PowerVault 的名稱在刪除指令中可以當成 shell 萬用字元，以及暫存複製紀錄唯一的檢查是一個每個 VM 磁碟都符合的前置字串。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.46~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Disabling a storage unmapped volumes whose in-use state could not be established, and a template could be captured mid-write. Both now refuse rather than assume, and a test stops the pattern coming back.</span>
-            <span class="lang-zh">停用儲存時，會對「無法確認是否使用中」的 volume 解除對應；範本也可能在寫入進行中被擷取。兩者現在都改為拒絕而非假設，並有測試防止這個寫法再出現。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.45~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">"Is anything using this device?" answered "no" every time it failed to find out — including when the one check that sees a running VM could not run. A delete and a rollback both trusted that answer.</span>
-            <span class="lang-zh">「有東西正在用這個裝置嗎？」只要查不出來就一律回答「沒有」—— 包含那個唯一看得到執行中 VM 的檢查跑不起來的時候。刪除與還原兩條路徑都相信了那個答案。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.44~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A momentary outage would have made a delete report success, and PVE removes the disk from the VM configuration the moment it does — leaving the volume on the array with nothing pointing at it. "Not there" and "could not ask" are now different answers.</span>
-            <span class="lang-zh">一次短暫的斷線會讓刪除回報成功，而 PVE 在那一刻就會把磁碟從 VM 設定中移除 —— volume 留在陣列上，卻再也沒有東西指向它。現在「不存在」與「問不到」是兩個不同的答案。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.43~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The ownership gate that guards every destructive path was defined, documented and tested — and called from nowhere. It is wired in now, and doing so immediately showed its own definition was incomplete.</span>
-            <span class="lang-zh">守著每一條破壞性路徑的所有權閘門，有定義、有文件、也有測試 —— 但沒有任何地方呼叫它。現在已經接上，而接上的當下就暴露出它自己的定義並不完整。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.42~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A node-wide multipath reconfigure was being used to make one LUN appear — on a timer, and on every device wait. It reapplies configuration to every map on the node, other vendors' storage included. A new LUN is now claimed one named path at a time.</span>
-            <span class="lang-zh">原本用一個「節點層級」的 multipath reconfigure 去讓單一 LUN 出現 —— 而且是依計時器執行、每次等待裝置也執行。它會把設定重新套用到節點上的每一個 map，包含其他廠牌的儲存。現在改為逐一指名路徑來認領新的 LUN。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.41~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A LUN with one path gets no multipath map on a node whose find_multipaths is strict — the Debian default, and exactly what a first hardware test looks like. The diagnostic now names it instead of leaving the operator to connect two facts.</span>
-            <span class="lang-zh">在 find_multipaths 為 strict 的節點上，只有單一路徑的 LUN 不會產生 multipath map —— 那是 Debian 的預設值，也正是第一次實機測試的樣子。診斷訊息現在會直接指名它，而不是把兩件事的關聯留給操作者自己想通。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.40~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A PowerStore timestamp's zone offset was read and then thrown away. On a node in UTC+8 every snapshot would have been dated eight hours wrong — which looks like a bug in PVE and is not one.</span>
-            <span class="lang-zh">PowerStore 時間戳的時區位移被解析出來之後就丟掉了。在 UTC+8 的節點上，每一個快照的時間都會差八小時 —— 那看起來像是 PVE 的問題，但並不是。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.39~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every PowerStore endpoint, request body and enum is now confirmed against Dell's own SDK and Ansible collection — all of them already matched. What remains unverified is what the array puts in a response.</span>
-            <span class="lang-zh">PowerStore 的每一個端點、請求內容與列舉值，都已對照 Dell 自己的 SDK 與 Ansible collection 確認 —— 原本就全部相符。仍未驗證的是陣列在回應裡放了什麼。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.38~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerStore could not have reported its capacity: the space metric was read as a REST collection when it is an entity name for the metrics service. The storage would have shown as inactive with nothing else wrong with it.</span>
-            <span class="lang-zh">PowerStore 根本無法回報自己的容量：容量指標被當成 REST 集合來讀，但它其實是指標服務的 entity 名稱。儲存會顯示為 inactive，而其他一切明明都正常。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.37~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex NVMe/TCP could not have connected at all — the family's default data path. The host was sent to the SDS-facing port, and the subsystem NQN was read from an object that has no NQN field. Both settled by reading Dell's own Ansible module.</span>
-            <span class="lang-zh">PowerFlex 的 NVMe/TCP 根本連不上 —— 而那是這個系列的預設資料路徑。主機被送往了面向 SDS 的連接埠，而 subsystem NQN 讀的是一個根本沒有 NQN 欄位的物件。兩者都是靠閱讀 Dell 自己的 Ansible 模組才確認的。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.36~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Dell's REST reference and Dell's own SDK spell the PowerFlex volume-size parameter differently. Creating a volume is the first thing anyone does here, so both are tried — and only on a rejection, never on a server error that may already have created something.</span>
-            <span class="lang-zh">Dell 的 REST 參考文件與 Dell 自己的 SDK，對 PowerFlex 容量參數的拼法並不相同。建立 volume 是使用本外掛的第一件事，因此兩種都會嘗試 —— 而且只在「被拒絕」時，絕不會在「可能已經建立了東西」的伺服器錯誤之後重試。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.35~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every command now runs in the C locale. On a zh_TW node — the kind this plugin is written for — a translated tool answers in Chinese and every parser expecting English silently matches nothing.</span>
-            <span class="lang-zh">每一個指令現在都在 C 語系下執行。在以 zh_TW 執行的節點上 —— 也就是本外掛所設想的那種節點 —— 有翻譯的工具會用中文回答，而每一個預期英文的解析器都會靜靜地比對不到任何東西。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.34~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The same mistake as the release before it, pointed at the operating system instead of the array: a node with no iSCSI was recognised by matching an English error string, which is not what a node running in another language says.</span>
-            <span class="lang-zh">與前一版同樣的錯誤，只是對象從陣列換成作業系統：判斷節點有沒有 iSCSI，靠的是比對一段英文錯誤訊息 —— 而以其他語言執行的節點並不會那樣說。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.33~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">"Does this volume exist?" was answered by matching the words an array chose. An array saying "storage pool not found" would have been read as "the volume is gone" — and the next thing a caller does with that answer is create a second one. A test now fails on any new decision made that way.</span>
-            <span class="lang-zh">「這個 volume 存在嗎？」原本是靠比對陣列所選的字句來回答。陣列若回「storage pool not found」，會被讀成「這個 volume 不見了」—— 而呼叫端拿到這個答案之後就會再建一個。現在只要出現新的這類判斷，就會有測試失敗。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.32~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Two things that would have done more than they were asked to: a feature check that could abort a whole operation, and a recovery tool that detached a volume it had not attached.</span>
-            <span class="lang-zh">兩處做了超出被要求範圍的事：一個功能檢查可能讓整個操作中止，以及一支救援工具會去解除它並沒有掛上的對應。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.31~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">No linked clone could have been snapshotted or renamed: a linked clone's name begins with "base-", and that was taken to mean it was a template. PVE would have refused with "the feature is not available on this storage".</span>
-            <span class="lang-zh">任何連結複製都無法建立快照或重新命名：連結複製的名稱以「base-」開頭，而這被當成了「它是範本」。PVE 只會回一句「此儲存不支援該功能」就拒絕。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.30~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Moving a linked clone's disk to another type of storage would have asked the target for a volume named after a base image it has never heard of. The volume-name contract is now measured against PVE's own RBD plugin rather than against a value someone wrote down.</span>
-            <span class="lang-zh">把連結複製的磁碟搬到另一種型別的儲存時，會要求目標端建立一個以「它從未聽過的範本映像」命名的 volume。volume 名稱的約定現在直接與 PVE 自己的 RBD 外掛比對，而不是比對某人當初寫下來的值。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.29~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A PowerStore host that belongs to a host group would have been handed a LUN id the group already held, because a group-level mapping names the group and not the host. Dell's own KB now backs why the LUN ceiling is 255.</span>
-            <span class="lang-zh">屬於某個 host group 的 PowerStore host，會被配到群組已經佔用的 LUN ID —— 因為群組層級的對應指名的是群組而不是 host。LUN 上限為何是 255，現在有 Dell 自己的知識庫文章佐證。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.28~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A PowerFlex volume mapped to an NVMe host could have looked unmapped forever, because a mapping entry that names both an SDC id and a host id had one of them dropped. The fourth appearance of the same mistake in this project, so the audit checklist now names the shape.</span>
-            <span class="lang-zh">對映到 NVMe host 的 PowerFlex volume 可能永遠看起來都未對映，因為同時帶有 SDC id 與 host id 的對應項目，其中一個被丟掉了。這是同一個錯誤在本專案第四次出現，因此稽核清單現在直接點名這個寫法。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.27~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A printed column heading is not a property name. The PowerVault basetype documentation settles which field names the JSON really carries, and the field order now follows it.</span>
-            <span class="lang-zh">列印出來的欄位標題不等於屬性名稱。PowerVault 的 basetype 文件確定了 JSON 實際帶的欄位名稱，欄位順序現在依照它排列。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.26~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The second volume mapped to a PowerVault host would have been handed a LUN the first one already used, because the LUN search compared an initiator IQN against a host name. PowerVault size and used space now read the field names the CLI Reference documents.</span>
-            <span class="lang-zh">對映到同一台 PowerVault host 的第二個 volume，會拿到第一個已經在用的 LUN —— 因為搜尋可用 LUN 時，拿 initiator 的 IQN 去比對 host 名稱。PowerVault 的大小與已用空間現在改讀 CLI Reference 記載的欄位名稱。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.25~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Two more PowerStore paths that rested on unverified request syntax: a volume deleted mid-listing would have failed the listing, and the iSCSI portal lookup would have found nothing at all if the array read one filter operator differently. Neither depends on the answer now.</span>
-            <span class="lang-zh">另外兩處 PowerStore 路徑原本建立在未驗證的請求語法上：列舉期間有 volume 被刪除會讓整個列舉失敗，而陣列若對某個過濾運算子解讀不同，iSCSI portal 就會完全查不到。現在兩者都不再取決於那個答案。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.24~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerStore volumes would have been invisible to PVE: the name filter used the wrong ilike wildcard, and an empty listing looks exactly like a storage with no volumes. An empty prefix listing is now rechecked locally, so the question cannot lose volumes either way.</span>
-            <span class="lang-zh">PowerStore 上的 volume 會完全看不到：名稱過濾用錯了 ilike 萬用字元，而「空的列舉」看起來就跟「沒有任何 volume 的儲存」一模一樣。現在前置字串列舉若為空會在本地重新比對，因此不論答案是哪一種都不會弄丟 volume。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.23~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every field name the API clients read is now listed with its verification state, so one pass over a real array response can settle all of them. A test keeps the list in step with the code.</span>
-            <span class="lang-zh">API 客戶端讀取的每一個欄位名稱都列出了它的查證狀態，因此比對一次真實回應就能一次確認全部。並有測試確保這份清單與程式同步。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.22~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every PowerVault pool would have looked completely full: show pools reports Avail, and the code read a field named avail-size that does not exist.</span>
-            <span class="lang-zh">每一個 PowerVault 儲存池看起來都會是滿的：show pools 回報的是 Avail，而程式讀的是一個不存在的 avail-size 欄位。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.21~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The "device is still in use" message could never name the process holding it: fuser -v prints its table to stderr, and only stdout was being read.</span>
-            <span class="lang-zh">「裝置仍在使用中」的訊息永遠說不出是哪個行程佔著它：fuser -v 把表格印到 stderr，而程式只讀了 stdout。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.20~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The package did not depend on LWP's HTTPS driver, which is a separate package on Debian and was present only because pve-manager happens to pull it in.</span>
-            <span class="lang-zh">套件沒有相依 LWP 的 HTTPS 驅動；那在 Debian 上是獨立套件，先前只是因為 pve-manager 剛好會把它帶進來才存在。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.19~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The release workflow installed only build tools, so every test that loads an API client would have died at compile time rather than testing anything.</span>
-            <span class="lang-zh">發布用的 workflow 只安裝了建置工具，因此每一個會載入 API 客戶端的測試都會在編譯期就死掉，什麼也沒測到。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.18~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A first-run guide for real hardware, in both languages: the order to work through, what to check after each step, and what each failure most likely means.</span>
-            <span class="lang-zh">新增雙語的實機首次執行指南：執行順序、每一步之後要看什麼，以及每種失敗最可能代表什麼。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.17~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerVault would have re-added an initiator on every host check, and the array's refusal fails activate_storage — so a working storage would have gone inactive. Ports the array calls unusable are no longer offered to the login loop.</span>
-            <span class="lang-zh">PowerVault 每次檢查 host 都會重新加入 initiator，而陣列的拒絕會讓 activate_storage 失敗 —— 原本正常的儲存因此會變成 inactive。陣列自己說不可用的連接埠，也不再送進登入迴圈。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.16~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerVault could not tell whether a volume was already mapped to this node: show maps has no host-name column, so the check always answered no and every activation would have remapped and taken another LUN.</span>
-            <span class="lang-zh">PowerVault 無法判斷 volume 是否已對應到本節點：show maps 根本沒有 host 名稱欄位，因此檢查永遠回答「否」，每次啟用都會再對應一次並再吃掉一個 LUN。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.15~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">map volume is the one PowerVault command whose documented argument order differs between ME4 and ME5. The plugin sends the ME5 form and falls back to the ME4 one, so both families work.</span>
-            <span class="lang-zh">map volume 是唯一一個在 ME4 與 ME5 之間記載順序不同的 PowerVault 指令。外掛會先送 ME5 的形式，並在需要時退回 ME4 的形式，因此兩個系列都能運作。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.14~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerVault would not have come up at all: the two host commands used on a storage's first activation were inferred rather than read from Dell's CLI Reference Guide, and both were wrong.</span>
-            <span class="lang-zh">PowerVault 原本根本起不來：儲存第一次啟用時用到的兩個 host 指令是推測出來的，而不是查 Dell 的 CLI Reference Guide，而且兩個都錯。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.13~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Each of the three families now has a whole VM's life tested against a fake array that enforces that family's own rules, including the order of the four values status() returns.</span>
-            <span class="lang-zh">三個系列現在各自都有一份「一台 VM 的完整生命週期」測試，跑在會強制執行該系列自身規則的假陣列上，其中也包含 status() 回傳四個值的順序。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.12~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Deleting a template could never succeed on PowerStore or PowerFlex: the decision was made by reading the array's refusal text, and on PowerStore the rule matched a hint this plugin had written itself. The array decides now.</span>
-            <span class="lang-zh">在 PowerStore 與 PowerFlex 上刪除範本永遠不會成功：這個判斷是靠讀取陣列的拒絕訊息做的，而在 PowerStore 上，那條規則比對到的是本外掛自己寫的提示文字。現在改由陣列決定。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.11~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A whole VM's life is now tested against an array that refuses what a real one refuses. It found a delete failure that blamed the volume's snapshots when the real obstacle was a linked clone.</span>
-            <span class="lang-zh">現在會讓一台 VM 的完整生命週期跑在「會像真實陣列一樣拒絕」的假陣列上。它找出了一個刪除失敗訊息：真正的阻礙是連結複製，卻怪到該 volume 的快照頭上。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.10~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex ran an nvme connect per target on every pvestatd poll — six times a minute per node, each with a 30 second timeout on a degraded network. It now connects only what is missing, and forks nothing when everything is up.</span>
-            <span class="lang-zh">PowerFlex 先前在每次 pvestatd 輪詢時，都會對每個目標各執行一次 nvme connect —— 每個節點每分鐘六次，在網路劣化時每次都帶 30 秒逾時。現在只連缺少的那些，全部連上時完全不會 fork。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.9~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The recovery tool's --insecure flag did nothing, and a protection domain named in the configuration was only consulted when the pool name happened to be ambiguous.</span>
-            <span class="lang-zh">災難復原工具的 --insecure 旗標完全沒有作用；而設定中指定的保護網域，先前只有在儲存池名稱剛好有歧義時才會被參考。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.8~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The PowerFlex options were undocumented, including the required one. Two new tests fail on documentation that has drifted from the code, and on a PVE upgrade that changes the contract underneath the plugin.</span>
-            <span class="lang-zh">PowerFlex 的選項完全沒有文件，包括必填的那一個。新增兩份測試，分別在「文件與程式碼脫節」以及「PVE 升級改動了外掛所依賴的約定」時失敗。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.7~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Missing, renamed and wrongly typed fields thrown at every parser in the plugin. Three defects fixed: names were not anchored exactly, a digit run too long to be a vmid decoded as a float, and a listing row that was not a hash killed the caller.</span>
-            <span class="lang-zh">把缺少、改名、型別不對的欄位丟給外掛中的每一個解析器，修正三項缺陷：名稱錨定不夠精確、長到不可能是 vmid 的數字串會被解成浮點數，以及不是雜湊的資料列會讓呼叫端整個掛掉。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.6~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Every file test on a device path is bounded — a stat on a dead multipath device blocks the same way vgs does — and a resize waits for the array to report the new size before the host is refreshed.</span>
-            <span class="lang-zh">所有對裝置路徑的檔案測試都加上時間上限 —— 對已失效的 multipath 裝置做 stat，會以與 vgs 相同的方式卡住 —— 而擴充容量時會先等陣列回報新容量，才去重新整理主機端。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.5~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Two test files that put the plugin under conditions an array is actually found in: a server that misbehaves on purpose, corrupt state files, hostile storage ids, and sixteen-way concurrent allocation — which found a real defect in the disk-id retry loop.</span>
-            <span class="lang-zh">新增兩份測試，以陣列實際會出現的狀態來施壓：故意行為不良的伺服器、損毀的狀態檔、惡意的 storage id，以及 16 路並行配置 —— 後者找出了 disk id 重試迴圈中的一個真實缺陷。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.4~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The storage API version is negotiated rather than hardcoded, deleting a snapshot releases the clone that was reading it (the vzdump snapshot-mode path), the orphan reaper leaves alone any device that still has a working path, and rolling back past newer snapshots is refused.</span>
-            <span class="lang-zh">儲存 API 版本改為協商而非寫死；刪除快照時會先釋放正在讀取它的暫時複製（即 vzdump 快照模式的流程）；殘留裝置清理不再碰任何仍有可用路徑的裝置；並拒絕跨過較新快照的還原。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.3~beta1</div>
-        <div class="changelog-date">2026-07-27</div>
-        <div class="changelog-summary">
-            <span class="lang-en">Cross-checked against the production incident records of the two related projects. Nine issues of the same classes were present here, including a refused delete that could be reported as success and an orphan reaper that made one array call per volume on every poll.</span>
-            <span class="lang-zh">對照兩個相關專案的實際生產事故紀錄逐條檢查，其中九項同類問題本專案也有，包括「被拒絕的刪除可能被回報成成功」，以及殘留裝置清理在每次輪詢時對每個 volume 各發一次陣列查詢。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.2~beta1</div>
-        <div class="changelog-date">2026-07-26</div>
-        <div class="changelog-summary">
-            <span class="lang-en">A review pass against the Proxmox VE 9.2.5 storage API source. Nine defects fixed, including PowerFlex applying PowerVault's name limit, deleting a volume leaving its snapshots behind, and a generated NVMe host NQN that was never persisted.</span>
-            <span class="lang-zh">對照 Proxmox VE 9.2.5 儲存 API 原始碼的全面檢查，修正九項缺陷，包括 PowerFlex 套用了 PowerVault 的名稱長度上限、刪除 volume 沒有一併清除快照，以及自動產生的 NVMe host NQN 沒有被保存。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.1~beta1</div>
-        <div class="changelog-date">2026-07-26</div>
-        <div class="changelog-summary">
-            <span class="lang-en">The VM config backup volume is no longer offered on PowerVault ME, whose volume ceiling is too low to spend one volume per snapshot. On PowerStore it stays on by default and can be turned off with the new dell-config-backup option.</span>
-            <span class="lang-zh">PowerVault ME 系列不再提供 VM 設定備份卷，因為它的 volume 上限太少，無法為每個快照再多花一個 volume。PowerStore 上維持預設開啟，並可用新增的 dell-config-backup 選項關閉。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.7.0~beta1</div>
-        <div class="changelog-date">2026-07-26</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerFlex support: NVMe/TCP by default, SDC optional. Both PowerFlex authentication generations are detected automatically.</span>
-            <span class="lang-zh">新增 PowerFlex 支援：預設 NVMe/TCP，SDC 為選項。兩種 PowerFlex 認證世代皆自動偵測。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.6.0~beta1</div>
-        <div class="changelog-date">2026-07-26</div>
-        <div class="changelog-summary">
-            <span class="lang-en">PowerVault ME4/ME5 support. HTTP 200 is not success on this family, expand takes a delta, and names are limited to 32 bytes without a dot.</span>
-            <span class="lang-zh">新增 PowerVault ME4／ME5 支援。這個系列的 HTTP 200 不代表成功、expand 收的是增量、名稱上限 32 bytes 且不可含句點。</span>
-        </div>
-    </div>
-
-    <div class="changelog-entry">
-        <div class="changelog-version">v0.5.0~beta1</div>
-        <div class="changelog-date">2026-07-26</div>
-        <div class="changelog-summary">
-            <span class="lang-en">First beta: the dellpowerstore storage type, the abstract block base, the recovery tool and the full documentation set.</span>
-            <span class="lang-zh">第一個 beta：dellpowerstore storage type、抽象 block 基底、災難復原工具與完整文件。</span>
-        </div>
-    </div>
-
-    <p>
-        <span class="lang-en">Full changelog: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/CHANGELOG.md">CHANGELOG.md</a>.</span>
-        <span class="lang-zh">完整變更紀錄：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/CHANGELOG_zh-TW.md">CHANGELOG_zh-TW.md</a>。</span>
-    </p>
-</section>
-
-<!-- ---- Acknowledgments ---- -->
-<section class="doc-section" id="acknowledgments">
-    <h2 class="section-title">
-        <span class="lang-en">Acknowledgments</span>
-        <span class="lang-zh">致謝</span>
-    </h2>
-    <p>
-        <span class="lang-en">The host-side layer — device discovery, multipath handling, the anti-hang rules and the orphan reaper — is carried over from two related projects, where those lessons were paid for in production:</span>
-        <span class="lang-zh">主機端底層 —— 裝置探索、multipath 處理、防止卡死的規則與 orphan 清理 —— 承接自兩個相關專案，那些教訓是在正式環境付出代價換來的：</span>
-    </p>
-    <ul>
-        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">jt-pve-storage-purestorage</a></li>
-        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">jt-pve-storage-netapp</a></li>
-    </ul>
-    <p>
-        <span class="lang-en">In the absence of hardware, this plugin was written against Dell's published documentation: the PowerStore REST guide, the PowerVault ME5 CLI Reference Guide, and the PowerFlex REST and SDC material.</span>
-        <span class="lang-zh">在沒有實機的情況下，本外掛是依據 Dell 公開的文件撰寫的：PowerStore REST 指南、PowerVault ME5 CLI Reference Guide，以及 PowerFlex 的 REST 與 SDC 資料。</span>
-    </p>
-</section>
-
-</div><!-- /content-wrap -->
-
-<footer class="footer">
-    <div class="footer__content">
-        <div class="footer__text">
-            <span class="lang-en">MIT License &middot; An independent community project, not affiliated with Dell Technologies</span>
-            <span class="lang-zh">MIT 授權 &middot; 獨立社群專案，與 Dell Technologies 無隸屬關係</span>
-        </div>
-        <div class="footer__text">Jason Cheng (Jason Tools) &lt;jason@jason.tools&gt;</div>
-    </div>
-</footer>
-
-</main>
-
-<script>
-(function() {
-    // Sidebar search
-    window.filterSidebar = function(query) {
-        var q = query.toLowerCase().trim();
-        document.querySelectorAll('.sidebar__link').forEach(function(link) {
-            var text = link.textContent.toLowerCase();
-            link.style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
-        });
-        document.querySelectorAll('.sidebar__section').forEach(function(section) {
-            var visible = section.querySelectorAll('.sidebar__link:not([style*="none"])');
-            section.style.display = visible.length ? '' : 'none';
-        });
-    };
-
-    // Language toggle
-    window.toggleLang = function() {
-        var current = document.documentElement.getAttribute('data-lang');
-        var next = current === 'en' ? 'zh' : 'en';
-        var url = new URL(window.location);
-        url.searchParams.set('lang', next);
-        window.location.href = url.toString();
-    };
-
-    // Language: URL parameter > this visit's choice > English.
-    //
-    // Deliberately sessionStorage and not localStorage. A choice made months
-    // ago should not decide what a new visitor sees: this page is written in
-    // English first, and someone arriving from a link expects to land there.
-    // Within one visit the choice still follows you from page to page, and
-    // ?lang= keeps working for sharing a specific language.
-    var LANG_KEY = 'jt-dellemc-lang';
-
-    // Anyone who used the site before this change has a permanent preference
-    // stored. Clear it, or they would go on seeing the old behaviour forever
-    // with no way to discover why.
-    try { localStorage.removeItem(LANG_KEY); } catch(e) {}
-
-    function applyLang(lang) {
-        document.documentElement.setAttribute('data-lang', lang);
-        document.documentElement.setAttribute('lang',
-            lang === 'zh' ? 'zh-Hant' : 'en');
-    }
-
-    var urlLang = new URLSearchParams(window.location.search).get('lang');
-    if (urlLang === 'en' || urlLang === 'zh') {
-        applyLang(urlLang);
-        try { sessionStorage.setItem(LANG_KEY, urlLang); } catch(e) {}
-    } else {
-        var saved = null;
-        try { saved = sessionStorage.getItem(LANG_KEY); } catch(e) {}
-        applyLang(saved === 'zh' ? 'zh' : 'en');
-    }
-
-    // Sidebar toggle (mobile)
-    window.toggleSidebar = function() {
-        var sidebar = document.getElementById('sidebar');
-        var overlay = document.querySelector('.sidebar-overlay');
-        sidebar.classList.toggle('open');
-        overlay.classList.toggle('show');
-    };
-
-    // Close sidebar when clicking a link (mobile)
-    document.querySelectorAll('.sidebar__link').forEach(function(link) {
-        link.addEventListener('click', function() {
-            if (window.innerWidth <= 1024) {
-                document.getElementById('sidebar').classList.remove('open');
-                document.querySelector('.sidebar-overlay').classList.remove('show');
-            }
-        });
-    });
-
-    // Active sidebar link tracking on scroll
-    var sections = document.querySelectorAll('.doc-section, .hero');
-    var navLinks = document.querySelectorAll('.sidebar__link');
-
-    function updateActiveLink() {
-        var scrollPos = window.scrollY + 100;
-        var current = '';
-        sections.forEach(function(section) {
-            if (section.offsetTop <= scrollPos) {
-                current = section.id;
-            }
-        });
-        navLinks.forEach(function(link) {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + current) {
-                link.classList.add('active');
-            }
-        });
-    }
-
-    var scrollTimer;
-    window.addEventListener('scroll', function() {
-        if (scrollTimer) cancelAnimationFrame(scrollTimer);
-        scrollTimer = requestAnimationFrame(updateActiveLink);
-    });
-    updateActiveLink();
-})();
-</script>
-
-</body>
-</html>
+# 變更紀錄
+
+本專案所有值得記錄的變更都寫在這裡。
+English version: [CHANGELOG.md](CHANGELOG.md)
+
+版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
+
+## [0.7.87~beta1] - 2026-08-06
+
+### 安全性
+- **登入用的雜湊會被完整寫進 journal。** PowerVault 文件記載的登入方式是把
+  `sha256("帳號_密碼")` **放在 URL 裡**,因此每次登入失敗都會把那個雜湊原樣
+  寫進節點的 journal —— 而它是無 salt、無迭代的 SHA-256,前半段通常還是已知
+  的帳號,字典攻擊每秒可試數百萬組。journal 的可讀範圍比 `/etc/pve/priv` 大得
+  多,而且會出現在每一份支援用的收集包裡。
+
+  本客戶端輸出的每一則訊息現在都會經過遮蔽:登入類字詞之後、路徑區段中的長
+  十六進位字串,以及任何 `Basic` 憑證區塊,都會被截成六字元前綴加
+  `[redacted]` —— 足以讓兩行日誌對得起來,不足以被破解。遮蔽是依**形狀**判斷
+  的,所以其他系列的登入形式也一併涵蓋,不必各自記得。
+
+  診斷資訊刻意保留:WWID 同樣是長十六進位字串,弄丟它等於用一個問題換另一個
+  問題。測試同時斷言兩半 —— 雜湊與 Basic 區塊消失,WWID、磁碟區名稱、陣列回傳
+  碼完好 —— 並以一次真實的失敗登入讀 journal 驗證。
+
+  這是回頭檢查前一版那個密碼修正「還漏了哪些外洩管道」時找到的。
+
+## [0.7.86~beta1] - 2026-08-06
+
+### 安全性
+- **陣列密碼原本以明文存放在 `/etc/pve/storage.cfg`。** 本外掛宣告了
+  `sensitive_properties` **方法** —— 但 PVE 從不呼叫方法。它呼叫的是
+  `PVE::Storage::Plugin::sensitive_properties($type)` 這個**函式**，而答案是
+  從 `plugindata` 查的。我們在那裡什麼都沒寫，於是 PVE 退回內建清單，
+  `dell-password` 不在其中，密碼就進了設定檔：**www-data 群組讀得到**、由
+  pmxcfs **複製到叢集每個節點**、**`GET /storage/<id>` 原樣回傳**，也會進入
+  任何 `/etc/pve` 備份。
+
+  四個系列現在都在 `plugindata` 中宣告，密碼改以 0600 寫入
+  `/etc/pve/priv/storage/<storeid>.pw` —— 那正是 PBS 使用的目錄，權限
+  `0700 root:www-data`，web server 連進都進不去。
+
+  **升級不會弄壞任何東西。** 在此之前建立的儲存照常運作：密碼優先讀 priv
+  檔，沒有就讀設定檔，並每小時提醒一次。要完成搬移，每個儲存執行一次：
+
+  ```bash
+  pvesm set <storeid> --dell-password '<密碼>'
+  ```
+
+  這道指令會寫入 priv 檔，**並在同一次操作中把 `storage.cfg` 裡的明文那行
+  刪除**。與密碼無關的 `pvesm set` 則完全不會動到它。
+
+  這是教訓 36 第四次出現 —— 一條被記錄、被測試、卻從未被呼叫的規則。測試
+  現在斷言的是 PVE 真正讀取的東西。
+
+## [0.7.85~beta1] - 2026-08-06
+
+### 修正
+- **PowerFlex：4.x 專屬的對應動作不再背 3.x 的包袱。** `addMappedHost` ——
+  只存在於 4.x 的動作 —— 原本被送入 `allowMultipleMappings: 'TRUE'`，那是
+  ScaleIO 3.x 參考文件把布林拼成**字串**的寫法。Dell 的 gen2 客戶端在這裡送的
+  是 JSON 布林，4.x 路徑現在也是；SDC 路徑保留文件記載的字串形式，因為記載它
+  的正是 gen1 陣列。
+- **登記了一個只有 4.x 陣列能回答的讀回問題：** 第一次 NVMe 對應之後，host
+  對應出現在磁碟區的哪個欄位？Dell 的公開程式碼從不讀回它，所以
+  `mappedHostInfo` 維持為本外掛已登記的猜測（欄位不存在時零成本並讀）；若真正
+  的欄位另有其名，症狀會是磁碟區每次 activation 都被重新對應 —— ME 教訓 21 的
+  症狀，先行登記。
+
+### 變更
+- multipath 內建對照現在涵蓋所有系列，寫在下一位讀者需要的程式碼註解裡：
+  Unity 跟隨核心的 DGC 條目（0.7.84）；PowerStore 與 ME 對各自內建條目的偏離
+  屬同類調校，ME 的區塊更已在 ME4024 上實機證明。0.7.84 的機制措辭已修正：
+  conf.d 的屬性是**逐屬性**覆蓋內建條目 —— 在本機讀取合併後的 `multipath -t`
+  驗證過 —— 而非整段取代。
+
+## [0.7.84~beta1] - 2026-08-06
+
+### 修正
+- **Unity：multipath 設定原本會把三十年的 CLARiiON 調校換成一個通用的猜測。**
+  `conf.d` 的 device 區段對比對到的裝置會**逐屬性覆蓋**核心內建條目，而 Unity
+  的 drop-in 帶著從 PowerVault 抄來的通用 ALUA 區塊。核心為 `^DGC` 寫的內建
+  條目是刻意不同的，而且每一處差異都要命：
+
+  - `path_checker emc_clariion`，且 `detect_checker no` 釘死 —— 家族專用
+    checker 認得 passive SP 與 inactive snapshot LU；TUR 不認得，上游釘死它
+    正是為了不讓自動偵測把它換掉。
+  - `prio emc` 而非 `alua` —— Unity 可跑 ALUA 或 PNR 模式，`emc` 兩種都能判。
+    `alua` 在 PNR 陣列上會把兩個 SP 打成同分，I/O 落到非擁有的 SP，LUN 在兩個
+    控制器之間不斷 *trespass* —— 一場看起來像 fabric 問題的效能崩塌。
+  - **不設** `hardware_handler` —— 內建條目對 DGC 刻意不設，把 `1 alua` 強加在
+    PNR 模式的陣列上會破壞它的 failover 處理。
+
+  drop-in 現在跟隨內建條目，只在其上追加有界復原設定（`no_path_retry 60` ——
+  內建自己的數字 —— `fast_io_fail_tmo`、`dev_loss_tmo`）。product 樣式放寬為
+  內建的 `^(RAID|DISK|VRAID)`。設定版本 2：帶著舊 drop-in 的節點會在下次
+  activation 自動升級。
+
+## [0.7.83~beta1] - 2026-08-06
+
+### 修正
+- **PowerFlex：NVMe host 原本根本對應不上。** NVMe host 與 SDC 是用**不同的
+  動作**對應的，不是同一個動作換參數：Dell 的 gen2 客戶端有 `addMappedHost`
+  （`{hostId, nqn, allowMultipleMappings}`）與 `addMappedSdc`
+  （`{sdcId, guid, allowMultipleMappings}`）並列，`removeMappedHost` 與之
+  對稱。本外掛原本把 `hostId` 送給 `addMappedSdc`、標著 NOT 0.7.83~beta1IFIED ——
+  而 **NVMe/TCP 是這個系列的預設協定**，等於預設路徑的對應呼叫建立在猜測上，
+  Dell 自己的程式碼卻早就寫著為它而存在的動作。現在兩個方向都依對應對象選擇
+  動作。
+
+  與倒回修正同一場稽核、同一天、同一系列：在真實 4.x 陣列上最先會失敗的兩個
+  呼叫,正是證據最薄弱的兩個。
+
+## [0.7.82~beta1] - 2026-08-06
+
+### 修正
+- **PowerFlex：倒回現在說的是陣列真正執行的那一代語言。** 這個系列最具破壞性
+  的呼叫 —— 以快照覆寫磁碟區 —— 原本對每一代陣列都送 `overwriteVolumeContent`：
+  那是 ScaleIO 3.x 參考文件的寫法，Dell 自己的客戶端從未實作過，打從寫下那天
+  就標著 NOT 0.7.82~beta1IFIED。Dell 的 gen2 客戶端顯示 4.x —— 今天實際部署的唯一
+  世代 —— 用的是 **`restore`** 配 `{srcVolumeId}`，URL 樣式相同。
+
+  倒回現在跟著登入偵測到的世代走：4.x 用 `restore`（讀自 Dell 自己的程式碼），
+  3.x 保留 `overwriteVolumeContent`（仍未驗證，但只會送給以 3.x 方式完成登入
+  的陣列）。寫測試時抓到初稿的第二個缺陷：動作名在任何登入發生之前就選定，
+  新建的用戶端會拿預設世代 —— 現在會先確保 session 再做選擇。
+
+  這是把逐鍵稽核轉向 PowerFlex —— 這項技術最後一個還沒到訪的系列 —— 找到的。
+  稽核其餘部分乾淨：建立時的雙尺寸拼法本就有文件化備援，對應動作與
+  `snapshotDefs` 都與 Dell 客戶端完全一致。
+
+## [0.7.81~beta1] - 2026-08-06
+
+### 修正
+- **Unity：陣列的錯誤編號從未送到操作者眼前。** `error_code_of` 在 0.7.70
+  加入、有測試、卻沒有任何呼叫者 —— 與教訓 36 如出一轍，靠 grep 呼叫端找到。
+  現在它接進錯誤翻譯，每個 Unity 拒絕都帶著 `(errorCode NNNN)`，一如
+  PowerVault 訊息裡的 `(return code -10389)`。ME4024 的首次實機測試證明了它的
+  價值：客戶的每一份回報都引用了那個數字，而數字正是把症狀變成診斷的東西。
+
+### 新增
+- `make critic`：perlcritic severity 4，以政策維持乾淨。340 條發現逐類稽核至
+  零；`.perlcriticrc` 裡每條抑制都附上贏得它的稽核 —— 包括對全部 143 個
+  `return undef` 的串列語境稽核（`lib/` 中串列語境接收者為零）。
+- `_array_*` 呼叫慣例已入測試套件守衛：各家族簽名與 BlockBase 實際呼叫點
+  逐位置以「名稱類別」比對 —— 只比數量的草稿被證明抓不到 0.7.80 的缺陷,
+  名稱類別版能精準指出它。
+
+## [0.7.80~beta1] - 2026-08-06
+
+### 修正
+- **Unity：每一次 WWID 查詢都回 `undef` —— 裝置探索等於一上機就陣亡。**
+  BlockBase 以兩個參數呼叫 `_array_get_wwid`（`$scfg, $array_name`），共十個
+  呼叫點；Unity 的實作卻宣告了三個，於是磁碟區名稱落進一個沒人讀的參數，
+  `$name` 本身是 `undef`。`path()` 會把 `/dev/mapper/unknown-*` 交給 QEMU、
+  activation 找不到自己剛對應的磁碟、`free_image` 會走無 WWID 分支 —— 每一顆
+  磁碟區、從上機的第一分鐘開始。
+
+  生命週期測試沒抓到,因為它們把裝置層 stub 掉了。現在有兩道防護:一次把全部
+  22 個 `_array_*` 方法的參數數與 BlockBase 實際呼叫點系統性比對(只有這一個
+  不匹配),以及一個「以 BlockBase 的原樣呼叫」的測試,斷言 `path()` 解析出
+  `/dev/mapper/<wwid>` 而非佔位符。還原修正會有四個測試失敗。
+
+## [0.7.79~beta1] - 2026-08-06
+
+### 修正
+- **被拒絕的 `pvesm add`，已經先把所有 vendor 的 multipath 設定重讀了一遍。**
+  這是把整條 `pvesm add` 路徑對著 Unity API 模擬器端到端跑、而節點兩種協定都
+  無法服務時發現的。`activate_storage` 在檢查協定前置條件**之前**就寫入了
+  multipath drop-in —— 並發出那唯一被允許的全節點 `multipathd reconfigure`。
+  沒有 HBA 的節點加 FC 儲存、或 portal 不可達的節點加 iSCSI 儲存，拒絕本身是
+  正確的；但 reconfigure 已經動過共用節點上每個 vendor 的 map，而本外掛的
+  drop-in 留在原地 —— 為了一個從未存在過的儲存。
+
+  drop-in 現在只在協定啟用成功之後才寫入。啟用過程不需要它 —— 它調校的是
+  裝置，而裝置要到 `activate_volume` 才出現。三個 BlockBase 系列同時受惠；
+  兩條拒絕路徑都對模擬器重跑過,零檔案殘留、零 reconfigure。
+
+## [0.7.78~beta1] - 2026-08-06
+
+### 修正
+- **PowerFlex：死掉的陣列要付兩次「死掉」的代價。** 0.7.75 的多位址容錯為
+  PowerVault 的兩種登入方式加上了逾時相乘的上限 —— 而 PowerFlex 的兩個登入
+  **世代**（先 4.x、後 3.x）模式一模一樣，卻沒有拿到同一個上限。在有兩個位址的
+  死陣列上：4.x 登入把兩個位址輪一遍、3.x 再輪一遍、外層重試又整套重來 ——
+  而這發生在有界的 `status()` 預算之內。現在只要 4.x 的嘗試已經親眼看完所有
+  位址都連不上，就不再嘗試 3.x：不回應的 TCP 不在乎它拒絕的是哪一種登入。
+
+  這是教訓 40a 在傳輸層的變形：為一個系列加上的防護，沒有人動手就不會出現在
+  另一個系列。測試斷言:兩個位址都連不上之後,`/api/login` 從未被請求。
+
+## [0.7.77~beta1] - 2026-08-06
+
+### 修正
+- **Unity：自相矛盾的列舉被讀成了空集合。** 一台回報 `entryCount: 9999` 卻交出
+  空頁的陣列，原本會被當成「集合是空的」—— 而在孤兒回收機制的路徑上，那讀起來
+  就是「所有磁碟區都被刪掉了」。矛盾現在會在恰好一次請求之後成為錯誤；頁數
+  上限的防護（十萬筆）也改為指名「列舉不完整」而死，不再靜默截斷：靜默的上限
+  讀起來像是完整，而讀這份清單的呼叫者裡，包括決定什麼可以刪除的那些。
+
+### 變更
+- **Unity：健康檢查的 ping 不再與容量查詢重複。** 每個 status 週期原本會列舉
+  儲存池兩次 —— ping 一次、容量一次。ping 現在改問 `basicSystemInfo`，那是
+  Unity 供應的最便宜的東西，而它的回答（名稱、型號、軟體版本）也正是首次
+  上機、什麼都不通時，日誌最需要的。
+
+## [0.7.76~beta1] - 2026-08-06
+
+### 修正
+- **0.7.75 的容錯轉了位址，卻把請求送回剛拋棄的那一個。** 請求的 URL 在每次
+  嘗試的開頭、登入**之前**就建好 —— 而登入正是發現控制器死掉、轉走位址的
+  地方。於是登入切換到活的控制器、成功了，接下來的請求卻仍然送往死的那個；
+  兩個位址的情況下，用戶端就這樣來回彈跳直到嘗試次數用完。URL 現在改在登入
+  之後、用登入證明活著的那個位址建構。
+
+  這是把 Unity 用戶端接上**真實 socket**（一個死埠加一個迷你 Unity）才抓到
+  的 —— 單元測試的假 UA 看不見它：假 UA 的登入不走網路，轉位址的時機和真實
+  登入不同。
+
+- **portal 自帶埠號時 URL 是壞的。** `1.2.3.4:8443` 會變成
+  `1.2.3.4:8443:443`。從一開始就潛伏著；同樣是真實 socket 讓它現形，因為
+  測試伺服器開在高埠號上。
+
+### 新增
+- **adverse 測試套件現在也攻擊 Unity**：接受連線後不出聲的伺服器、攔截
+  proxy 回的 HTML、真實 socket 上真實的 302 —— 被拒絕、不被跟隨、並解釋成
+  它在這個 API 上的真正意義 —— 以及跨兩個真實 socket 的端到端控制器容錯。
+
+## [0.7.75~beta1] - 2026-08-06
+
+### 新增
+- **`dell-portal` 可以填多個位址，用戶端會在其間自動容錯。** 由 ME4024 的測試
+  者提出：他們的陣列每個控制器各有一個管理 IP —— active 在 `.11`、standby 在
+  `.12` —— 沒有浮動位址，所以控制器 failover 會把設定裡的位址一起帶走。資料
+  路徑從來不是問題：dm-multipath 與 ALUA 自己會處理，執行中的 guest 毫無感覺。
+  壞掉的是管理 —— 狀態、配置、快照、刪除 —— 直到有人手動改儲存設定為止。
+
+  現在：`--dell-portal 192.168.1.11,192.168.1.12`。一個陣列根本沒收到的連線
+  失敗（LWP 自己標記的 `Client-Warning: Internal response`）會立刻換到下一個
+  位址、不做退避 —— 快速切換正是第二個位址存在的意義。答話的位址會被記住。
+  每次切換都會丟棄 session，因為 **session 屬於簽發它的那個控制器**：帶著它
+  過去，會把「位址不通」換成「對著活的控制器無限認證失敗」。即使是健康檢查
+  用戶端，每個位址也至少會被試一次，所以 `pvesm status` 的最壞情況是每個位址
+  一次短逾時 —— 仍然有界。
+
+  只填一個位址時行為與從前完全相同。四個系列全部繼承這個功能，因為它在共用的
+  傳輸層。
+
+  這個上界是被強制的，不只是承諾。第一版草稿讓巢狀的請求層 —— 外層呼叫、登入
+  重試、PowerVault 的兩種登入方式 —— 各自把位址清單輪一遍，2 秒的狀態逾時在
+  死掉的陣列上變成了 21 秒。現在只要有一個請求親眼看完所有位址都連不上，一個
+  旗標就會阻止上層再去輪同一批死位址。本機實測：兩個死位址、
+  `dell-status-timeout 2`，`pvesm status` 多花 4.0 秒 —— 每個位址一次逾時，
+  恰好是文件寫的最壞情況。
+
+  實作測試時抓到一個缺陷：請求的 URL 原本在重試迴圈外面建好 —— portal 換了，
+  重試卻仍然送往死掉的位址。現在改為每次嘗試重建。
+
+## [0.7.74~beta1] - 2026-08-06
+
+### 修正
+- **Unity：0.7.71 的倒回備份快照，自己帶著兩個陷阱。** 在功能發布三個版本
+  之後，因為持續清查而找到。
+
+  第一,備份永遠是磁碟區上最新的快照,而它對 PVE 可見 —— 於是
+  `volume_rollback_is_possible` 會以「不是最新的快照」拒絕每一次**第二次**
+  倒回,恰好擋住了備份本來要保護的那個操作。備份現在會從 PVE 看到的清單中
+  過濾掉;磁碟區刪除前的快照清理不走那條路徑,所以隱藏它不會造成孤兒。
+
+  第二,備份的快照名稱是 `rollback` —— 一個 PVE 使用者打得出來的名字。使用者
+  若真的建了叫 `rollback` 的快照,會與備份相撞,清理時會把**使用者的**快照刪掉。
+  名稱現在改為 `pve.rollback`,帶一個點:**PVE 禁止快照名稱帶點**,因此不可能
+  有使用者快照叫這個名字。測試真的建立一個叫 `rollback` 的使用者快照、倒回
+  兩次,斷言它存活。
+
+  另外備份不再累積:每次 restore 前會先移除前一份,所以永遠只有一份安全網,
+  而不是每倒回一次就多一份、佔著空間、PVE 又看不見。
+
+## [0.7.73~beta1] - 2026-08-06
+
+### 修正
+- **Unity：刪除路徑上的「不存在」現在要經過列舉確認，不再只信一個 404。**
+  手冊給了 404 三種成因，其中之一是無效的 **URI 樣式** —— 而以名稱查詢正是一種
+  URI 樣式。不支援 `/instances/<type>/name:` 的韌體會對每一次查詢回 404，每一顆
+  磁碟區都讀成「不存在」，`free_image` 就會對從未發生的刪除回報成功：PVE 把磁碟
+  從 VM 設定中移除，資料卻留在陣列上。
+
+  在破壞性路徑上 —— 刪除磁碟區與刪除快照 —— 查詢答「不存在」之後，現在要再
+  問一次列舉。列舉成功而名稱不在其中，證明確實不存在；列舉裡有那個名稱，證明
+  查詢壞了 —— 那是一個指名韌體的大聲錯誤，不是安靜的成功。代價是每次「刪除
+  不存在的東西」多一次列舉，而那很罕見。
+
+- **Unity：`qm rescan` 原本會把每一顆連結複製加成兩份。** 連結複製必須列在
+  PVE 為它儲存的 volid 底下 —— `base-.../vm-...` —— 否則 rescan 看到一顆沒有
+  任何設定參照的磁碟區，就把它第二次加進去、當成 unused disk。Unity 的精簡
+  複製會在 `parentSnap` 回報它讀取的快照；那個快照的名稱解得回範本，所以整個
+  對應只需要一次快照列舉，絕不是逐磁碟區呼叫。
+
+## [0.7.72~beta1] - 2026-08-06
+
+### 修正
+- **Unity：建立 LUN 時的儲存池鍵是錯的 —— 又是教訓 28 的翻版。** Dell 的
+  `LunParameters` 結構,欄位「名稱」叫 `StoragePool`,而真正上線路的 JSON 標籤
+  是 **`pool`**。前一版讀了欄位名稱、送出 `storagePool`;每一次建立都會被拒,
+  或更糟 —— 被接受但儲存池被靜靜忽略。在 Go 程式碼裡,`json:"..."` 標籤才是
+  屬性名稱,欄位名稱只是印出來的名字。模擬器沒抓到,因為它什麼 body 都接受;
+  結構標籤抓到了。
+
+- **Unity:並行的對應變更可能靜靜地把某個節點解除對應。** `hostAccess` 是
+  讀-改-寫、沒有 compare-and-swap:兩個節點同時寫 —— 遷移目標在 attach、來源
+  同時在 detach,或兩個平行的 activation —— 各自讀清單、各自寫回,後寫的把
+  先寫的丟掉。被丟掉的那個節點以為自己已對應,裝置卻永遠不出現;在遷移中,
+  那是**執行中 guest 的磁碟**。
+
+  遺失的更新事後看得見 —— 剛寫進去的清單裡沒有自己的 host id —— 所以 attach
+  與 detach 現在都會在寫後驗證,並帶著重新讀到的現況重試,把競爭者加進去的
+  內容一併保留。一個永遠寫不進去的更新是一個指出可能原因的錯誤,不是無窮迴圈,
+  也不是安靜的成功。
+
+### 已驗證
+- Resize 與 Dell 自己的客戶端逐鍵核對:同一個 URI、同樣的
+  `{lunParameters: {size}}` 包裝、收新總量而非增量。Rename 的裸 `{name}`
+  內容也與 Dell 客戶端一致。
+
+## [0.7.71~beta1] - 2026-08-06
+
+### 修正
+- **Unity：每一次倒回，遲早會讓磁碟區變得刪不掉。** Dell 自己的白皮書明載：
+  restore 會*自動建立一個備份快照* —— 不管有沒有要求。放給陣列自己命名，那個
+  名稱是快照清理（刪除磁碟區前必經的步驟）認不得的，所有權閘門也不會允許碰它。
+  而 Unity 拒絕刪除仍有快照的 LUN —— 於是從第一次 `qm rollback` 起，`qm
+  destroy` 就會失敗：在幾天之後、以一種完全不會指回那次倒回的方式。
+
+  restore 現在會帶上 `copyName`，讓備份快照用本外掛自己的命名、指回它所屬的
+  磁碟區，並為第二次倒回時 Unity 附加的計數器預留空間。生命週期測試的假陣列
+  現在會像真陣列一樣在每次 restore 時產生備份快照，測試證明倒回一次、兩次之後
+  磁碟區仍然刪得掉。
+
+- **Unity：EFI disk 原本根本建不出來。** PVE 會要求非常小的磁碟區 —— EFI disk
+  與 TPM state 各只有 4 MiB —— 而 Unisphere 拒絕低於最小容量的 LUN，連帶讓整個
+  `qm create` 失敗。低於 1 GiB 的請求現在會被向上補足：取太大只是在少數幾顆
+  小磁碟區上浪費空間，取太小則是整個功能直接壞掉。
+
+### 測試套件中新驗證的
+- PVE 會詢問的完整功能矩陣，依磁碟區種類逐項：連結複製的快照與改名（它的
+  volname 以 `base-` 開頭但不是範本）、從範本複製、從快照複製、轉換範本、完整
+  複製、以 `raw+size` 匯出、以及容器的 fsfreeze。這張表答錯一個「否」是看不見的
+  —— 按鈕就只是不在那裡。
+
+## [0.7.70~beta1] - 2026-08-05
+
+### 修正
+- **Unity：302 原本會被跟隨，而它並不是重新導向。** Dell 自己的狀態碼表把 302
+  列為 *Unauthorized* —— 「當 `X-EMC-REST-CLIENT` 標頭缺少或不是 true 時的授權
+  錯誤或逾時」。LWP 預設會跟隨最多七次轉址，所以客戶端會去抓陣列的 Web UI、拿回
+  HTML，然後回報*「回應內容不是 JSON」* —— 說出症狀、蓋掉原因，而真正的原因是
+  一個沒有送達的標頭。
+
+  現在這個 API 一律不跟隨轉址。就其本身而言這也是比較安全的預設：每一個請求都
+  帶著 `Authorization` 標頭，而跟隨轉址正是讓憑證送到一台沒有人選擇的主機的途徑。
+
+  401 是同一個錯誤但標頭有送達，因此現在會被解釋為單純的「帳號密碼不對」，而不是
+  標頭缺少。
+
+- **Unity：分頁原本建立在一個猜測上。** 原本是一直往下讀，直到某一頁回傳的筆數
+  少於請求的頁大小為止。手冊記載了 `with_entrycount=true`，它會讓陣列回報**完整
+  清單**中有多少筆 —— 而陣列本來就可以回傳比請求更少的筆數，所以「短頁即結束」
+  這條規則從來就不成立。現在它只是「韌體沒有回報總數時」的備援，不再是主要依據。
+  一份被默默截斷的清單，正是孤兒回收機制把存活中的磁碟區當成已刪除的成因。
+
+### 變更
+- 錯誤內容的結構是 `{error: {errorCode, httpStatusCode, messages}}`，而
+  `errorCode` 是**數字** —— 那是用來做判斷的穩定依據，就像 PowerVault 的
+  return code 一樣。現在會把它讀出來備用；旁邊的訊息會被在地化成九種語言，那是
+  給人看的。
+- 409 與 422 現在會附上「陣列的意思是什麼」的說明。
+
+## [0.7.69~beta1] - 2026-08-05
+
+### 修正
+- **Unity：一個沒有回傳 id 的建立動作，會靜靜回傳 `undef`。** 這是把客戶端接上
+  一個 Unity REST API 模擬器時發現的 —— 它對 `createLun` 回的是 **204 且沒有
+  內容**。某些韌體的真實陣列可能也是如此，或以非同步 job 回應。
+
+  在那裡回傳 `undef` 是兩種壞結果的組合：磁碟區確實存在，而呼叫端沒有任何把柄
+  指向它 —— 於是它下一步就會在第一顆之上再建一顆。現在每一個建立、複製與快照
+  動作，都會退回「用剛才那個名稱查一次」，如果連那樣都無法回答就大聲失敗，並明說
+  該物件可能已經存在、重試前請先檢查陣列。
+
+### 新增
+- **一個在有硬體之前、就能以真實 HTTP 驗證某個系列客戶端的方法。**
+  `github.com/mackayd/Unity-API-Emulator` 是一個單一 Python 檔，它會說 Unity 的
+  信封格式，缺少 `X-EMC-REST-CLIENT` 時回 302、寫入缺少 `EMC-CSRF-TOKEN` 時回
+  403，並且支援 `name:` 查詢。它不是 Dell 的產品，也不模擬儲存行為 —— 它無法
+  證明刪除是否真的刪掉了 —— 但它獨立驗證了本客戶端所預期的三件事，也找出了上面
+  那個缺陷。
+
+  `docs/TESTING.md` 寫了怎麼跑它，以及同樣重要的：它**不能**告訴你什麼。
+
+## [0.7.68~beta1] - 2026-08-05
+
+### 新增
+- **Unity XT，第四個 storage type：`dellunity`。** 一位客戶有一台走 Fibre
+  Channel 的 Unity 480，所以這個系列是對著真實存在的硬體寫的。一顆 VM 磁碟就是
+  一顆 Unity LUN，快照與精簡複製都由陣列負責；dm-multipath、裝置探索與所有安全
+  檢查都來自共用層，而那一層已經在一台 ME4024 上以同樣的協定驗證過。
+
+  **這裡沒有任何一項在 Unity 陣列上執行過** —— 但其中極少是用猜的。每一個 URI、
+  請求內容與欄位清單都出自 `github.com/dell/gounity`，也就是 Dell 自己的 CSI
+  driver 所使用的客戶端，而不是文件敘述。兩者不一致時以程式碼為準：Unisphere 的
+  文件頁說 LUN 名稱上限是 85 個字元，而 Dell 的客戶端在請求送到陣列之前就會拒絕
+  超過 63 的名稱。
+
+  這件事釐清了什麼、又如何決定了程式的樣貌：
+
+  - **Unity 可以直接以名稱查詢**，端點是 `/instances/lun/name:<名稱>`。其他每個
+    系列都得送 server-side filter，而一個未驗證的 filter 回傳空集合，跟「根本
+    沒有這個東西」無法區分 —— 那個錯誤曾讓 PowerStore 看不見任何磁碟區。這個
+    系列不帶那一整套防禦，因為它不需要。
+  - **`hostAccess` 是取代整份主機清單，不是附加。** 對應時會先讀出現況再送出
+    聯集，解除對應時送出差集；兩者都在呼叫端的重試迴圈**裡面**讀取，因為一份在
+    別的節點寫入之前讀、之後送的清單，會把那次寫入移除的狀態原封不動放回去。
+    只送本節點的 host，正是磁碟區從叢集裡其他每個節點被解除對應的成因。
+  - **LUN 是以 `lun` 讀取、以 `storageResource` 操作**，而且建立時的儲存池鍵是
+    `storagePool` —— `pool` 只是 LUN 回報時用的。
+  - **連結複製是快照的精簡複製**，所以範本的標記快照會比它的複製活得久，陣列也
+    會拒絕刪除仍有存活複製的範本。
+  - 大小的單位是位元組，不是 PowerVault 的 512 位元組區塊。
+
+  120 個測試，全部不需要陣列：85 個對著假的 Unity 測試客戶端，35 個對著一個
+  「會拒絕真實陣列會拒絕的事情」的假陣列，走完一整個 VM 的生命週期 —— 仍有快照
+  的 LUN、仍有複製在讀取的快照、仍在對應中的 LUN、超過 63 個字元的名稱。這種測法
+  正是在 PowerVault 上抓出三個已發布缺陷的那一個。
+
+  寫這些測試時抓到一個：這個 API 的欄位是 opt-in，所以一個「回來是空殼」的儲存池
+  跟「找到了」長得一模一樣，而建立時會把 null 送到儲存池 id 的位置。
+
+  `docs/TESTING.md` 逐項記錄了每個欄位的出處，以及五個只有陣列才能回答的問題 ——
+  其中包括 SCSI 的 vendor 與 product 字串，那決定了外掛究竟認不認得一顆裝置。
+
+## [0.7.67~beta1] - 2026-08-05
+
+### 變更
+- **別人現在會找到最新的那一版。** GitHub 不會把預先發行版稱為「Latest」，因此
+  把每個 0.x 都標成預先發行版的結果，是那個綠色標記一直掛在某個剛好沒被標記的
+  舊版上 —— 有一段時間那是 v0.7.49，落後三個星期、二十個版本，而那正是第一次
+  造訪的人看到的「目前版本」。把一個過期的建置呈現成最新的，比少一個標記更糟。
+  現在 release 不再標記為預先發行版，並明確把最新的那個設為 latest。
+
+  這樣不會失去任何警告：release 內文的開頭就是 beta 警語，README 的開頭也是，
+  而版本號本身就寫著 beta。
+
+- **安裝用的網址不會再過期。** 每一版現在都會附一份檔名固定不變的套件副本，因此
+  文件裡那道指令永遠正確、永遠不必修改：
+
+  ```bash
+  curl -LO https://github.com/jasoncheng7115/jt-pve-storage-dellemc/releases/latest/download/jt-pve-storage-dellemc_all.deb
+  ```
+
+  GitHub 會解析 `latest`，但不會解析檔名，而每一個真實檔名裡都帶著版本 —— 所以
+  在此之前，任何寫出下載網址的文件，都在新版發布的那一刻就過期了，而照著做的人
+  會拿到舊的建置。版本在套件**裡面**，`apt` 與 `dpkg` 讀的就是那裡；
+  `dpkg-deb -f ... Version` 會告訴你抓到的是哪一版。
+
+  帶版號的副本保留，因為回報問題時該引用的是那個檔名。`SHA256SUMS` 兩份都列，
+  這就是驗證步驟現在要加 `--ignore-missing` 的原因。
+
+## [0.7.66~beta1] - 2026-08-05
+
+### 修正
+- **每一次成功的刪除都會印出一則 multipath 失敗訊息。** 在該 ME4024 上，每次
+  `qm destroy` 都會出現兩次：
+
+  ```
+  multipath -f /dev/mapper/3600c0ff... failed or timed out,
+  trying dmsetup remove --force
+  ```
+
+  其實什麼都沒失敗，也沒有逾時。`cleanup_lun_devices` 會先以名稱移除該 map
+  （`multipathd remove map`），接著才呼叫 flush 作為雙保險；而對一個已經不存在
+  的 map 執行 `multipath -f` 本來就會以非零狀態結束，這卻被當成故障回報。現在
+  flush 會先確認裝置是否還在才決定要不要出聲：**不在**正是我們要的結果。其餘
+  情況 —— **包括無法判斷** —— 仍然會走 `dmsetup` 備援：在一個已死的 map 上
+  stat 逾時，正是那道備援存在的理由。
+
+  一則在每次正常操作都會出現的訊息，比沒有訊息更糟：它看起來像故障，而且會把
+  「flush 真的逾時了」那一次埋掉。
+
+### 變更
+- **本專案不再宣稱「從未在硬體上執行過」。** 已經有一台 PowerVault ME4024 走
+  Fibre Channel 跑過它，而且自 0.7.65 起完整通過首次執行測試。README、文件站、
+  開發階段表與 release 說明總共五處寫的都還是舊的。現在改為陳述**仍然**未驗證
+  的部分，因為那才是絕大多數：PowerStore 與 PowerFlex 完全沒有，PowerVault 的
+  iSCSI 與 SAS 路徑也沒有。
+- **release 說明會解釋為什麼沒有任何一版掛著 GitHub 的「Latest」標記。** 所有
+  0.x 都是預先發行版，而 GitHub 不允許預先發行版被標記為 latest，因此
+  `/releases/latest` 根本無法解析。這是刻意的，但對一個正在找檔案下載的人來說
+  並不明顯 —— 所以說明現在會請人取清單最上方那一個，並附上一道會把預先發行版
+  一併納入、解析出最新 release 的指令。
+
+## [0.7.65~beta1] - 2026-08-05
+
+**第一次在實體硬體上端到端跑完。** 一位客戶把 0.7.64 裝到 PowerVault ME4024
+（`MIL-ME4024`、韌體 `GT280R011-01`、走 Fibre Channel）上，完整走過
+`docs/FIRST_RUN`。從儲存能夠啟用、到真的有一顆可用的磁碟之間，卡著三個缺陷，
+而且一個被前一個擋著看不到。
+
+### 修正
+- **任何磁碟區都無法對應：`-10386`。** `map` 與 `unmap` 收的是**識別碼**，而
+  ME 的語法用後綴區分三種物件：`<名稱>` 是 initiator、`<名稱>.*` 是 host、
+  `<名稱>.*.*` 是 host group。本外掛送出的是裸的 host 名稱，陣列於是拿它去找
+  同名的 initiator，然後正確地找不到 —— 兩種有文件記載的參數順序都因為同一個
+  原因被拒。
+
+  送出側與比對側必須一起改。陣列在 `show maps` 裡會把同一套語法原樣回報，所以
+  nickname 讀回來是 `pve-pve-host15.*`；比對時不去掉後綴就永遠不會命中，只改
+  送出側會把「無法對應」變成「LUN 衝突」。
+
+- **第二顆磁碟區撞號：`-3177`。** `show maps` 回的是依磁碟區分組的樹 —— 最上層
+  是 `volume-view`，每顆磁碟區一筆，各自把資料列放在底下的
+  `volume-view-mappings`。最上層根本沒有對應陣列。直接索引最上層讀回來是空的，
+  於是每個 LUN 都看起來沒人用，第二顆對應到同一 host 的磁碟區拿到了第一顆已經
+  佔用的號碼。現在每一列都會把它所屬的磁碟區帶下來 —— 資料列自己只用
+  `durable-id` 指向父物件。
+
+  這與 0.7.63 修掉的 host 清單是同一個錯誤，只是發生在同一台陣列的另一份清單上。
+
+- **每次刪除都想解除對應 `all other initiators`：`-10007`。** 每顆磁碟區都會
+  帶一列描述其 default mapping 的資料列，即使根本沒有設定：`lun ""`、
+  `access "not-mapped"`、`access-numeric 0`、`identifier "all other
+  initiators"`、`nickname ""`。它不會出現在 CLI 自己的表格輸出裡，只有 JSON
+  有；而空的 nickname 正是讓那個顯示字串被推上名稱清單的原因。現在改以它的
+  **access** 辨識，而不是比對那個字串 —— 字串是顯示層的選擇，可能被翻譯。本
+  外掛從來不會建立 default mapping。
+
+### 變更
+- **記錄在 host group 層級的對應，現在會被計為佔用該 LUN。** 只要 host 是某個
+  群組的唯一成員，即使 `map` 指定的是 host，陣列仍會把對應記在群組層級 —— 而
+  這樣一列會替群組內每一個 host 佔住那個 LUN。PowerStore 自從認識 host group
+  之後就處理了這件事，PowerVault 沒有。往這個方向判斷錯，代價是 255 個號碼裡
+  少一個。
+- **`show maps <volume>` 會被檢查是否真的照要求過濾了。** 現在每一列都帶著自己
+  的磁碟區，所以這個檢查不花成本。在解除對應這條路徑上，不檢查的後果是把沒有
+  對應的磁碟區回報成已對應，同時把真正的對應留在原地。
+
+### 已驗證
+- `unmap volume initiator <host>.* <volume>` —— 原始碼中原本標註 `NOT 0.7.65~beta1IFIED`。
+- WWID 換算規則：`3` + `6`(NAA) + OUI `00c0ff` + `000` + 磁碟區序號第 7–12 碼 +
+  序號後 16 碼。外掛算出的 WWID 與 `multipath -ll`、`/dev/mapper` 在四顆磁碟區
+  上完全吻合。
+- host 物件要的 WWPN 寫法：純十六進位、以逗號分隔。
+- 經過百分號編碼的 `*`，在陣列的 CLI 看到之前就會被解碼 —— 這就是 URL 跳脫不需
+  要為新的後綴開例外的原因。
+- `docs/FIRST_RUN` 全部項目：容量與 GUI 一致、連續數次配置且 LUN 依序遞增、
+  dm-multipath 兩條路徑、透過 `/dev/mapper` 的 `dd` 讀寫並以雜湊驗證、快照、
+  倒回、刪除快照、範本、秒級完成的連結複製、陣列正確拒絕刪除仍有存活複製的
+  範本，以及解除對應、刪除與本機裝置清理。
+
+  這不代表另外兩個系列已經驗證，也不代表 iSCSI 或 SAS 已經驗證。那台陣列走的是
+  Fibre Channel。
+
+## [0.7.64~beta1] - 2026-08-04
+
+### 驗證
+- **0.7.63 兩項修正背後的 ME4024 實機回應已經歸檔。** 客戶提供了該陣列
+  `show host-groups` 與 `show pools` 的實際回應（PowerVault ME4024、
+  `MIL-ME4024`、韌體 `GT280R011-01`、走 Fibre Channel）。0.7.63 發布的兩項修正
+  當時是依 Dell 文件寫的，與陣列實際送出的內容相符：最上層只有 `host-group`，
+  host 巢狀在 `host`（單數）底下、initiator 再巢狀在 `initiator` 底下；可用空間
+  的欄位是 `total-avail`，而且沒有 `avail`。
+
+  這些回應逐字保留在 `t/fixtures/powervault/`，測試套件現在直接從檔案讀取，
+  其中包含客戶實測的 98.56% —— 也就是先前被讀成 100% 已滿的那個儲存池。
+  `docs/TESTING.md` 新增一節，記錄那台陣列確認了什麼、又還沒確認什麼。
+
+### 修正
+- **不屬於任何 host group 的 host，原本仍有可能查不到。** 這是唯一還沒有人抓到
+  的結構：ME 的 CLI 會把 ungrouped host 印在另一個區塊，而它在 JSON 裡對應到
+  哪個鍵名不明 —— 對單節點安裝來說，這是常態而不是邊角案例。因此鍵名清單不再
+  是決定因素。ME 回應裡的每個物件都會在 `object-name` 說出自己的型別，只要那
+  一列寫著 `"object-name": "host"`，不論它掛在哪個鍵底下都會被收進來。反向也
+  成立：從 host 鍵走到、卻自稱是別種型別的那一列，就是那個別的東西，絕不會被
+  當成 host。
+
+## [0.7.63~beta1] - 2026-08-04
+
+### 修正
+- **PowerVault：外掛找不到自己剛剛建立的 host。** 由一台 ME4024 回報。每一次
+  activate 都會建立 host 物件、查不到它、再建立一次，然後被陣列拒絕：
+
+  ```
+  command 'create host initiators ... ' failed:
+  The specified host name is already in use. (return code -10389)
+  ```
+
+  儲存因此進入 inactive 而且再也回不來。`show host-groups` 回傳的是一棵樹 ——
+  host group 在最上層，host 巢狀在其中，initiator 再巢狀一層 —— 而本外掛讀的
+  是一個根本不存在的最上層 `hosts` 陣列。接著的備援又把 host **group** 當成
+  結果回傳，那些是群組名稱，所以任何查詢都不可能命中。
+
+  現在改為走訪整棵樹而不是直接索引；群組絕不會被當成 host 回傳；只有大小寫
+  不同的名稱，也會對應到陣列自己的唯一性檢查會找到的那個 host。
+
+  由於下一版韌體仍可能以沒人看過的結構回答，這裡另外加了第二道防線：把陣列
+  自己的 `-10389` 當成「host 確實存在」的證據 —— 判斷只讀回傳碼，絕不讀訊息
+  文字 —— 並且用「請陣列把 initiator 掛上去」這個會自己回答自己的問題，來確定
+  真正攸關資料安全的那一點：**這個節點的 initiator 是否在那個 host 上**。若連
+  這一點都無法確定，儲存仍然拒絕啟用：把磁碟區對應到可能屬於別的節點的 host，
+  正是兩個節點同時寫入同一顆磁碟的成因。
+
+- **PowerVault：每個儲存池都回報 100% 已用。** 由同一台陣列回報。`pvesm
+  status` 顯示儲存已完全用盡、可用空間為 0，而 PVE 不會配置到一個已滿的儲存池
+  裡。可用空間的欄位讀的是 `avail`，那是 `show pools` **印出來**的欄位標題；
+  pools basetype 記載的是 **`total-avail`**，而這台 ME4024 沒有以標題為名的
+  欄位。陣列沒有的欄位會讀成 0，那與「真的滿了」完全無法區分。舊的拼法仍然會
+  讀，只是排在文件記載的那一個之後。
+
+- **FC：fabric 明明正常，卻一直說「No FC target ports are visible from this
+  node」。** 由同一個節點回報，每次 `pvesm status` 都出現。核心給遠端埠的名稱是
+  `rport-<host>:<channel>-<remote>` —— host 編號後面是**冒號**，例如
+  `rport-5:0-3`。掃描時比對的卻是三段以連字號分隔的數字，那種名稱核心從來沒有
+  建立過，於是目標清單永遠是空的，每一台走 FC 的節點都被告知它的 zoning 有問題。
+
+  這個警告原本還是在一條每十秒、每個儲存、每個節點都會跑的路徑上直接 `warn`。
+  現在改走每小時一次的路徑，而且會說出**看到了什麼**，不只是缺了什麼：完全看
+  不到遠端埠指向 zoning，看得到埠但沒有一個是上線中的 target 則指向完全不同的
+  地方。
+
+### 變更
+- `_cmd` 新增 `allow_codes`：預期中的拒絕改以陣列自己的回傳碼辨識，而不是訊息
+  文字。訊息文字會被在地化、會在韌體改版之間換句話說，而且在本專案歷史上已經
+  有兩次，那段文字其實是外掛自己組出來的。
+
+## [0.7.62~beta1] - 2026-08-04
+
+### 修正
+- **第一個在實體硬體上找到的缺陷。** 一台 PowerVault ME4024 完全無法建立儲存：
+
+  ```
+  GET /show/system returned a body that is not JSON:
+  Wide character in subroutine entry at .../Common/REST.pm line 483
+  ```
+
+  JSON 需要的是**位元組**，而 `HTTP::Response::decoded_content` 回傳的是**字元**。它會依 Content-Type 的 charset 解碼，而任何沒有標明 charset 的 `text/*`，`HTTP::Message` 會退回 ISO-8859-1 —— 於是每一個大於 0x7F 的位元組都變成 wide character，`decode_json` 隨即死掉。ME 的 CLI 回應的正是 `text/*`，而這台陣列的 `/show/system` 裡帶了一個非 ASCII 字元，這樣就足以讓儲存根本建立不起來。
+
+  現在所有回應內容一律以位元組讀取 —— `decoded_content(charset => 'none')`，它會還原 gzip 但不做 charset 解碼 —— 三個系列全部套用，不只出問題的那一個。
+
+### 新增
+- **不是 JSON 的內容會被引用在錯誤訊息裡**，最多 200 個可列印字元。在第一次實機執行時，「HTML 錯誤頁」「空的回應」與「CLI 橫幅」之間的差別就是整個診斷本身，而只說「不是 JSON」什麼線索都沒有。
+- `t/02-rest.t` 會用這些陣列已知會回應的每一種 Content-Type 做測試，包含造成這次問題的 `text/*`，並且會在舊寫法下失敗。
+
+## [0.7.61~beta1] - 2026-08-04
+
+### 修正
+- **`SHA256SUMS` 現在記錄的是實際提供的檔名。** GitHub 不會提供檔名含 `~` 的附件，會把它改寫成 `.`；因此以 Debian 檔名產生的 `SHA256SUMS`，列出的是一個下載後根本不存在的檔案 —— `sha256sum -c` 會回報 *「No such file or directory」*。而那正是照著安裝說明操作的人會遇到的情況，並且是靠**實際照做一次**發現的，不是靠閱讀說明。現在改名發生在計算雜湊之前，因此附件與驗證檔互相吻合。
+
+## [0.7.60~beta1] - 2026-08-04
+
+### 修正
+- **發佈流程恢復正常。** 自 v0.7.36 起的每一次發佈都在語法檢查失敗、什麼都沒發佈；那些 tag 有半數根本沒有對應的 release，而 v0.7.53 到 v0.7.59 從未被建立。
+
+  在 perl 5.38（`ubuntu-24.04` runner 使用的版本）上，`use base` 遇到不存在的基底類別時回報的是 `Base class package "PVE::Storage::Plugin" is empty`，而不是 `Can't locate PVE/...`。後者卻是 `make syntax` 唯一容忍的失敗，因此每一個模組都會讓檢查失敗。現在兩種形式都容忍。
+
+- **`make unit-nopve` 現在也會跑語法檢查**，並使用能重現真實訊息的 stub。先前的 stub 在訊息尾端加了換行，使 `base.pm` 的行為變成檢查原本就會容忍的形式 —— 於是這個模擬把它本該重現的失敗遮蔽掉了，並對「CI 正在拒絕的那份程式碼」回報成功。
+
+## [0.7.59~beta1] - 2026-08-04
+
+### 新增
+- **release workflow 會把失敗的語法檢查同時輸出成 GitHub annotation。** job 的 annotation 可以透過公開 API 讀取，而它的記錄檔不行；因此在此之前，一個紅色的步驟對沒有登入權限的人來說就只是一個沒有任何原因的紅色步驟。這正是「一個從 v0.7.36 起就擋住每一次發佈的 CI 失敗」得靠客戶回報才浮現的原因。
+
+## [0.7.58~beta1] - 2026-08-04
+
+### 修正
+- **`build-deb.yml` 執行檢查時完全沒有安裝相依套件。** 於是 `perl -c` 在 `Can't locate JSON.pm` 就失敗 —— 而那不是 `Can't locate PVE/`，也就是 syntax 目標唯一容忍的失敗 —— 因此這個 job 每一次執行都失敗，持續了好幾個月。現在它會安裝本外掛的執行期 Perl 模組，與 release workflow 原本就有的做法一致。
+- **`make syntax` 會指出缺少哪個模組**，並說明這是「失敗」而不是「略過」，而不是丟出一段原始的編譯錯誤就結束。
+
+### 新增
+- **`release.yml` 改為每項檢查一個步驟。** job 的步驟清單可以透過公開 API 讀取，而它的記錄檔不行 —— 因此合併成一個 *Run checks* 步驟，等於沒有告訴外面的人三項檢查中是哪一項失敗，而那正是過去二十個版本的狀態。它同時也會印出 Perl 版本與相依模組版本，讓環境差異在沒有記錄檔的情況下也看得見。
+
+## [0.7.57~beta1] - 2026-08-04
+
+### 修正
+- **release workflow 一直在失敗,什麼都沒發佈。** 從 v0.7.36 起有半數的 tag 根本沒有對應的 release,而 v0.7.53 到 v0.7.56 從未被建立 —— workflow 在 *Run checks* 就失敗,之後每一步都被跳過。
+
+  CI runner 上沒有 Proxmox VE,因此任何會用到 plugin 的測試都必須 skip 而不是死掉。0.7.37 新增的一段沒有這樣做,於是 `make unit` 在那裡失敗,而在有 PVE 的節點上卻一直是綠的。本機沒有任何東西察覺,因為本機從來沒有以 CI 的方式跑過這套測試。
+
+### 新增
+- **`make unit-nopve`** 會以「沒有 Proxmox VE 的機器」的方式跑完整套測試,而 `make release-check` 現在包含它。一套只能證明開發者自己機器沒問題的綠燈測試,價值非常有限。
+
+### 說明
+`SHA256SUMS` 目前仍未出現在已發佈的 release 上。它只是一個雜湊驗證檔:**不影響套件的安裝與執行。** 這一項另行追蹤。
+
+## [0.7.56~beta1] - 2026-07-27
+
+### 變更
+- **文件網站：功能支援表的三個系列欄位改為置中**，標題與值一起。只把標題置中的話，`dm-multipath` 會停在一個標題位於中央的欄位左側；而只把值置中，正是跨欄那幾列已經在做的事 —— 所以要嘛都做，要嘛都不做。
+
+  功能名稱欄維持靠左：那是眼睛會由上往下讀的一欄。此變更以 class 限定在這張表，頁面上其餘 12 個表格不受影響。
+
+## [0.7.55~beta1] - 2026-07-27
+
+### 變更
+- **文件網站：表格除了橫向分隔線之外，也加上了直向的欄位分隔線。** 現在可以直接對著欄位標題讀值，而不必橫著數過去 —— 在四欄的功能支援表上差別最明顯。全頁 13 個表格都適用。
+
+  最外側的邊框交給外層容器繪製，不在每列最後一格重複畫一次；而跨滿整個寬度的儲存格不加分隔線 —— 它本來就沒有需要被分隔的欄。表頭的分隔線用較深的邊框色、內容用較淺的，讓表頭仍然一眼看得出是表頭。
+
+## [0.7.54~beta1] - 2026-07-27
+
+### 變更
+- **文件網站：三個系列相同的值，改為跨欄並置中。** 跨欄儲存格若靠左對齊，看起來像是屬於 PowerStore 欄的值 —— 意思正好相反。原本三欄都是同一個「✓」的五列也一併合併。
+
+  各系列確實有差異的列，仍然保持分欄，因此這張表現在一眼就能分辨：合併的列代表「三者相同」，分欄的列代表「有差異」。
+
+## [0.7.53~beta1] - 2026-07-27
+
+### 變更
+- **文件改以「安裝發行版套件」為主。** 從原始碼建置現在被放回它本來的位置 —— 那是要修改這個外掛、或想針對自己的 PVE 版本跑測試套件時才做的事，而不是安裝者第一個讀到的東西。release 的 `.deb` 就是該版本測試時所用的建置。文件網站、兩份 README 與兩份 QUICKSTART 都已一致。
+
+### 修正
+實際檢查線上 release 頁面，找到兩處文件與現實不符。
+
+- **`SHA256SUMS` 沒有出現在任何一個 release 上。** 它從第一版就列在 workflow 的上傳清單裡，但每一個已發佈的 release 都只有 `.deb` —— 也就是說，文件要求的驗證步驟**根本無法執行**。現在 workflow 會在發佈前檢查該檔案存在且非空，並設定 `fail_on_unmatched_files`，因此 release 要嘛有它、要嘛大聲失敗。
+- **GitHub 會把附件檔名裡的 `~` 換成 `.`。** 檔案是 `..._0.7.52.beta1-1_all.deb`，而套件版本是 `0.7.52~beta1-1`，因此任何用版本號拼出來的指令都會 404 —— 而文件裡那行 `curl` 正是如此。文件現在改為請使用者從 release 頁面複製檔名，並說明原因。
+
+## [0.7.52~beta1] - 2026-07-27
+
+### 修正
+- **名為 `before-s-after` 的快照，會被解析成「一個不存在的 volume 的快照」。** PVE 以 `pve-configid` 驗證快照名稱，而它允許 `-`，所以這是使用者打得出來的名字。在快照分隔符為 `-s-` 的 PowerVault 與 PowerFlex 上，分隔符是以貪婪方式比對的，取到的是**最後一個**。該快照因此對 `volume_snapshot_list` 隱形，也被「刪除 volume 前必須執行的清除」漏掉 —— 於是刪除那個 volume 會失敗並顯示「它仍有快照」，卻無從得知是哪一個。
+
+  改成非貪婪並不是解法：那會取到**第一個** `-s-`，而 storage id 淨化後為 `s` 的儲存，其 volume 名稱本身就含有 `-s-`。現在改為以 volume 名稱的實際結構比對，那是唯一沒有歧義的讀法。
+- **陣列會「改動」的快照名稱，現在會被拒絕，而不是被安靜地改名。** PVE 保留使用者輸入的名稱，並在之後每次查詢時重新編碼；因此當使用者要求 `trailing-`、卻被存成 `trailing` 時，該快照列出的名稱與 VM 設定不符，而之後的 `trailing` 還會與它相撞。而 `trailing-` 正是 PVE 會接受的名稱。
+
+### 變更
+- 只是「放不下」的快照名稱仍然會被縮短，而且是刻意如此：PVE 允許 40 個字元，而 PowerVault 整個 volume 名稱只有 32 個 —— 拒絕它會讓 `before-upgrade` 這種在正常 storage id 下的名字被擋掉。縮短是決定性的，因此之後每次查詢仍然找得到。
+- `t/01-naming.t` 會以「經過 PVE 自己的 `pve-configid` 驗證過」的名稱對三個系列的命名層做模糊測試，並斷言 volume 那一半永遠精確、快照那一半永遠只會是所要求名稱的前置字串。
+
+## [0.7.51~beta1] - 2026-07-27
+
+### 修正
+- **兩個只差在標點符號的 storage id，會產生完全相同的 volume 名稱。** storeid 折進前置字串時，`-` 會變成 `_` —— 因為 `-` 是 volume 名稱內部的分隔符，id 裡若含有它會讓解析變得有歧義。但那個折疊是**有損的**：`ps-1`、`ps.1`、`ps+1`、`ps@1`、`ps__1` 全都變成 `ps_1`，而 `ps1_`、`_ps1`、`ps1!` 全都變成 `ps1`。
+
+  兩個這樣的儲存放在同一台陣列上，會共用**每一個** volume 名稱。彼此都會列出對方的磁碟、所有權閘門對兩者都通過，而對其中一個執行 `qm destroy`，刪掉的是 PVE 認為屬於另一個的 volume —— 在它發生之前，沒有任何跡象。`docs/NAMING_CONVENTIONS.md` 原本描述的是「防止另一種相關情況」，而這一種完全沒有被提到。
+
+  這在名稱裡無法修：PowerVault 的整個 volume 名稱只有 32 個字元、PowerFlex 只有 31，沒有多餘空間。因此改由 `on_add_hook` 拒絕建立「前置字串與既有儲存相同」的儲存，並指名是與哪一個相撞、以及該改什麼 —— 在那個當下 storage id 還可以自由更改，而一個已經存放了 volume 的儲存則不然。已在本機用真實的 `pvesm add` 驗證。
+
+### 新增
+- `t/13-hostile.t` 會確認那些會相撞的組合確實相撞，以及一個儲存的所有權閘門確實會接受另一個的 volume —— 這樣這個掛鉤存在的理由就不會被遺忘而悄悄移除。
+- `CLAUDE.md` 第 43 條教訓：無法用資料表達的守衛，仍然可以在「資料被建立的那一刻」表達。
+
+## [0.7.50~beta1] - 2026-07-27
+
+### 修正
+- **儲存型別說不出口的協定，現在會在設定當下就被拒絕。** `dell-protocol` 是三種型別共用宣告的 —— `PVE::SectionConfig` 遇到重複的屬性名稱會直接死掉，而且會連帶讓節點上每一個儲存停止運作 —— 因此它的 enum 列出的是所有系列支援的協定總和。於是 PowerStore 接受 `sdc`、PowerFlex 接受 `fc`。PowerFlex 會在第一次使用時死掉，而儲存早已建立、每個操作都失敗；SAN 系列更糟，它們直接把不認識的協定當成 iSCSI —— 節點要求的是一條資料路徑，卻永久地、安靜地拿到另一條。現在由 `on_add_hook` 與 `on_update_hook` 檢查（那是共用屬性的「各系列限制」唯一能放的地方），並已在本機用真實的 `pvesm add` 驗證。
+- **PowerVault：傳輸層會拒絕帶有空白參數的指令。** ME CLI 是位置參數式的，因此一個空白參數不是「空的參數」—— 它是「少一個參數的指令」，後面每一個參數都往前位移。`unmap volume initiator <host> <volume>` 若 host 為空，就變成 `unmap volume initiator <volume>`，而 Dell 文件明載那會移除**預設對應** —— 從陣列上的**每一台主機**，不只是本節點。
+
+### 變更
+- 經檢視確認：兩個 SAN 外掛都沒有覆寫任何 PVE 直接呼叫的破壞性方法，它們只實作 `BlockBase` 在守衛之後才呼叫的 `_array_*` 方法，因此守衛確實對它們生效。這正是與 PowerFlex 的差別 —— PowerFlex 什麼都不繼承，每一道守衛都必須在 0.7.48 逐一手動補上。
+
+## [0.7.49~beta1] - 2026-07-27
+
+### 修正
+- **LXC 容器的快照是對著執行中的檔案系統擷取的。** `PVE::LXC::Config` 只有在儲存回答 `volume_snapshot_needs_fsfreeze` 為真時，才會在快照前凍結容器的掛載點。基底類別回答 0，而本外掛從未覆寫它 —— 但容器的根檔案系統是掛載在**本機**上、而且在陣列擷取快照的同時仍在被寫入。結果最多只是 crash-consistent：還原時需要 journal replay，而且容器以為已經寫入完成的資料仍可能遺失。三種型別現在都回答 1，與 `ZFSPlugin` 基於同樣理由的做法一致。
+- **把磁碟搬到另一種型別的儲存，在任何本外掛的程式碼執行之前就被拒絕了**，`pvesm export`／`import` 與遠端遷移也一樣。`storage_migrate` 會詢問兩端儲存共同支援的傳輸格式，而基底類別對於沒有 `path` 的儲存回答「沒有」。LVM 與 RBD 同樣是沒有 `path` 的原始區塊儲存，兩者都宣告 `raw+size`；現在本外掛也是。「連同快照一起傳輸」與「單獨傳輸一個連結複製」仍然拒絕 —— 兩者都沒有可以獨立傳送的內容。
+
+### 新增
+- `t/15-pve-contract.t` 會對照已安裝的 PVE 檢查這兩項，包含傳輸格式是否與 `LVMPlugin` 對原始磁碟區提供的一致。
+- `CLAUDE.md`：基底方法在這裡可能不是「會死掉」而是「沒有用」。有數個方法在 `$scfg->{path}` 未設定時回傳 `()` 或 0，等於默默地拒絕一整項功能。請對照 `LVMPlugin` 與 `RBDPlugin` —— 那兩個同樣是沒有 path 的區塊儲存。
+
+## [0.7.48~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 完全沒有「使用中」檢查。** 它不繼承 `BlockBase`，因此 SAN 系列具備的守衛沒有任何一項套用到它身上：`free_image` 會解除對應並刪除 volume、`create_base` 會擷取範本、`volume_snapshot_rollback` 會覆寫 volume —— 三者都沒有檢查是否有 guest 正在使用。現在三者都會在「裝置使用中」以及「無法確認」時一律拒絕。
+- **PowerFlex 的還原現在會在陣列還原快照之前**先清空主機快取、之後再失效化，與 SAN 系列一致。
+- **所有權閘門現在也在 PowerFlex 的刪除之前執行** —— volume、它的快照，以及清除流程。
+
+### 新增
+- `CLAUDE.md` 記錄了這次稽核找到的每一個缺陷，並新增一份由「找出它們的那些問題」組成的資料安全檢查清單：「查不出來」會不會以「安全」的身分抵達破壞性動作；「陣列沒回答」有沒有與「陣列說沒有」區分開；閘門辨識的是物件還是只有儲存；某個參數能不能改變指令的**語意**；操作範圍是否限於單一 map；寫入裝置前是否經核心確認；以及損毀的狀態檔能讓無人看管的流程做出什麼。
+- 第 40a 條：PowerFlex 不繼承 `BlockBase` 的任何東西，因此在那裡新增的安全規則，這裡也必須補上。做完這類變更之前，先 grep 一次 `DellPowerFlexPlugin.pm`。
+
+## [0.7.47~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 的 volume 名稱可能被當成 shell 萬用字元。** URL 跳脫在**每一個**參數上都放行了 `*`、`?` 與 `[]`，因為 `show volumes pattern` 確實需要它們 —— 但那只是其中一個參數。而 `delete volumes` 是以位置參數指定刪除目標，因此一個叫做 `pve-me5-*` 的名稱，等於要求陣列刪除該儲存的每一個 volume。現在只有緊接在字面 token `pattern` 之後的那個參數會保留萬用字元。沒有任何地方會產生這種名稱，所有權閘門也會拒絕它 —— 但傳輸層本來就不該有能力表達它。
+- **暫存複製的回收機制可能刪掉真正的磁碟。** 它的閘門是「名稱是否以本儲存的前置字串開頭」，而該儲存上的每一個 VM 磁碟也都符合。一筆指向真實磁碟的損毀紀錄，就足以讓它被刪除 —— 而且是在輪詢的背景中、無人看管地執行。現在改以名稱中的 infix 來辨識暫存複製，那是任何 VM 磁碟都不會有的，而且兩處會移除它的地方都套用了這個檢查。
+
+## [0.7.46~beta1] - 2026-07-27
+
+### 修正
+「使用中」檢查剩下的三個呼叫端，現在遇到「查不出來」也一律拒絕，補完 0.7.45 開的頭：
+
+- **`deactivate_storage`** 會移除本機裝置**並且**解除 volume 的對應。在這裡誤判為「沒在使用」，等於把磁碟從還在寫入的 guest 手上拿走 —— 而停用某個儲存，正是管理者會在 VM 執行中做的事。
+- **`create_base`**：之後每一個連結複製，讀的都是在這裡建立的標記快照。在寫入進行中擷取的範本，是一個從未一致過的檔案系統，而且會被複製進每一個由它衍生的複製。
+- **孤兒清理**遇到無法確認的裝置改為放著不動。它是在輪詢的背景中無人看管地執行：留一個裝置給人工判斷不花什麼成本，移除一個正在使用中的裝置則不然。
+
+### 新增
+- `t/11-imports.t` 會在 `is_device_in_use` 被當成單純布林值使用時失敗 —— 因為 `undef` 在那裡會被讀成「否」，而那正是整個問題所在。唯一一處 fail-open 無害的地方（決定快照前要不要 flush）現在會在呼叫點寫明理由，而這正是這個守衛存在的用意。
+
+## [0.7.45~beta1] - 2026-07-27
+
+### 修正
+- **一個答不出來的安全檢查，原本回答的是「安全」。** `is_device_in_use` 對於所有「查不出來」的情況都回傳 0（沒在使用）：stat 逾時、sysfs 讀不到、`fuser` 被自己的逾時殺掉。而 `fuser` 是其中唯一看得到「執行中的 QEMU」的檢查 —— QEMU 開著裝置，但沒有掛載、也沒有 holder —— 所以 `fuser` 沒跑成功時，前面沒有任何一項排除得了這種情況。現在它回傳 1／0／**undef**，而兩條破壞性路徑遇到 undef 一律拒絕：`free_image` 會先解除對應再刪除，而還原會覆寫整個 volume。
+- **還原現在會在陣列還原快照之**前**先清空主機快取**，而不只是之後。之後才被寫回的髒頁會蓋在已還原的 volume 上，結果看起來像是「還原只成功了一半」。`CLAUDE.md` 規則 14 從一開始就要求「之前 flush、之後 invalidate」，而程式只做了後半。
+
+### 變更
+- 若陣列沒有回報某個 volume 的 WWID，還原會繼續進行，並記錄一次說明。裝置本來就是**以 WWID 來探索**的，因此一個從未有過 WWID 的 volume 不可能在本節點上有裝置，也就不可能被本地任何東西持有 —— 但這確實代表該儲存的裝置探索是壞的，值得在記錄裡留一行，而不是保持沉默。
+
+## [0.7.44~beta1] - 2026-07-27
+
+### 修正
+- **陣列連不上時，刪除會回報成功。** `free_image` 在 `eval` 裡檢查 volume 是否存在，並把**任何**失敗（包含連線逾時）都讀成「它可能已經被刪掉了」，然後回傳成功。而 PVE 在 `free_image` 回傳的當下就會把該磁碟從 VM 設定中移除。於是一次短暫的斷線，就會讓 volume 留在陣列上、而 PVE 裡再也沒有任何東西指向它：資料完好，但誰也找不到。現在「陣列說它不在」與「問不到陣列」是兩個不同的答案，只有前者算刪除成功。
+- **PowerFlex 在更深一層有同樣的漏洞。** 它的後備 volume 列舉會把自己的錯誤吞掉並回傳空清單，而呼叫端會把那讀成「不存在」。答不出來的後備必須說自己答不出來，不能回答「否」。
+
+### 新增
+- **本外掛唯一會寫入的裝置，現在在 `mkfs` 之前會被檢查兩次。** 設定備份磁碟區是由 WWID 經過一段「有後備機制」的查詢解析出來的 —— multipathd 可能連不上，而其後的 `/dev/disk/by-id` glob 是子字串比對。格式化之前，必須由**核心自己對該裝置的識別**確認 WWID（dm uuid 為 `mpath-<wwid>`，或 sd 裝置的 `wwid` 屬性／VPD page 0x83 中的 NAA），**而且**該裝置必須小到足以是一個 1 MB 的設定磁碟區。任何無法確認的情況一律拒絕 —— 設定備份失敗本來就被視為非致命，用它來換「不會格式化到執行中 VM 的磁碟」是正確的代價。
+
+## [0.7.43~beta1] - 2026-07-27
+
+### 修正
+- **所有權閘門現在真的是一道閘門。** `is_pve_managed_volume` 有定義、有文件寫明它守著每一條破壞性路徑、也有測試直接驗證它 —— 但**沒有任何地方呼叫它**。現在它會在每一次「對陣列刪除 volume 或快照」之前執行，帶上 storeid，並在各系列自己的 naming 類別上呼叫，讓各系列的分隔符規則生效。接上去之後立刻就暴露出它自己的定義不完整：它會拒絕「暫時性快照存取複製」，而那正是本外掛自己產生、也必須能夠刪除的東西。
+- **文件網站每次進站都預設英文。** 語言選擇原本存在 `localStorage`，於是幾個月前的一次點選，就決定了之後每一位使用該瀏覽器的訪客會看到什麼。現在它跟隨「本次瀏覽」而不是瀏覽器，載入時會清掉舊的偏好設定，而 `?lang=` 仍可用於分享特定語言的連結。
+- **「PowerFlex SDC 在 Proxmox VE 上的支援狀態」改為準確敘述。** Dell 確實有提供套件、也有寫操作步驟 —— KB 000462918 直接點名 Proxmox VE，SDC 的 tarball 裡也有 `Debian13_SDC` 變體 —— 但 Proxmox VE **不在**作業系統支援矩陣（KB 000272738）裡，任何 PowerFlex 版本皆然。原本的文件把前者當成後者來寫。現在兩份 KB 都附上連結，讓讀者可以自己查證，而不是相信我們。
+
+### 新增
+- `t/11-imports.t` 會在同一個檔案裡有重複定義的 subroutine 時失敗。
+- `PowerFlex/Host.pm` 中直接使用 `-b` 的理由已寫進註解：它們由該函式自己持有的 alarm 所界定，涵蓋 glob 與迴圈中的每一次測試；改用 `is_block_device` 反而會把「單一總預算」換成「不限次數的、各自有界的步驟」。
+
+## [0.7.42~beta1] - 2026-07-27
+
+### 修正
+- **除了一處無法再收窄的操作之外，任何 multipath 動作都不會碰到本外掛不擁有的 map。** `multipathd reconfigure` 會重讀每一個設定檔，並把設定重新套用到節點上的**每一個** map —— 包含其他廠牌的儲存，以及管理者自己手動建立的 map —— 而它原本被用來「讓新對映的 LUN 出現」：在 `activate_storage` 裡**依計時器執行**，以及每一次等待裝置時都會執行。兩者都已移除。新的 LUN 改用 `multipathd add path <sdX>`，只針對該 WWID 的路徑。
+- 唯一保留的節點層級 reconfigure，只在本外掛自己的 `conf.d` 檔案內容改變時執行 —— 因為 multipathd 沒有「只重讀單一檔案」的指令 —— 而且現在會在記錄中寫明它是節點層級的，以及為什麼在該處無法避免。
+
+### 新增
+- `make check-multipath-flush` 現在也會在出現 multipathd 版本的「節點層級 flush」時讓建置失敗 —— 那是本外掛**絕不**應該產生的指令。它會移除節點上每一個未使用的 map（包含其他廠牌的儲存），只是換了一個舊守衛不認得的名字。
+- `t/03-multipath.t` 會確認 `BlockBase` 中只剩下唯一一處節點層級的 reconfigure，並確認「認領某個 WWID 的路徑」完全不會發出 reconfigure。
+- `t/11-imports.t` 會在同一個檔案裡有重複定義的 subroutine 時失敗。Perl 會保留最後一份定義，並在每次載入時發出警告 —— 也就是每一次 `pvesm` 呼叫 —— 而較早的那一份會變成「看起來仍然有效」的死程式碼。這次工作中新增的一個 helper 正好踩到；它已移除，改用模組原有的版本，那一份有廠商過濾、而且嚴格來說更好。
+
+## [0.7.41~beta1] - 2026-07-27
+
+### 新增
+- 「裝置沒有出現」的診斷訊息，現在會在原因是 `find_multipaths` 時直接指名它。Debian 的預設值是 `strict`，在該設定下，multipathd 不會為只看得到單一路徑的 LUN 建立 map —— 而那正是「只有一個 iSCSI session 或一個 HBA 連接埠」的第一次實機測試會遇到的情況。原本訊息只寫「by-id 連結有、map 沒有」，把兩者之間的關聯留給操作者自己想通；現在會直接說明，並附上從 multipathd 自己的合併設定中讀出的實際值。
+
+## [0.7.40~beta1] - 2026-07-27
+
+### 修正
+- **PowerStore 的快照時間可能差上好幾個小時。** `creation_timestamp` 會帶有明確的時區位移 —— Dell 自己的範例回應結尾就是 `+00:00` —— 而程式把位移解析出來後就丟掉了，並沒有實際套用。若陣列回報的不是 UTC，位於 UTC+8 的節點看到的每一個快照時間都會差八小時：那種錯法看起來像是 PVE 的問題，但並不是。現在小數秒、`Z`、不帶時區的時間戳，以及兩種位移寫法都已處理。
+
+### 變更
+- `docs/TESTING.md` 標示出哪些 PowerStore **回應**欄位已由 Dell 自己的範例回應佐證，其餘則明確標為未驗證。volume 範例確認了 `id`、`name`、`size`（位元組）、`wwn`（`naa.` 形式）、`state`、`type`、`appliance_id`、`logical_used`，以及帶有 `source_id` 的 `protection_data`。WWN 仍需與主機自己的 `scsi_id` 比對 —— 那正是範例回應無法回答的唯一一件事。
+
+## [0.7.39~beta1] - 2026-07-27
+
+### 變更
+- **PowerStore 的整個請求面向都已對照 Dell 自己的程式碼確認。** `python-powerstore` 逐字列出了每一個端點路徑，送出的請求內容也與本外掛完全相同；`ansible-powerstore` 則記載了 `port_type` 與 `os_type` 的列舉值。這些原本就全部相符。這一點現在寫進了 `docs/TESTING.md`，讓第一位實測者知道「哪些失敗不可能是請求格式錯誤」—— 而仍未驗證的是**回應**的欄位集合，那正是欄位名稱一覽表存在的理由。
+
+### 修正
+- `volume_create` 沒有把選項往下傳給傳輸層，因此單次呼叫的逾時設定對它不起作用。
+
+## [0.7.38~beta1] - 2026-07-27
+
+### 修正
+- **PowerStore 根本無法回報自己的容量。** `space_metrics_by_cluster` 被當成一個 REST 集合來讀。它其實是效能／容量指標服務的 *entity 名稱*，而該服務要用 `POST /metrics/generate` 搭配 `{entity, entity_id, interval}` 存取 —— 那才是文件記載的形式，也是 Dell 自己的 SDK 送出的形式。在沒有同時把這個序列開放成集合的陣列上，`status()` 會回傳 undef，儲存就顯示為 **inactive**，而其他一切明明都正常。現在先試文件記載的形式，其次是集合形式，再其次是逐一 appliance 加總，而失敗訊息會把三者都列出來。
+- **最新的一筆指標才是當前值。** PowerStore 回傳時是由舊到新，因此取第一筆等於回報「這個時間窗開始時」的容量。
+
+### 變更
+- 本外掛用到的每一個 REST 端點，都已對照 Dell 自己的 `python-powerstore` SDK 確認 —— 它在 `PyPowerStore/utils/constants.py` 中逐字列出了這些路徑。`docs/TESTING.md` 記下了這一點，也記下了當 Dell 文件網站拒絕存取時該去哪裡查：Dell 自己的程式碼。
+
+## [0.7.37~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 的 NVMe/TCP 根本連不上** —— 而 NVMe/TCP 正是這個系列的預設資料路徑。原因有兩個，都是靠閱讀 Dell 自己的 `ansible-powerflex` 模組（其中有一份真實的 SDT 物件）才確認的：
+  - **主機連到了 `storagePort`。** SDT 會公布 `nvmePort` 4420、`storagePort` 12200 與 `discoveryPort` 8009。`storagePort` 走的是 SDS 與 SDT 之間的流量，主機該連的是 `nvmePort`。原本每一次 `nvme connect` 都會被拒絕，也就永遠不會出現任何 namespace。
+  - **subsystem NQN 是從 SDT 讀的，而 SDT 根本沒有 NQN 欄位。** 少了它 `nvme_connect` 會直接 croak，於是 `activate_storage` 在連上任何東西之前就先死了。現在改用 `nvme discover` 對探索連接埠取得 —— 每個儲存一次，之後快取 —— 並跳過探索子系統自己的 NQN。
+- 主機不再連線到 role 為 `StorageOnly` 的 SDT 位址。完全沒有 role 的位址仍然會使用，這樣不熟悉的韌體才不會讓節點一條路徑都沒有。
+
+### 變更
+- `docs/TESTING.md` 記下了 SDT 的欄位名稱、三個連接埠與位址 role，並各自附上 Dell 模組實際顯示的內容。
+
+## [0.7.36~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 建立 volume 時，兩種容量參數拼法都能存活。** ScaleIO REST 參考文件記載的是 `volumeSizeInKb`，而 Dell 自己的 `python-powerflex` SDK 送的是 `volumeSizeInGb`。建立 volume 是任何人使用本外掛的第一件事，因此只接受另一種拼法的陣列，原本會讓第一次 `pvesm alloc` 就卡住。現在先送文件記載的形式，SDK 的形式作為後備，並在記錄中寫下這台陣列採用的是哪一種。
+- 後備**只在 4xx 時**啟用 —— 那代表陣列拒絕了請求、什麼都沒有建立。5xx 有可能已經生效，再送一次就會變成第二個 volume，因此一律不重試，這與傳輸層對所有 POST 的規則一致。
+
+### 變更
+- 多個 PowerFlex 欄位名稱不再標示為未驗證。Dell 自己的 `ansible-powerflex` collection 記載了 `ancestorVolumeId`、`creationTime`、`protectionDomainId`／`protectionDomainName`，以及 `mappedSdcInfo` 的內容（`sdcId`、`sdcName`、`sdcIp`、`accessMode`、`limitIops`）。同一來源也確認了 8 GB 的配置單位、以及陣列是**向上**取整 —— 這正是本外掛原本的做法。
+- `setVolumeSize` 搭配 `sizeInGB`、`removeVolume` 搭配 `removeMode`，都已對照同一份 SDK 確認，並記入模組檔頭。
+
+## [0.7.35~beta1] - 2026-07-27
+
+### 修正
+- **本外掛執行的每一個指令現在都在 C 語系下執行。** util-linux 有提供翻譯，因此在以 `zh_TW` 執行的節點上 —— 而那正是本外掛所設想的節點 —— `fuser -v` 會用中文回答，於是每一個依英文輸出寫成的解析器都會靜靜地比對不到任何東西。不會失敗、也不會有記錄，資訊就只是不再送達 —— 兩個版本前那行「是哪個行程佔著這個裝置」之所以空白，也是同一種「安靜」，只是原因不同。
+- `pve-dell-config-get` 也一併固定語系，讓救援過程中的掛載失敗訊息在每一台節點上都長得一樣。
+
+### 新增
+- 有測試確認三個會執行指令的模組都固定了語系。
+
+## [0.7.34~beta1] - 2026-07-27
+
+### 修正
+- **沒有設定 iSCSI 的節點，在非英文語系下每次 rescan 都會發出警告。** 判斷 `/sys/class/iscsi_session` 是不是根本不存在，靠的是拿 `$!` 去比對 `No such file or directory`。`strerror` 會依節點的語系呈現，因此在 `LC_MESSAGES` 不是英文時比對不到任何東西，「這裡沒有 iSCSI」就被回報成「無法列舉 iSCSI session」。現在改由 errno（透過 `%!`）決定。
+
+### 新增
+- 有測試確認 iSCSI 相關程式碼不會去比對 `strerror` 的文字。註解裡可以提到那個字串，程式碼裡不行。
+
+## [0.7.33~beta1] - 2026-07-27
+
+### 修正
+- **不再有任何「存在性檢查」是靠讀陣列所選的字句來決定答案的。** 原本有三處：PowerFlex 的 `volume_get` 與 `volume_id_by_name`，以及 PowerVault 的 `volume_get_by_name`，都是拿 `/not found/` 去比對錯誤訊息。陣列若因為指定錯儲存池而回「storage pool not found」，就會被讀成「這個 volume 不見了」—— 而呼叫端拿到這個答案之後，下一步就是再建一個。
+- 現在改為判讀狀態碼，或改問一個不會被誤解的問題。PowerVault 的 CLI 把「volume 不存在」回報成錯誤而不是空清單，因此改用「pattern 列舉成功、而清單裡沒有這個名稱」作為證據；若連列舉也失敗，就把陣列原本的錯誤拋出來，而不是去猜。
+
+### 新增
+- REST 層新增 `get_or_undef`：代表「不存在」的狀態碼回傳 undef，其餘回傳解析後的 JSON，全程不讀任何訊息文字。
+- `t/11-imports.t` 會在任何新的「靠比對陣列錯誤文字來做決定」出現時失敗。這是本專案第三次犯下這個錯誤 —— 前兩次分別是 422 提示裡含有「clones」，以及 `add host-members` 裡含有「member」—— 因此它現在是一條有測試撐著的規則，而不只是一個教訓。
+
+## [0.7.32~beta1] - 2026-07-27
+
+### 修正
+- `volume_has_feature` 遇到讀不懂的 volume 名稱時不再直接死掉。它會在逐一檢視 VM 設定的迴圈中被呼叫，所以在那裡 die 會讓整個操作因為一個根本不是問題所在的提問而中止。
+- `pve-dell-config-get` 只會解除它自己掛上去的對應。原本就已經對映到本節點的 volume，是別的東西基於這支工具不知道的理由掛上去的，退出時把它解除是沒有人要求過的變更。
+
+## [0.7.31~beta1] - 2026-07-27
+
+### 修正
+- **連結複製沒辦法建立快照，也不能重新命名。** `volume_has_feature` 是用「名稱是否以 `base-` 開頭」來判斷一個 volume 是不是範本映像。而連結複製的名稱是 `base-100-disk-0/vm-101-disk-0`：它確實以 `base-` 開頭，卻是整個儲存上最不像範本的一種 volume。於是每一個連結複製都被當成範本映像，而外掛一旦回答「否」，PVE 就會直接拒絕 `qm snapshot` 與重新命名 —— 只留下一句「此儲存不支援該功能」，沒有任何可追查的線索。現在改由 `parse_volname` 決定，與 `RBDPlugin` 的做法一致。
+
+### 新增
+- `t/15-pve-contract.t` 會檢查各外掛對連結複製的功能回答，與 0.7.30 加入的 `parse_volname` 比對放在一起。這兩個缺陷的根源相同：同一種 volname 形式，被兩處程式碼理解成不同的東西。
+
+## [0.7.30~beta1] - 2026-07-27
+
+### 修正
+- **把連結複製的磁碟搬到另一種型別的儲存會失敗。** 對連結複製而言，`parse_volname` 回傳的名稱元素是整個 volname。`PVE::Storage::storage_migrate` 會用這個元素組出目標端的 volume 名稱，於是目標儲存會被要求建立一個叫做 `base-100-disk-0/vm-101-disk-0` 的 volume —— 那指的是一個它從未聽過的範本映像。現在改為回傳末端名稱，與 `RBDPlugin` 對同樣這種兩段式 volname 的做法一致。
+
+### 新增
+- `t/15-pve-contract.t` 會在已安裝的 PVE 上，直接把本外掛的 `parse_volname` 與 `RBDPlugin` 的做比較。這樣這項約定就不可能在沒有測試出聲的情況下悄悄退回去，而且它對照的是那個外掛本身，不是某人當初寫下來的一個值。
+
+## [0.7.29~beta1] - 2026-07-27
+
+### 修正
+- **屬於某個 host group 的 PowerStore host，會被配到一個已經在使用中的 LUN ID。** 對 host group 建立的 `host_volume_mapping` 帶的是 `host_group_id` 而沒有 `host_id`，而這樣的對應會在群組中的每一台 host 上都佔用一個 LUN ID。原本尋找可用 LUN 時只看 host 層級的對應，於是配出了群組已經佔用的 ID；對應檢查也會判定該 volume 未對映而再掛載一次。本外掛從不建立 host group，但沒有任何機制阻止管理者把它的 host 放進某個群組。
+- 解除對應時若只找到群組層級的對應，現在會指名該群組並說明，而不是當作沒有東西要移除就直接返回。
+
+### 新增
+- `docs/TROUBLESHOOTING.md` 收錄了 [Dell KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/) 的數字：ESXi 預設掃描 LUN ID 0～1023，而 **Linux 搭配 Emulex FC 驅動只掃描 0～255**。這正是本外掛止於 255、而非止於陣列允許上限的原因，而且現在有測試把這道上限連同理由一起釘住。
+
+## [0.7.28~beta1] - 2026-07-27
+
+### 修正
+- **對映到 NVMe host 的 PowerFlex volume，可能永遠看起來都是未對映的。** 對應項目會以 SDC id 或 host id 指出目標，而同一筆項目有可能兩者皆有；程式讀的是 `sdcId // hostId`，把另一個丟掉了。以 host id 自稱的節點，每次啟用時都會發現該 volume 未對映、於是再對映一次，之後又用一個並非持有者的 id 去解除對映。現在會蒐集該項目指出的每一個 id，並且與 `mappedSdcInfo` 一併讀取 `mappedHostInfo`。
+- PowerVault 依名稱查詢 host 時，會比對資料列可能帶有的兩種拼法，而不是只取第一個有值的。同樣的模式、同樣的理由：這已經是本專案第四次遇到它。
+
+### 變更
+- `t/16-docs.t` 現在也看得到「透過變數讀取」的欄位。以 `qw()` 列出的欄位名稱原本對它是隱形的，而這正是 `mappedHostInfo` 有可能在該列的表格裡沒有任何一行、卻仍進入釋出版本的原因。
+
+## [0.7.27~beta1] - 2026-07-27
+
+### 修正
+- **0.7.26 調整的 PowerVault 欄位順序，弄錯了「哪一個名稱才是文件記載的」。** `show volumes` **印出**的欄位標題是 Total Size 與 Alloc Size，但 volumes basetype —— 也就是 JSON 實際帶的屬性名稱 —— 記載的是 `size`、`total-size` 與 `allocated-size`，而且各自都有以 512 位元組區塊計的 `-numeric` 版本。因此這幾個名稱重新排回最前面，欄位標題則保留為較後的備援。0.7.26 並沒有壞掉，因為備援鏈接住了它，但那個順序表達的意思與 Dell 文件正好相反。
+
+### 變更
+- `creation-date-time-numeric` 不再標示為未驗證：volumes basetype 記載它是未格式化的建立時間。
+- `docs/TESTING.md` 直接寫明當初讓推測出錯的那個分野：**列印出來的欄位標題不等於屬性名稱。** 對 `Avail` 而言兩者相同，對 `Alloc Size` 而言則不然。
+
+## [0.7.26~beta1] - 2026-07-27
+
+### 修正
+- **對映到同一台 PowerVault host 的第二個 volume 會與第一個相撞。** `next_free_lun` 取的是對應資料列中「第一個有值」的身分欄位，再拿它跟 host 比對 —— 而真實的資料列 `identifier`（initiator 的 IQN 或 WWPN）與 `nickname`（host 名稱）兩者都有值。IQN 永遠不會等於 host 名稱，於是沒有任何一列比對得上、每個 LUN 看起來都是空的，下一次對映就會拿到一個已經在用的 LUN。現在會比對該列帶有的任何一種身分，且不分大小寫。
+- **PowerVault 的已用空間會讀成 0。** `show volumes` 文件記載的欄位是 **Total Size** 與 **Alloc Size**，而程式先找的是 `size` 與 `allocated-size`。較舊的拼法仍然接受，只是排在已記載的名稱之後。
+
+### 變更
+- 原本註解寫著「`show maps` 沒有 host 名稱欄位」是錯的。`volume-view-mappings` basetype 記載 `nickname` 就是 host 或 host group 名稱 —— 未設定時為空白，這也正是仍然要一併比對 initiator id 的原因。
+- `docs/TESTING.md` 記下了 `show volumes` 的輸出欄位、`volume-view-mappings` 與 `initiator-view` 的屬性，以及 `pattern` 接受 shell 風格萬用字元、比對的是名稱中**是否含有**該字串。
+
+## [0.7.25~beta1] - 2026-07-27
+
+### 修正
+- **列舉期間若有其他節點刪掉了某個 volume，整個列舉都會失敗。** 總筆數是從第一頁得知的，因此當集合在分頁過程中變短時，分頁確實有可能要求一個超過結尾的 offset。Dell 文件把這種情況記為 `416 Range Not Satisfiable`，而客戶端把它當成一般 4xx 處理：直接致命。現在分頁會就此結束，並保留已經讀到的頁。
+- **iSCSI portal 的查詢不再建立在一個未驗證的過濾運算子上。** 原本是以 `purposes=cs.{Storage_Iscsi_Target}` 取得位址，而 `cs` 與它的大括號字面值從未在真實陣列上驗證過。陣列若不接受或解讀不同，就會回傳空集合 —— 在這裡的意思是沒有 portal、無法登入 iSCSI、也就沒有任何裝置，而且記錄裡不會有任何線索。現在若過濾查詢一無所獲，會改為取回全部位址並在本地比對 purpose，同時印出一行指出原因的警告。
+
+### 新增
+- REST 層新增 `allow_status`：呼叫端若清楚某個特定的拒絕代表什麼，就能依狀態碼本身處理，而不必去比對陣列寫出來的訊息文字。
+- `docs/TESTING.md` 記下了從開發者指南讀到的分頁規則 —— `limit` 為 1～2000（預設 100）、`offset`、`Range` 標頭、`206` 搭配 `Content-Range`，以及 offset 超過結尾時的 `416`。
+
+## [0.7.24~beta1] - 2026-07-27
+
+### 修正
+- **PowerStore 上的 volume 會完全看不到。** 以名稱前置字串過濾時，`ilike` 的萬用字元用的是 `%`。《Dell PowerStore REST API Developers Guide》裡每一個範例寫的都是 `*` —— 而陣列若把萬用字元當成普通字元，就會一筆都對不上：陣列上明明還在的 volume，列舉出來卻是空的。而且不會有任何東西失敗，因為「空的列舉」正是一個沒有任何 volume 的儲存該有的樣子。
+- **DELL-EMC-TOKEN 改為從任何帶有它的回應更新。** Dell 文件把 CSRF token 描述成「每次寫入前先用 GET 取得」，這就留下了一個未定之數：陣列會不會在 session 進行中重新發放。如果會，一直沿用登入當下那一份，結果會是所有寫入都失敗、而所有讀取都正常 —— 看起來就像權限問題。
+- 清除 PowerStore session 時會一併清空 cookie jar，因此 401 之後重新登入時，不會把已被拒絕的 `auth_cookie` 跟新的憑證一起送出去。
+
+### 變更
+- PowerStore 以名稱前置字串列舉時若回傳空集合，會再查一次不帶過濾條件的版本並改在本地比對，同時印出一行指出原因的警告。不論這台陣列接受哪一種萬用字元寫法，外掛都不會再因此弄丟 volume。
+- 若陣列把名稱過濾套用得比「前置字串」更寬鬆，也不會再讓別的儲存的 volume 混進這個儲存的列表裡：每一筆回來的資料都會重新檢查前置字串。
+- `docs/TESTING.md` 記下了目前已從 PowerStore 開發者指南讀出來的部分 —— session 與 CSRF 規則、過濾寫法、運算子清單、萬用字元 —— 讓第一位實測者能把它與仍屬推測的部分區分開來。
+
+## [0.7.23~beta1] - 2026-07-27
+
+### 新增
+- **API 客戶端讀取的每一個欄位名稱一覽表**，收在 `docs/TESTING.md`：每個欄位的用途，以及它是「從 Dell 文件讀出來的」還是「只是推測」。第一次上實機前找到的兩個最嚴重缺陷都是不存在的欄位名稱，而且都不會大聲失敗 —— 一個讓每個 PowerVault 儲存池看起來都是滿的，另一個讓對應檢查永遠回答「否」。這張表的用意，是讓一次比對真實回應就能一次解決全部。
+- 當程式讀取的欄位沒有出現在那張表上時，`t/16-docs.t` 會失敗，因此它不會悄悄過期。
+
+## [0.7.22~beta1] - 2026-07-27
+
+### 修正
+- **每一個 PowerVault 儲存池看起來都會是滿的。** `show pools` 回報的是 Total Size、Avail 與 Snap Size，而程式找的是一個不存在的欄位 `avail-size`，於是可用空間讀成 0、已用空間變成整個儲存池 —— PVE 會拒絕配置任何東西，而容量告警會在第一次輪詢就發出。現在改讀 `avail`，其他拼法則保留為備援。
+
+## [0.7.21~beta1] - 2026-07-27
+
+### 修正
+- **「裝置仍在使用中」的訊息永遠說不出是哪個行程佔著它。** `fuser -v` 會把它的表格印到 stderr，只有純 PID 清單走 stdout，而程式只讀了 stdout。這段訊息的其他部分其實做了不少事 —— 列出 holder、判斷主機從客體磁碟裡啟用了哪個 LVM volume group、並給出對應的 `vgchange -an` —— 但唯獨「是哪個行程開著它」那一行一直是空的。
+
+## [0.7.20~beta1] - 2026-07-27
+
+### 修正
+- **套件沒有相依 LWP 的 HTTPS 驅動。** `libwww-perl` 只有在裝了 `liblwp-protocol-https-perl` 之後才會說 HTTPS —— 在 Debian 上那是獨立的一個套件 —— 而它之所以在每台 PVE 節點上都存在，只是因為 `pve-manager` 剛好相依它。這件事沒有任何保證。少了它，對陣列的每一個請求都會以 `501 Protocol scheme https is not supported` 失敗，而那句話完全沒說要裝什麼。現在它是明確宣告的相依套件，REST 客戶端也會檢查並指名該裝哪一個。
+
+## [0.7.19~beta1] - 2026-07-27
+
+### 修正
+- **發布用的 workflow 根本跑不了它宣稱會跑的測試。** 它只安裝了 `build-essential`、`debhelper` 與 `fakeroot`，因此在沒有 `libwww-perl` 的 runner 上，每一個會載入 API 客戶端的測試都會在編譯期就死掉。現在會在那裡安裝外掛自身的執行期相依套件；而若這些模組不存在，那些測試會以明確理由跳過，而不是失敗 —— 一個「什麼都沒測到卻全綠」的結果，比紅字更糟。
+
+## [0.7.18~beta1] - 2026-07-27
+
+### 新增
+- `docs/FIRST_RUN.md` 與其繁體中文版：第一次接上真實陣列時該怎麼做。包含執行順序、每一步之後要看什麼，以及每種失敗最可能代表什麼 —— 整份文件圍繞著「其他一切都依賴、而且是推測而非讀自 Dell 文件」的四件事來寫：決定外掛會碰哪些裝置的 SCSI vendor 與 product 字串、WWN 轉 WWID 的換算、陣列公布的 portal，以及 multipath drop-in。文件中也明講哪些拒絕是刻意的，以免把正確的拒絕誤認成缺陷。
+
+## [0.7.17~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 每次檢查 host 時都會重新加入 initiator。** 「這個 host 是否已經有本節點的 initiator」原本是靠讀取 host 物件上的扁平欄位來判斷，但 `show host-groups` 是把 initiator **巢狀**放在 host 底下的 —— 每個 initiator 有 Nickname、Discovered、Mapped、Profile、Host Type 與 ID。因此這個檢查永遠回答「沒有」，而陣列會拒絕加入一個它已經有的成員；這個拒絕會讓 `activate_storage` 失敗，於是一個原本正常的儲存會變成 inactive。現在會在 host 結構中的任何位置尋找該 id，不論韌體用的是哪種格式；而「它已經是你想要的狀態了」這類拒絕也會被接受，而不再視為致命錯誤。
+- **陣列自己說不可用的 iSCSI 連接埠，不再送進登入迴圈。** `show ports` 會回報 Media、Target ID（iSCSI 埠是節點名稱）、Status（Up、Warning、Error、Not Present、Disconnected）、IP Address 與 Health。原本只讀了 Media 與位址，因此一個已斷線的連接埠，輕則讓本節點多做一次探測，重則付出一次 discovery 加一次 login 的逾時。
+- **「可容忍的拒絕」只比對陣列自己的用字。** 完整的錯誤訊息裡還帶著失敗的指令，而一個叫做 `add host-members` 的指令會命中任何在找「member」這個字的樣式 —— 這正是在 0.7.12 之前讓範本永遠刪不掉的同一個陷阱。
+
+## [0.7.16~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 無法判斷某個 volume 是否已經對應到本節點。** `show maps` 每個 initiator 回一列，欄位是 Serial Number、Name、Ports、LUN、Access、Identifier、Nickname 與 Profile —— 完全沒有 host 名稱這一欄，因此拿 host 名稱去比對永遠得到「否」。於是每一次啟用都會再對應一次，並且再吃掉一個 LUN；而在這個系列上，那正是會讓新磁碟不再出現的耗損。現在會以 host 名稱**或**本節點自己的任一 initiator id 來比對；解除對應時也使用同一組識別，因為 `unmap volume initiator` 接受 initiator、host 或 host group 皆可。
+
+### 變更
+- 另外四個指令也依 ME5 CLI Reference Guide 確認過，寫法正確：`create snapshots volumes <volumes> <snap-names>`、`delete snapshot <snapshots>`、`expand volume size <size> <volume>`（指南明確寫著這個 size 是「要加到該 volume 的空間量」，而不是新的總容量），以及 `show maps`。
+
+## [0.7.15~beta1] - 2026-07-27
+
+### 修正
+- **`map volume` 在 ME4 與 ME5 之間的記載不同**，而且兩種順序都出自 Dell 自己的 CLI Reference：ME5 把 volume 放在最後，ME4 把它放在最前面。本外掛同時支援這兩個系列，因此會先送 ME5 的形式，若陣列拒絕就退回 ME4 的形式 —— 對應是「沒有它任何 volume 都不能用」的操作。若陣列想要另一種順序，journal 中會記錄一次。
+- `show volumes` 的參數順序改為與指南一致。
+- `docs/ARCHITECTURE.md` 中，關於「抽象介面」與「property 宣告規則」由哪些測試涵蓋的說明是錯的，也缺少了文件寫成之後新增的幾個可覆寫方法。
+
+### 變更
+- 0.7.14 修正的那兩個 host 指令，除了 ME4 指南之外也再對照 ME5 指南確認過。兩個系列的記載完全相同，因此該修正對兩者都正確 —— 這值得確認，因為 `map volume` 正好證明了兩份指南並不總是一致。
+
+## [0.7.14~beta1] - 2026-07-27
+
+### 修正
+- **PowerVault 原本根本起不來。** 儲存第一次啟用時會用到的兩個指令是推測寫出來的，而不是查 Dell 的 CLI Reference Guide，而且兩個都錯：
+  - 建立 host 的正確寫法是 `create host initiators <清單> <名稱>`；原本送的是 `create host id <清單> <名稱>`。
+  - 把 initiator 加進既有 host 的正確寫法是 `add host-members initiators <清單> <host>`；原本送的是 `set initiator host <host> <initiator>`，那是另一個指令 —— `set initiator` 只是為 initiator 命名並設定 profile，不會把它掛到任何 host 上 —— 而且那樣的語法本身也不成立。
+
+  兩者現在都與指南一致，而且所有缺少的 initiator 會在同一個指令中一次加入，不再一個一個送。
+
+### 變更
+- 另外四個 PowerVault 指令也依同一份指南確認過，寫法正確：`delete volumes`、`set volume name <新名稱> <volume>`、`unmap volume initiator <hosts> <volumes>`，以及 32 位元組的名稱上限。順帶查到兩個有用的細節：`delete volumes` 只有在互動式主控台模式才會出現確認提示，因此腳本不需要任何確認旗標；而 `unmap volume` 若省略 initiator，刪掉的會是**預設對應**而不是明確對應 —— 這正是本外掛一律指名 host 的原因。
+- `docs/TESTING.md` 現在會區分「已從 Dell 文件讀出來的」與「仍屬推測的」。
+
+## [0.7.13~beta1] - 2026-07-27
+
+### 新增
+- `t/19-powervault-lifecycle.t` 補齊了最後一塊：三個系列現在各自都有一份「一台 VM 的完整生命週期」測試，跑在會強制執行該系列自身規則的假陣列上。PowerVault 的模型是三者中最特別的 —— 快照本身就是同一個命名空間裡的一級 volume，因此連結複製其實是一個「披著 volume 名稱的快照」—— 而這個假陣列強制執行 Dell 管理者指南所寫的規則：帶有子快照的 volume 或快照，必須先刪掉子項才能刪除。
+- 生命週期測試也會驗證 `status()` 回傳的四個值的順序。PVE 要的是總量、可用、已用、是否可用；而陣列回報的順序是總量、已用、可用。把其中兩個對調，除了 GUI 上的數字不對之外看不出來。
+
+## [0.7.12~beta1] - 2026-07-27
+
+### 修正
+- **在 PowerStore 與 PowerFlex 上，刪除範本永遠不可能成功。** 「要不要移除範本標記」是靠讀取陣列的拒絕訊息來決定的，而這兩個系列對「這個 volume 還有快照」與「有東西是從它複製出來的」使用相同的措辭。PowerStore 的情況更糟：本外掛在 422 時附加的提示文字裡本來就有 `clones` 這個字，於是這條規則等於在比對自己寫的文字，標記永遠不會被移除 —— 該 volume 也就永遠刪不掉。現在改由陣列決定。連結複製是「從標記複製出來的」，因此只要複製還在，陣列就會拒絕刪除標記；直接嘗試並接受拒絕，既安全又是唯一可靠的判斷方式。
+- **面向管理者的訊息都以換行結尾。** 少了它，Perl 會在訊息後面接上 ` at /usr/share/perl5/PVE/Storage/Custom/... line 1234.`，而在 PVE 的工作紀錄裡，那是擋在「正在設法搞清楚該怎麼辦的人」面前的雜訊。
+
+### 新增
+- `t/18-powerflex-lifecycle.t`：PowerFlex 上一台 VM 的完整生命週期。這個系列有自己的配置、複製、快照與刪除路徑，因此 0.7.11 新增的生命週期測試完全沒有涵蓋到它。這裡的假陣列行為與 PowerFlex 一致 —— 以 id 定址、快照本身就是一個帶有 ancestor 的 volume、有後代的 volume 不能刪除 —— 上述的範本刪除問題就是這樣被找出來的。
+- `t/11-imports.t` 現在也會在「die 訊息沒有以換行結尾」時失敗。
+
+## [0.7.11~beta1] - 2026-07-27
+
+### 修正
+- **刪除仍有連結複製的範本時，錯誤訊息怪錯了對象。** 訊息說的是「這個 volume 仍有快照」，那是陣列針對 volume 給的答案；而陣列針對**快照**給的答案才是重點 —— 它有相依的複製。現在會把快照的拒絕理由一併帶進訊息裡，讓管理者知道真正擋住的是哪一個物件，而不是被引導去找快照來刪。
+
+### 新增
+- `t/17-lifecycle.t`：讓一台 VM 的完整生命週期跑在一個「會像真實陣列一樣拒絕」的假陣列上。建立兩顆磁碟、擴充、快照、還原、拒絕跨過較新快照的還原、做成範本、建立連結複製、在複製還在時拒絕刪除範本、兩者都刪掉、摧毀一台磁碟仍帶快照的 VM，以及透過複製讀取快照後再把它刪除 —— 每一步之後都檢查陣列上剩下的東西是否完全正確，以及有沒有任何 volume 被留在對應狀態。
+
+## [0.7.10~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 在每次輪詢時，都會對陣列公布的每一個目標執行 `nvme connect`。** PVE 每個 pvestatd 週期都會呼叫 `activate_storage`，而它會對每個目標各跑一次 `nvme connect`。對已經連上的位址再連一次會成功，所以表面上看不出問題 —— 但那是每個節點、每分鐘六次、每個位址一個行程，而在網路劣化時每一個都帶著 30 秒的逾時。現在改為先讀一次現有路徑，只連缺少的那些；全部都連上時完全不會 fork。持續連不上的目標會依照重新掃描間隔重試，而不是每次輪詢都試 —— 除非一條路徑都沒有，那就立刻重試，因為在有路徑之前這個儲存根本不能用。
+- **儲存池在每次輪詢中被驗證了兩次。** `activate_storage` 會列出陣列上所有儲存池以確認設定的那個存在，而同一次輪詢中 `status()` 又列了一次來回報容量。現在 `activate_storage` 中的檢查改為限制頻率；儲存池若消失，仍會在下一次 `status()` 被發現。
+
+## [0.7.9~beta1] - 2026-07-27
+
+### 修正
+- **`pve-dell-config-get --insecure` 完全沒有作用。** 它背後那個運算式的兩個分支產生的是同一個值，因此不論有沒有加這個旗標，憑證驗證都是關閉的。在 recover 模式下它維持預設關閉 —— 這與外掛本身 `dell-ssl-verify` 的預設一致，而且在故障復原途中跳出憑證錯誤是阻礙而不是保護 —— 並新增 `--verify-ssl` 來開啟。這兩個旗標現在在「從 `storage.cfg` 取得陣列資訊」時也同樣有效。
+- **`pflex-protection-domain` 先前只是個平手時的裁決條件。** 只有在儲存池名稱有歧義時才會被參考，不歧義時就被忽略，於是設定了保護網域的儲存仍可能被指到另一個網域裡的儲存池 —— 而那正是指定網域想避免的事。現在它是必要條件；若該名稱的儲存池不在指定的網域中，會直接拒絕，並列出它實際所在的網域。
+- 當某個端點管理超過一個 PowerFlex 系統時，會明講，而不是默默使用列在最前面的那一個。
+- 建立時未指定 type 的 REST 客戶端，不會再在它要回報的錯誤上面，多疊一個未初始化值的警告。
+
+### 新增
+- `docs/TESTING.md` 說明每一個未驗證的端點該去哪裡確認：PowerStore 的陣列本身就提供 Swagger UI（`https://<mgmt-ip>/swaggerui`），而 PowerVault 的指令可以先用 SSH 試跑，再交給外掛以 HTTPS 送出。
+- `t/16-docs.t` 會實際執行災難復原工具的 `--help`。Getopt::Long 是在被呼叫時才驗證它的選項表，而不是在檔案編譯時，而故障當下是最不適合發現選項表壞掉的時刻。
+
+## [0.7.8~beta1] - 2026-07-27
+
+### 修正
+- **PowerFlex 的選項完全沒有文件。** 五個都沒有，包括必填、而且 PowerFlex 本身沒有預設值的 `pflex-storage-pool`。`docs/CONFIGURATION.md` 與其繁體中文版現在都描述了這些選項，並一併說明該系列 8 GiB 的配置單位、31 個字元的名稱上限，以及在 NVMe/TCP 與 SDC 之間選擇實際上代表什麼。
+
+### 新增
+- `t/15-pve-contract.t`：直接讀取已安裝的 `PVE::Storage::Plugin`，在下列情況失敗 —— 本外掛會繼承到「會去呼叫 `filesystem_path`」或「預設就 die」的基底方法、宣告的 API 版本落在執行中 PVE 可接受的範圍之外、或三個外掛中有兩個宣告了相同的屬性名稱（這會讓 PVE 在建立儲存 schema 時直接 die，並讓節點上所有儲存一起停擺）。日後 PVE 升級若動到這些，會在這裡就失敗，而不是在生產環境才發現。
+- `t/16-docs.t`：當選項存在卻沒有文件、文件寫了不存在的選項（管理者照抄進 `storage.cfg` 會導致整個儲存被拒絕），或某份文件缺少另一種語言的對應版本時，測試失敗。
+- `make release-check` 現在也會檢查兩份 README 與文件網站，包括版本標章，以及網站上是否已有這次發布的變更紀錄條目。
+
+## [0.7.7~beta1] - 2026-07-27
+
+### 修正
+- **名稱比對改為精確錨定。** Perl 的 `$` 也會匹配「字串結尾的換行之前」，因此 `"vm-100-disk-0\n"` 會通過一個原本應該完全相符的樣式，並解析到與乾淨名稱相同的陣列物件。現在所有名稱樣式都以 `\z` 結尾。
+- **長到不可能是 vmid 的數字串不再被解讀為 vmid。** Perl 在第一次以數值使用它時會轉成浮點數，因此一個由三十個 9 組成的名稱會解出 `1e+30` 這個 vmid —— 而它會就這樣被帶進 volid 裡。
+- **列表中不是雜湊的資料列不再讓呼叫端整個掛掉。** 直接解參考會拋出 Perl 型別錯誤而不是略過該列，於是一個非預期的回應格式就足以讓整份列表失效。
+
+### 新增
+- `t/14-parsing.t`：把「缺少的、改名的、型別不對的」欄位丟給外掛裡的每一個解析器 —— WWN 轉換、PowerVault 的 CLI status 物件、容量欄位、volume 資料列、陣列物件名稱，以及 PVE 的 volume 名稱。這些客戶端裡的每個欄位名稱都來自文件而不是實際的陣列，因此其中一定有寫錯的；這份測試要求的是「猜錯時安全地失敗」，而不是照著錯的值繼續動作。
+
+## [0.7.6~beta1] - 2026-07-27
+
+### 修正
+- **對裝置路徑做檔案測試也可能卡住。** `-b` 是一次 stat；當某個 multipath 裝置的所有路徑都失效、而 queueing 仍然開著時，這個 stat 會進入與「讓 `vgs` 卡死」相同的不可中斷睡眠。現在所有這類測試都改走 `Multipath::is_block_device`，由它加上時間上限 —— 並且會把呼叫端原本設好的 alarm 放回去，因為沒有這一步的巢狀 `alarm()` 會默默取消呼叫端自己的逾時保護，那比它想防的卡住更糟。
+- **`volume_resize` 會先等陣列回報新的容量**，才去處理主機端。在 resize 還在進行時就發出逐裝置重新掃描，kernel 會停留在舊容量，QEMU 的 `block_resize` 便會對一顆其實已經長大的 volume 回報「Cannot grow device files」。這個等待有時間上限，而且無論如何都還是會做主機端的重新整理。
+
+### 變更
+- 套件移除腳本會列出哪些儲存將因此停止運作，直接讀取 `storage.cfg`。改用 `pvesm` 詢問就得去連上每一台陣列才能回答，而一個卡住的移除會讓 dpkg 停在半設定狀態。
+
+## [0.7.5~beta1] - 2026-07-27
+
+以「陣列實際會出現的狀態」而非「文件上描述的狀態」來測試。
+
+### 修正
+- **並行配置可能直接失敗，而不是改用下一個編號重試。** 選定 disk id 與建立 volume 是兩個步驟，而 PVE 的配置是平行執行的；但「這個編號是不是已經被拿走」的檢查卻放在重試迴圈外面。於是在競爭中落敗的那個工作行程，會因為一個它其實還可以自由更換的名稱而直接失敗。這是由「16 個行程同時對同一個共用陣列配置」的測試找出來的。
+
+### 新增
+- `t/12-adverse.t`：一台故意行為不良的真實 HTTP 伺服器 —— 接受連線後完全不回應、回應到一半就斷、以 200 回一段 HTML、直接關閉連線不回應、拒絕帳密、登入成功卻不給 token。每一種情況都必須快速失敗、訊息中要指出是哪個儲存，而且絕不能卡住。它同時證明「以 5xx 失敗的建立請求只會送出一次」：該請求可能其實已經送達陣列，重試會讓一顆 PVE 磁碟變成陣列上的兩個 volume。
+- `t/13-hostile.t`：損毀的狀態檔（空檔、截斷、二進位、結構不對的 JSON）、守護所有破壞性路徑的所有權判斷、含有路徑穿越與 shell 特殊字元及非 ASCII 文字的 storage id、各系列在對齊邊界上的容量計算、PowerVault 的增量式擴充，以及 16 路並行配置。
+- `docs/TROUBLESHOOTING_zh-TW.md`：在陣列端手動移除 LUN 之後，殘留 sd 路徑該怎麼處理。沒有任何機制會自動移除 sd 裝置，而它們會一直安靜到下一次 `multipathd` reload 時，才用 EBUSY 灌滿 journal。
+
+## [0.7.4~beta1] - 2026-07-27
+
+延續對兩個相關專案事故紀錄的逐條檢查，並比對 Dell 官方的 PowerStore 與 PowerVault 手冊。
+
+### 修正
+- **儲存 API 版本改為協商，不再寫死。** 當外掛宣告的版本比執行中的 PVE 還新，PVE 會直接拒絕載入 —— 該類型的所有儲存都會從節點上消失；宣告得比較舊則會讓 PVE 在每次載入 `PVE::Storage` 時印出 `implementing an older storage API`，也就是每執行一次 `pvesm`、每啟動一次 daemon 都印一次。PVE 9 在 9.1 的小版本之間就把 `APIVER` 提高了兩次，所以任何固定數字必然在某些版本上是錯的。現在改為宣告「執行中的 PVE 所要求的版本」，上限是本外掛真正實作過的最新版本。
+- **`volume_resize` 處理儲存 API 14 新增的 `$snapname` 參數。** 先前直接忽略它，因此「調整快照大小」的請求會變成調整該快照的來源 volume。現在會明確拒絕並說明原因。
+- **刪除快照時，會先釋放正在讀取它的暫時複製。** 這正是 `vzdump` 快照模式的流程：PVE 建立快照、透過 `path()` 讀取它（這需要在陣列上做一份該快照的複製），備份一完成就立刻刪除快照。陣列不會允許刪除一個「已被複製」的快照，因此每一次這種備份都會在清理階段失敗，並在陣列上留下複製、在本節點留下裝置。Dell 的 PowerVault 手冊把規則寫得很清楚：帶有子快照的 volume 或快照，必須先刪掉子快照才能刪除。
+- **殘留裝置清理不會去動任何「仍有可用路徑」的裝置。** 熱新增到執行中 VM 的磁碟，會有一小段時間不出現在陣列的列表中，而客體其實已經打開了它；而客體開啟的檔案描述子既不是 holder 也不是掛載點，因此「是否使用中」的檢查看不到它。在執行中的客體底下把 map 拔掉，對它而言就是一顆全新磁碟立刻出現 I/O 錯誤。
+- **中斷改以時間長度判定，而不是輪詢次數。** PVE 一旦把儲存標成 inactive 就會有一段時間不再詢問，因此一次真實的中斷可能只會進到外掛一兩次 —— 需要連續三次失敗的計數器，正好會在最該回報的中斷中保持沉默。`activate_storage` 也會記錄自己失敗的原因：PVE 先呼叫它、失敗就不會走到 `status()`，而陣列不可達時失敗的正是它。
+- **`volume_snapshot_info` 與 `rename_snapshot` 改為自行實作。** 基底類別的版本是透過 `filesystem_path` 去讀 qcow2 檔案，而本外掛無法提供該方法，於是會以一個跟呼叫者無關的錯誤訊息失敗。
+- **PowerVault 在還原時會回答確認提示。** CLI Reference 記載的語法是 `rollback volume [prompt yes|no] snapshot <snap> <vol>`；不帶這個參數，陣列就會一直等一個腳本永遠不會給的答案。
+- **PowerFlex 回報真正的快照時間**，不再把每個快照都顯示成 1970 年。
+- **`pve-dell-config-get` 的 `mount` 與 `umount` 加上時間上限。** 它是在故障期間、對著可能只剩半條命的儲存執行的，沒有上限的 mount 會永遠不回來。
+
+### 變更
+- **拒絕還原到「不是最新」的快照。** Dell 手冊說明了「從快照還原 volume」對該 volume 的影響，卻沒有說明那些在還原點之後才建立的快照會怎麼樣。若陣列會把它們清掉，PVE 仍會繼續列出已經不存在的還原點。現在會把擋住它的快照清單交給 PVE 顯示，做法與內建那些「還原具破壞性」的外掛一致。
+
+### 新增
+- `dell-rollback-any-snapshot`（布林，預設關閉）：讓已在自己陣列上驗證過行為的管理者解除上述限制。
+
+## [0.7.3~beta1] - 2026-07-27
+
+對照兩個相關專案 [jt-pve-storage-netapp](https://github.com/jasoncheng7115/jt-pve-storage-netapp) 與 [jt-pve-storage-purestorage](https://github.com/jasoncheng7115/jt-pve-storage-purestorage) 的實際生產事故紀錄逐條檢查。每一類已記錄的故障都在本專案的程式碼中追過一遍，其中九項確實也存在。
+
+### 修正
+- **被陣列拒絕的刪除可能被回報成成功。** `free_image` 在中間夾了其他 `eval` 之後才讀 `$@`，而 `eval` 會把它重設。於是陣列拒絕刪除時的回傳值與成功時完全相同，PVE 便把磁碟從 VM 設定中移除，而 volume 其實還在陣列上。現在會在刪除回傳的當下立刻把錯誤接住。
+- **volume 可能在仍被對應的狀態下被刪除。** 當陣列沒能回答某個 volume 對應到哪些 host 時，`free_image` 仍會繼續往下刪。每一台仍對應著它的節點都會留下一個不會回應的裝置，任何碰到它的行程都會卡在不可中斷睡眠。現在這個查詢失敗即視為致命錯誤 —— 這是可以重試的，殘留裝置不是。
+- **殘留裝置清理曾經對每個 volume 各發一次陣列查詢。** 它跑在每次 `status()` 輪詢的背景中，因此負載會以（volume 數 × 節點數 ÷ 10 秒）成長 —— 這正是壓垮陣列管理介面的典型模式。現在只使用列表查詢已經回傳的欄位；而當整份列表都沒有 WWID 時，會直接放棄該次清理，而不是推論成「所有 volume 都被刪掉了」。
+- **讀取快照用的暫時複製可能洩漏。** 建立它的行程若在刪除前被砍掉，就會留下一個沒有 PVE volume 名稱的物件：它不會出現在任何列表中，而清理程序又不會去動陣列上仍然存在的物件。現在會以節點為單位記錄，並在建立它的行程消失後移除。
+- **PowerStore 的列表查詢可能悄悄被截斷。** 分頁在收到比要求還短的一頁時就停止，但陣列本來就可以把單頁上限壓在要求值以下。被截掉的 volume 會從磁碟清單中消失，清理程序也會把它們當成已刪除。現在改為依照陣列回傳的 `Content-Range` 判斷。
+- **PowerVault 與 PowerFlex 在建立物件後會等待它變成可見**，與 PowerStore 一致。建立成功並不保證下一個查詢就看得到它，而每一個呼叫端都會緊接著對它做對應或查詢。
+- **PowerFlex 的所有倒回路徑都改為先解除對應再刪除**，而本節點無法對應的複製會被倒回，而不是留下一顆裝置永遠不會出現的磁碟。
+- **接在裝置 glob 之後的區塊裝置檢查，改到與 glob 同一個逾時保護之內**。
+- `PowerStore/API.pm` 呼叫了 `decode_json` 卻沒有 `use JSON`。
+
+### 新增
+- `t/11-imports.t`：`perl -c` 對「呼叫未定義的副程式」完全不會有意見，因此少寫一行 `use` 只會在執行期才爆 —— 而且是在面向陣列的路徑上爆，那正是沒有硬體就測不到的地方。上面那個漏掉的 `JSON` 就是這樣被找出來的。
+
+## [0.7.2~beta1] - 2026-07-26
+
+對照 Proxmox VE 9.2.5 的儲存 API 原始碼，逐一檢查外掛的每個進入點，以及各系列的 API 客戶端。共修正九項缺陷，每一項都會在實機測試的頭幾個小時內出現。
+
+### 修正
+- **PowerFlex 套用了錯誤的名稱長度上限。** `PowerFlex::Naming` 已把上限覆寫為 31 個字元，但繼承自 PowerVault 的方法直接讀取該系列的常數 32，因此每個產生出來的名稱都被允許超出一個位元組。storage id 稍長時，快照或連結複製就會被陣列拒絕。共用方法現在改為向類別詢問上限。
+- **刪除 volume 時沒有一併清掉它的快照。** PVE 刪除 VM 磁碟時不會處理儲存端的快照 —— `qm destroy` 直接呼叫 `vdisk_free` —— 而範本一定帶著它的標記快照，因此兩者都會在陣列端失敗。現在會比照 Ceph 與 ZFS 外掛的作法，先刪掉本外掛自己建立的快照。範本標記留到最後處理，而且只有在陣列的拒絕理由與相依物件無關時才刪，因此仍有連結複製依賴它的範本會保留這個識別用的標記。
+- **用來讀取快照的暫時複製，忽略了各系列的名稱長度限制。** 它是用字串直接串接出來的，長度會到 39 個位元組，PowerVault（32）與 PowerFlex（31）都會拒絕，因此這兩個系列根本無法讀取快照。現在改為統一走命名類別產生。
+- **自動產生的 NVMe host NQN 沒有被保存下來。** `nvme gen-hostnqn` 每次呼叫都會產生一組新的隨機 NQN，於是陣列被告知的是 A、而 `nvme connect` 呈現的是 B，namespace 永遠不會出現。現在會以不覆寫既有檔案的原子方式寫入 `/etc/nvme/hostnqn`。
+- **連結複製被列在錯誤的 volid 底下。** `clone_image` 回傳的是 `base-100-disk-0/vm-101-disk-0`，PVE 也是這樣存的，但 `list_images` 卻回報 `vm-101-disk-0`。這會讓 `qm rescan` 認為有一個沒有任何設定檔引用的 volume，於是再次把它加成未使用磁碟。現在改由陣列自身的中繼資料推導出母體；無法判斷的系列則以純名稱回報，與 LVM-thin 外掛的作法一致。
+- **`vollist` 過濾採用前置字串比對**，因此查詢 `vm-1-disk-1` 也會一併傳回 `vm-1-disk-10`。現在比照內建外掛改為完全相符。
+- **PowerStore 可能在陣列已接受的操作上失敗。** 部分請求回應的是 202 與一個 job id，而不是完成後的物件，而程式緊接著就依名稱去查詢。建立與複製現在會等待物件出現。
+- **PowerVault 會把 volume 回報為 0 位元組**，當 `show volumes` 只提供格式化字串而沒有 `-numeric` 欄位時。0 還會讓每次調整大小都看起來像是擴充。現在會退而解析格式化字串。
+- **時鐘往回跳之後，週期性 SAN 重新掃描就停住了**，與先前在健康檢查冷卻時間修掉的是同一類缺陷。
+
+### 變更
+- host 註冊改為每個儲存最多每五分鐘檢查一次，而不是每次 `activate_storage` 都檢查 —— PVE 每次 pvestatd 輪詢都會呼叫它，而在 PowerVault 上這個檢查是一次完整的 `show host-groups`。
+- `pve-dell-config-get` 遇到非 `dellpowerstore` 的儲存會直接拒絕，而不是拿 PowerStore REST 去跟其他系列的陣列講話，並會說明為什麼 PowerVault 上沒有設定備份。
+
+## [0.7.1~beta1] - 2026-07-26
+
+### 變更
+- `dellpowervault` 系列不再提供 VM 設定備份卷。每次對 VM 做快照都會為了保存一份設定而多用掉一個 volume，而 PowerVault ME 陣列的 volume 與快照上限比 PowerStore 少了大約一個數量級 —— 少到這個代價足以決定陣列的 volume 會不會用完。快照、還原與連結複製都不受影響，設定也仍然可以從 PVE 備份、或從叢集中其他節點的 `/etc/pve` 取回。
+- `Common::BlockBase` 新增 `supports_config_backup()`，由它在系列層級決定是否提供此功能，並用它把所有設定卷相關路徑都擋起來。
+
+### 新增
+- `dell-config-backup`（布林，預設開啟）：在有提供此功能的系列上把它關掉，適合 volume 數量已接近上限的 PowerStore。在不提供此功能的系列上設定它不會有任何作用。
+
+### 修正
+- 刪除快照或磁碟時，仍會清掉舊版本寫下的設定卷，即使此功能已經關閉 —— 否則那些 volume 會被遺留在陣列上。
+
+## [0.7.0~beta1] - 2026-07-26
+
+新增 PowerFlex 3.x 與 4.x 的 `dellpowerflex` storage type。
+
+### 新增
+- `PowerFlex/API.pm`、`PowerFlex/Naming.pm`、`PowerFlex/Host.pm` 與 `DellPowerFlexPlugin.pm`。
+- `Common/Schema.pm`：把共用的 `dell-*` 選項抽出來，讓非 block 系列也能使用而不必繼承 `BlockBase`。
+- `docs/POWERFLEX_SDC_zh-TW.md`：SDC 與 NVMe/TCP 的比較、Dell 支援矩陣的所在位置，以及如何確認某個 kernel 是否受支援 —— 以連結官方來源的方式呈現，而不是複製一份會過時的內容。
+- README 加上三個系列各自的設定步驟，並在標題下方加上文件網站連結。
+- 單元測試總計 991 個。
+
+### PowerFlex 的特殊之處
+- **它不繼承 block 基底類別。** volume 是透過 Dell 的 SDC kernel module 或 kernel 內建的 NVMe/TCP initiator 出現的；沒有 SCSI LUN、也沒有 dm-multipath，因此 `BlockBase` 對裝置所做的一切在這裡都是錯的。
+- **預設是 NVMe/TCP。** Dell 針對 Proxmox VE 的說明列出 PVE 8.x 有 SDC 支援，PVE 9.x 則僅為*規劃中*；而且 `scini` 必須針對每個 kernel 編譯 —— 一次 kernel 升級就可能讓節點在模組重建之前沒有儲存。NVMe/TCP 用的是 Proxmox 已經提供的 kernel。
+- **NVMe 的路徑走 ANA，逾時值很關鍵。** 連線時帶入 `ctrl-loss-tmo` 60 秒而非 kernel 預設的 600 秒：它是 NVMe 版的 `no_path_retry`，設成無上限會讓全路徑中斷看起來像當機。啟用時若偵測到 `nvme_core.multipath` 被停用、或只連上部分 target，都會提出警告。
+- **兩種認證世代是自動偵測而非設定**：4.x 從 `/rest/auth/login` 取得 bearer token（五分鐘到期），3.x 從 `/api/login` 取得 token 再當成密碼使用。密碼被拒絕時絕不改用另一個端點重試，否則會讓帳號鎖定政策的失敗次數加倍。
+- 容量向上對齊 8 GB 配置單位；名稱上限 31 個字元。
+
+### 移除
+- 內部開發規格書已不再放在 repository 中。
+
+## [0.6.0~beta1] - 2026-07-26
+
+新增 PowerVault ME4／ME5 系列的 `dellpowervault` storage type。
+
+仍是 beta，也仍未經實機驗證。這次不同的是：面向陣列的細節是實際讀取《Dell PowerVault ME5 Series CLI Reference Guide》而來，不是憑記憶撰寫；[docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 也把「來自官方文件」與「尚未查證」分開列出。
+
+### 新增
+- `PowerVault/API.pm`、`PowerVault/Naming.pm` 與 `DellPowerVaultPlugin.pm`。
+- 新增 154 個單元測試，總計 867 個。
+
+### 這個系列的不同之處，以及為什麼重要
+- **HTTP 200 不代表成功。** ME 是把 CLI 透過 HTTPS 開放出來；被拒絕的指令一樣回 200，判斷結果放在 `status` 物件裡。若以 HTTP 狀態碼為準，建立失敗的 volume 看起來會像成功，PVE 就會記錄一顆並不存在的磁碟。
+- **`expand volume` 收的是增量，不是總量。** PVE 給的是新的絕對容量。直接傳過去，會把使用者要求擴充到 33 GiB 的 32 GiB volume 變成 64 GiB。
+- **容量在這裡要向上取整。** 陣列以 4 MiB 對齊且**向下**取整，所以客戶端必須先向上取整，否則實際 volume 會小於 PVE 以為的大小。
+- **名稱上限 32 bytes 且不可含句點。** 因此這個系列有自己的命名模組：較短的物件名稱、以 `-s-` 而非句點作為快照分隔符號，以及 storeid 的 10 字元額度。放不下的名稱會直接報錯，而不是被截斷成可能與其他 VM 撞名的名稱。
+- **連結複製就是快照。** ME 的快照可寫入也可對應，所以複製即是「取一個名稱長得像 volume 的快照」—— 瞬間完成，且不複製資料。
+
+### 變更
+- 路線圖：PowerStore → PowerVault ME → PowerFlex → PowerMax；PowerScale 未排入。
+- type 字串為 `dellpowervault` 而非 `dellme5`：其他系列都以產品線而非型號命名，而且 ME4 與 ME5 共用同一套 API。
+
+## [0.5.0~beta1] - 2026-07-26
+
+Phase 2 至 4。`dellpowerstore` storage type 已經存在。
+
+> 它**尚未**在任何 PowerStore 陣列上執行過。所有面向陣列的細節在 [docs/TESTING_zh-TW.md](docs/TESTING_zh-TW.md) 中仍標記為未驗證。1.0.0 的門檻是實機測試通過，而不是再寫更多程式。
+
+### 新增
+- `Common/BlockBase.pm`：抽象的 PVE plugin 基底。SAN 啟用、配置、裝置探索與拆除、快照、範本、複製、multipath drop-in，以及背景 orphan 清理 —— 全部與「背後是哪一台陣列」無關。系列 plugin 只需實作 `_array_*` 方法，其餘全部繼承。
+- `PowerStore/API.pm`：涵蓋 volume、快照、精簡複製、host、對應關係與傳輸端點的 REST 客戶端，附 fixture 與 96 項請求格式測試。
+- `PowerStore/Naming.pm`：PowerStore 較寬鬆的名稱限制。
+- `DellPowerStorePlugin.pm`：storage type 本身，以及 PVE 要註冊的 schema。
+- `bin/pve-dell-config-get`：把每次快照旁邊那個設定備份卷裡的 VM 設定讀回來。復原模式下它會自己解析 `storage.cfg`，或直接由命令列取得陣列資訊，完全不經過 pvesm —— 因為這個工具存在的情境，正是 `/etc/pve` 已經不在、或 pvedaemon 起不來的時候。
+- 文件：快速上手、設定參數說明、架構說明、疑難排解、命名慣例與實機測試矩陣，皆有英文與繁體中文版本，另有 `docs/` 底下的專案頁面。
+
+### 值得知道的行為
+- Volume 在建立時就會對應到所有節點，讓線上遷移不必先重新對應；而解除對應一律在刪除之前 —— 相反的順序會讓任何節點上正在進行的重新掃描把該 LUN 重新匯入，在刪除的背後又把裝置建回來。
+- LUN ID 由外掛自行配發，從 `pstore-lun-id-base` 往上補空號。PowerStore 自己的 REST 端序列從 200 開始且不重用 ID，因此不斷對應與解除對應的叢集，最終會把它推到超過主機掃描範圍，新磁碟就再也不會出現。
+- Volume 容量會向上對齊 PowerStore 要求的 8 KiB 粒度。向下取整會交回一個比 PVE 要求還小的 volume。
+- `make syntax` 對需要 Proxmox VE 的模組會回報為「已跳過」而不是失敗，讓一般 CI runner 上的結果是誠實的，而不是碰巧變綠。
+
+## [0.2.0] - 2026-07-26
+
+Phase 1 — 共用的 Common 層。尚未註冊任何 storage type，這些是各系列 plugin 之後要建立在其上的模組。
+
+### 新增
+- `Common/Naming.pm`：物件命名、PVE volume 名稱轉換，以及 `is_pve_managed_volume` 這道 `pve-<storeid>-` 歸屬檢查 —— 所有列舉、刪除與清理路徑都必須先通過它。全部採用 class method，讓各系列以繼承方式放寬名稱長度限制，不需引入共用的可變狀態；因為單一 PVE 行程會同時載入所有 Dell plugin。
+- `Common/REST.pm`：HTTP 傳輸層。POST 遇到 5xx 一律不重試，因為請求可能已經在陣列上生效，重試會多建立一個 volume。401 會清掉 session 並重新登入重試一次。429／503 採退避策略，遵守 `Retry-After` 但上限 30 秒。session 記錄建立它的行程編號，讓 fork 出來的 PVE worker 重新認證，而不是沿用不屬於自己的 session。以 `retries => 1` 搭配短逾時建構，即為 `activate_storage` 與 `status()` 所需的健康檢查用戶端。
+- `Common/Multipath.pm`：裝置生命週期處理，自 NetApp 與 Pure plugin 移植並將 vendor 判斷參數化。程式中絕不會產生 `multipath -F`：`multipath_flush` 一定要有裝置參數。所有 sysfs 存取都在有逾時限制的子行程中進行，因為直接讀取已失效的 LUN 會陷入任何訊號都無法中斷的睡眠狀態。
+- `Common/ISCSI.pm`：initiator 身分、portal 預檢、session 生命週期，以及會跳過非 `LOGGED_IN` session 的逐一 rescan。
+- `Common/FC.pm`：HBA 探索與 WWN 正規化（同一個 WWN 會以三種寫法出現）。預設不發出 LIP。
+- `Common/WwidState.pm`：節點端的 WWID 追蹤，包含 orphan 清理前必須同時通過的寬限期與連續未命中門檻，以及同節點其他 Dell 儲存的辨識，避免把別的儲存正在使用的裝置誤報為殘留。
+- `Common/Health.pm`：`status()` 用的中斷偵測與容量告警，並加上頻率限制，避免約 10 秒一次的輪詢灌爆 journal。
+- 342 個單元測試（`t/01-naming.t` 至 `t/05-state.t`），在不需要陣列與實體裝置的前提下涵蓋重試策略、清理防護、歸屬檢查與 taint 處理。
+
+### 修正
+- 有頻率限制的健康訊息改為明確判斷「從未發送過」，並把未來的時間戳記視為應該發送。先前兩者都依賴與 0 相比的 epoch 運算，因此時鐘往回校正一次，就可能在時差消失前一直把真正的中斷事件靜音。
+
+## [0.1.0] - 2026-07-26
+
+Phase 0 — 專案骨架。本版本尚未註冊任何 storage type。
+
+### 新增
+- MIT 授權、雙語 README 骨架（含 multipath 安全規則與實機驗證免責聲明）。
+- `Makefile`，提供 `install`、`uninstall`、`test`、`syntax`、`unit`、`check-multipath-flush`、`deb`、`clean` 等目標。模組清單改由 `lib/**/*.pm` 自動探索，不需手動維護，後續各階段新增模組時打包設定不必跟著改。
+- Debian 打包檔：`control`、`rules`、`compat`、`changelog`、`copyright`、`docs`、`postinst`、`prerm`、`postrm`。安裝動作透過 `override_dh_auto_install` 交由 Makefile 執行。
+- `postinst` 檢查項目：必要執行檔是否存在（可攔截以 `dpkg -i` 安裝而未解相依的情況）、`/etc/multipath.conf` 與 `/etc/multipath/conf.d/*.conf` 中的危險設定、所有路徑皆失效的 Dell 殘留 map、缺少 LVM `global_filter`、進行中的儲存操作，以及叢集全節點安裝提醒。
+- GitHub Actions 工作流程：安全檢查、`perl -c` 與單元測試通過後才建置 `.deb`。
+- CI 檢查 `make check-multipath-flush`：只要程式碼或文件出現全系統 flush 的大寫 F 指令，建置即失敗；明確禁止該指令的敘述文字則放行。
+- 多系列架構的目錄骨架（`lib/PVE/Storage/Custom/`、`DellEMC/Common/`、各系列子目錄、`t/`、`docs/`、`bin/`）。

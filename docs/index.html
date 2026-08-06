@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.86~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.87~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.87~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">SECURITY: PowerVault's login puts sha256("user_password") in the URL, so a failed login wrote a crackable hash into the journal in full. Every message now passes a shape-based redactor &mdash; credentials cut to a correlatable prefix, WWIDs and volume names untouched.</span>
+            <span class="lang-zh">安全性:PowerVault 的登入把 sha256(「帳號_密碼」) 放在 URL 裡,因此登入失敗會把一個可破解的雜湊完整寫進 journal。現在每則訊息都會經過依形狀判斷的遮蔽 —— 憑證截成可對照的前綴,WWID 與磁碟區名稱完好保留。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.86~beta1</div>
