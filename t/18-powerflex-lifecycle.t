@@ -450,4 +450,31 @@ ok($P->volume_rollback_is_possible($scfg, $store, 'vm-300-disk-0', 'second', [])
       . ' lookup');
 }
 
+{
+    # The upgrade path: a storage whose password is still in storage.cfg.
+    #
+    # Between 0.7.86 and 0.7.91 this died with "Can't locate object method
+    # _warn_once" — the warning about the legacy location was written for
+    # BlockBase, which this plugin does not inherit. Every PowerFlex storage
+    # upgraded from before 0.7.86 failed on activate, status and every array
+    # call, on the compatibility path itself.
+    my $legacy = { 'dell-password' => 'from-the-config' };
+
+    my $pw = eval { $P->_password($legacy, 'pf-legacy') };
+    is($@, '', 'a password still in storage.cfg does not die');
+    is($pw, 'from-the-config', '... and is the one that gets used');
+
+    ok($P->can('_warn_once'),
+        'the throttled warning exists on this class — it inherits nothing'
+      . ' from BlockBase, so nothing arrives from there');
+
+    is($P->_warn_once('pf-legacy', 'a-topic', 'first'), 1,
+        'the first warning of a topic is written');
+    is($P->_warn_once('pf-legacy', 'a-topic', 'second'), 0,
+        '... and the next one within the hour is not: activate_storage runs'
+      . ' every ten seconds and these conditions persist');
+    is($P->_warn_once('pf-legacy', 'another-topic', 'x'), 1,
+        '... while a different topic still gets through');
+}
+
 done_testing();

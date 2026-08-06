@@ -337,4 +337,73 @@ for my $file (sort @files) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# A method called on $class has to exist on that class
+#
+# perl -c compiles $class->_warn_once(...) without a word, and the method is
+# looked up at runtime — so a call to something the class does not inherit
+# fails only when that line runs. It shipped exactly that way in 0.7.86:
+# DellPowerFlexPlugin's _password called _warn_once, which is defined in
+# BlockBase, which PowerFlex does not inherit (it is a PVE::Storage::Plugin
+# subclass in its own right). Every PowerFlex storage whose password was
+# still in storage.cfg — i.e. every one upgraded from before 0.7.86 — died
+# with "Can't locate object method" on activate, status and every array call,
+# and the code path was the upgrade-compatibility path itself.
+#
+# The check is static so it runs where PVE is not installed: parse each
+# file's package, its `use base`, and the subs it defines, then resolve every
+# $class->_private(...) call against that chain. Only underscore-prefixed
+# names are checked — those are this project's own, so a miss is a bug rather
+# than a method PVE's base class provides.
+# ---------------------------------------------------------------------------
+
+{
+    my (%pkg_of, %defined, %bases, @sources);
+    find({ no_chdir => 1, wanted => sub {
+        push @sources, $File::Find::name if /\.pm\z/;
+    } }, 'lib');
+
+    for my $file (sort @sources) {
+        my $src = do { open my $fh, '<', $file or die "$file: $!"; local $/; <$fh> };
+        my ($pkg) = $src =~ /^package\s+([\w:]+);/m or next;
+
+        $pkg_of{$file} = $pkg;
+        $defined{$pkg} = { map { $_ => 1 } $src =~ /^sub\s+(\w+)/mg };
+        $bases{$pkg}   = [ map { split ' ' }
+                           $src =~ /^use\s+(?:base|parent)\s+qw\(([^)]*)\)/mg ];
+    }
+
+    my $resolves;
+    $resolves = sub {
+        my ($pkg, $method, $seen) = @_;
+        $seen //= {};
+        return 0 if $seen->{$pkg}++;
+        return 1 if $defined{$pkg} && $defined{$pkg}{$method};
+        for my $base (@{ $bases{$pkg} // [] }) {
+            return 1 if $resolves->($base, $method, $seen);
+        }
+        return 0;
+    };
+
+    for my $file (sort @sources) {
+        my $pkg = $pkg_of{$file} or next;
+        my $src = do { open my $fh, '<', $file or die "$file: $!"; local $/; <$fh> };
+
+        my @missing;
+        while ($src =~ /\$(?:class|self|_\[0\])->(_\w+)\s*\(/g) {
+            my $method = $1;
+            next if $resolves->($pkg, $method);
+            my $line = 1 + (substr($src, 0, pos($src)) =~ tr/\n//);
+            push @missing, "$method (line $line)";
+        }
+
+        is_deeply(\@missing, [],
+            "$file: every private method it calls on itself exists on its"
+          . " own class or a class it inherits")
+            or diag("These resolve at runtime only, and this class does not"
+                  . " inherit whatever defines them:\n  "
+                  . join("\n  ", @missing));
+    }
+}
+
 done_testing();

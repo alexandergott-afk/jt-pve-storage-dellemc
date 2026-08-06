@@ -1,3 +1,28 @@
+jt-pve-storage-dellemc (0.7.92~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * IMPORTANT for dellpowerflex users on 0.7.86 to 0.7.91: every storage
+    whose password was still in storage.cfg - that is, every one upgraded
+    from before 0.7.86 - died with 'Can't locate object method "_warn_once"'
+    on activate_storage, status and every array call, and the storage went
+    inactive. The warning about the legacy password location was written as
+    $class->_warn_once(...), which is defined in BlockBase; PowerFlex is not
+    a BlockBase subclass. The broken path was the upgrade-compatibility path
+    itself. Fixed by giving PowerFlex its own throttled warning. Without
+    upgrading, the workaround is what the warning asked for anyway:
+    pvesm set <storeid> --dell-password '<the password>'
+  * t/11-imports.t now resolves every private method a class calls on itself
+    against that class's own package and use-base chain, statically, so it
+    runs in CI. perl -c compiles such a call without complaint and Perl
+    resolves it only when the line runs.
+  * Fixed: three warnings on PowerFlex's NVMe activation path had no
+    throttle, on conditions that persist - a missing SDT, native multipathing
+    off, a discovery port that does not answer. activate_storage runs every
+    ~10s per node per storage, so each wrote six lines a minute. They go
+    through _warn_once now (rule 35).
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 23:15:00 +0800
+
 jt-pve-storage-dellemc (0.7.91~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

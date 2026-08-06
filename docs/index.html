@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.91~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.92~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.92~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">IMPORTANT for dellpowerflex on 0.7.86&ndash;0.7.91: a storage whose password was still in storage.cfg died with "Can't locate object method" on every array call &mdash; the warning about the legacy location used a method PowerFlex does not inherit. The broken path was the upgrade-compatibility path itself. Also: three unthrottled warnings on PowerFlex's activation path.</span>
+            <span class="lang-zh">使用 dellpowerflex 且版本在 0.7.86&ndash;0.7.91 者請注意:密碼仍在 storage.cfg 的儲存,每一次陣列呼叫都會以「Can't locate object method」失敗 &mdash; 那則關於舊位置的警告用了 PowerFlex 並未繼承的方法。壞掉的正是升級相容路徑本身。另修正:PowerFlex 啟用路徑上三則未節流的警告。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.91~beta1</div>

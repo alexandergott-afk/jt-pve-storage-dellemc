@@ -7,6 +7,38 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.92~beta1] - 2026-08-06
+
+### Fixed
+- **Every upgraded PowerFlex storage was broken, on the upgrade path itself.**
+  0.7.86 moved the array password into `/etc/pve/priv` and left a warning in
+  place for storages whose password is still in `storage.cfg`. The warning
+  was written as `$class->_warn_once(...)`, which is defined in `BlockBase` —
+  and PowerFlex is not a BlockBase subclass. So any `dellpowerflex` storage
+  carrying a password in `storage.cfg`, which is every one upgraded from
+  before 0.7.86, died with *Can't locate object method "_warn_once"* on
+  `activate_storage`, on `status`, and on every array call. The storage went
+  inactive and stayed there.
+
+  Perl resolves a method at the moment the line runs, and `perl -c` compiles
+  the call without a word, so nothing before this saw it. `t/11-imports.t`
+  now resolves every private method call a class makes on itself against that
+  class's own `package` and `use base` chain — statically, so it runs in CI
+  where there is no PVE. One hit in the whole tree, which was this.
+
+  **Anyone running `dellpowerflex` on 0.7.86 to 0.7.91 should upgrade.** The
+  workaround without upgrading is to move the password into `/etc/pve/priv`,
+  which the warning was asking for anyway: `pvesm set <storeid>
+  --dell-password '<the password>'`.
+
+- **Three warnings on PowerFlex's activation path had no throttle.** A
+  missing SDT, native NVMe multipathing switched off, and a discovery port
+  that does not answer are all conditions that persist — and
+  `activate_storage` runs about every ten seconds per node per storage, so
+  each wrote six lines a minute and buried everything else in the journal.
+  They go through `_warn_once` now, one per storage per topic per hour, which
+  is the rule the SAN families have followed since 0.7.63.
+
 ## [0.7.91~beta1] - 2026-08-06
 
 ### Fixed

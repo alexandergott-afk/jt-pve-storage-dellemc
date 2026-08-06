@@ -516,7 +516,8 @@ sub _ensure_nvme_sessions {
     # Without native multipathing each path shows up as its own block device,
     # and two of them can be written through at once.
     my $mp_warning = $HOST->nvme_multipath_message();
-    warn "Storage '$storeid': $mp_warning\n" if $mp_warning;
+    $class->_warn_once($storeid, 'nvme-multipath',
+        "Storage '$storeid': $mp_warning") if $mp_warning;
 
     my $targets = eval { $api->nvme_targets(status => 1) } // [];
     unless (@$targets) {
@@ -580,10 +581,11 @@ sub _ensure_nvme_sessions {
 
     # One path is not multipathing. Say so, because the array published more
     # targets than this node could reach.
-    warn "Storage '$storeid' has $now_up of " . scalar(@$targets)
-       . " NVMe/TCP targets connected; could not reach: "
-       . join(', ', @failed) . ". The volumes will work but with reduced"
-       . " path redundancy.\n" if @failed;
+    $class->_warn_once($storeid, 'nvme-targets',
+        "Storage '$storeid' has $now_up of " . scalar(@$targets)
+      . " NVMe/TCP targets connected; could not reach: "
+      . join(', ', @failed) . ". The volumes will work but with reduced"
+      . " path redundancy.") if @failed;
 
     return 1;
 }
@@ -615,14 +617,49 @@ sub _nvme_subsystem_nqn {
         return $nqn;
     }
 
-    warn "Storage '$storeid': none of the array's SDT addresses answered NVMe"
-       . " discovery, so there is no subsystem NQN to connect to. Check that"
-       . " the discovery port (8009 by default) is reachable from this node.\n";
+    $class->_warn_once($storeid, 'nvme-discovery',
+        "Storage '$storeid': none of the array's SDT addresses answered NVMe"
+      . " discovery, so there is no subsystem NQN to connect to. Check that"
+      . " the discovery port (8009 by default) is reachable from this node.");
 
     return undef;
 }
 
 # Wall clock of the last time a periodic check ran, per storage and topic.
+# One warning per storage per topic per hour.
+#
+# activate_storage runs every ~10s per node per storage, and the conditions
+# warned about on that path — a missing SDT, native multipathing off — persist
+# until someone fixes them. Unthrottled, each writes six lines a minute per
+# storage and buries everything else in the journal (rule 35).
+#
+# BlockBase keeps its flags in WwidState's lock directory. There is none here:
+# PowerFlex has no dm-multipath and no WWID state, so the throttle is
+# process-wide instead — which is what actually bounds the rate, because the
+# process that polls is pvestatd and it is long-lived. A short-lived `pvesm`
+# invocation warning once is the right answer anyway.
+#
+# Until 0.7.92 this method did not exist here at all, and _password called it:
+# every PowerFlex storage whose password was still in storage.cfg died on
+# "Can't locate object method". See lesson 65.
+my %WARNED;
+
+sub _warn_once {
+    my ($class, $storeid, $topic, $message, %opts) = @_;
+
+    my $interval = $opts{interval} // 3600;
+    my $key = ($storeid // '?') . "\0$topic";
+    my $now = time();
+
+    my $last = $WARNED{$key};
+    return 0 if defined $last && $now >= $last && ($now - $last) < $interval;
+
+    $WARNED{$key} = $now;
+    warn "$message\n";
+
+    return 1;
+}
+
 #
 # activate_storage runs on every pvestatd poll, so anything in it that is not
 # strictly a health check has to be rate-limited. Process-wide on purpose:

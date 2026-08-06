@@ -5,6 +5,31 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.92~beta1] - 2026-08-06
+
+### 已修正
+- **每一個升級上來的 PowerFlex 儲存都壞了,而且壞在升級相容路徑本身。**
+  0.7.86 把陣列密碼移進 `/etc/pve/priv`,並為密碼仍留在 `storage.cfg` 的儲存保留了
+  一則警告。那則警告寫成 `$class->_warn_once(...)`,而這個方法定義在 `BlockBase`
+  —— PowerFlex 並不是 BlockBase 的子類別。於是任何密碼還在 `storage.cfg` 的
+  `dellpowerflex` 儲存(也就是每一個從 0.7.86 之前升級上來的),都會在
+  `activate_storage`、`status` 以及每一次陣列呼叫時,以
+  *Can't locate object method "_warn_once"* 失敗。儲存就此變成 inactive 並停在那裡。
+
+  Perl 是在那一行真正執行時才解析方法,而 `perl -c` 會毫無異議地編譯這種呼叫,所以
+  在此之前沒有任何東西看得見它。`t/11-imports.t` 現在會把每個類別對自己呼叫的私有
+  方法,靜態地對照該檔案自己的 `package` 與 `use base` 繼承鏈解析 —— 靜態,所以在
+  沒有 PVE 的 CI 上也會跑。整棵樹只有一處命中,就是這個。
+
+  **正在使用 `dellpowerflex` 且版本在 0.7.86 到 0.7.91 之間的人請升級。** 不升級的
+  暫時作法,就是把密碼移進 `/etc/pve/priv` —— 那本來就是那則警告在請求的事:
+  `pvesm set <storeid> --dell-password '<密碼>'`。
+
+- **PowerFlex 啟用路徑上的三則警告沒有節流。** SDT 少一台、NVMe 原生多重路徑被關掉、
+  探索連接埠沒有回應,都是會持續存在的狀況 —— 而 `activate_storage` 每個節點每個儲存
+  大約每十秒跑一次,所以每一則每分鐘寫六行,把其他訊息全埋掉。現在都走 `_warn_once`,
+  每個儲存每個主題每小時一次,也就是 SAN 家族自 0.7.63 起就遵守的規則。
+
 ## [0.7.91~beta1] - 2026-08-06
 
 ### 已修正
