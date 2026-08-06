@@ -386,6 +386,22 @@ which is noted per row; the rest are still inferred.
 
 ### PowerFlex (from the REST documentation)
 
+**Re-audited 2026-08-06 key-for-key against `python-powerflex` (gen1 and
+gen2)** — the sweep that was clean on PowerStore found this family's two
+weakest-evidence calls, both formerly `NOT VERIFIED`, both now read from
+Dell's own gen2 client:
+
+| Call | Was | Now |
+|---|---|---|
+| snapshot rollback | `overwriteVolumeContent` sent to every generation | 4.x sends the **`restore`** action (`{srcVolumeId}`); the 3.x form is kept only for arrays that answered the 3.x login, and stays unverified there |
+| NVMe host map/unmap — **the default protocol** | `hostId` sent to `addMappedSdc` | **`addMappedHost` / `removeMappedHost`**, the actions Dell's client carries beside the SDC pair |
+
+Also confirmed in the same audit: `volumeSizeInKb`/`volumeSizeInGb` dual
+spelling (our documented fallback already covers both), `snapshotDefs`
+element keys, `setVolumeSize`'s `sizeInGB`, `removeVolume`'s `removeMode`,
+and `port_name`-style checks do not apply here.
+
+
 | Field | Read for | State |
 |---|---|---|
 | `id`, `name`, `sizeInKb`, `volumeSizeInKb` | volumes | corroborated |

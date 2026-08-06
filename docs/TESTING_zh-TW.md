@@ -333,6 +333,20 @@ host、加入 initiator、metrics/generate）：每一個線上鍵都與 Dell �
 
 ### PowerFlex（出自 REST 文件）
 
+**2026-08-06 已對 `python-powerflex`（gen1 與 gen2）逐鍵重新稽核** —— 在
+PowerStore 上乾淨收場的那一輪掃描,在這個系列找到了兩個證據最薄弱的呼叫,
+兩者原本都標 `NOT VERIFIED`,現在都改為讀自 Dell 自己的 gen2 客戶端:
+
+| 呼叫 | 原本 | 現在 |
+|---|---|---|
+| 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的陣列,在那裡仍未驗證 |
+| NVMe host 對應／解除 —— **預設協定** | 把 `hostId` 送給 `addMappedSdc` | 改用 **`addMappedHost`／`removeMappedHost`**,Dell 客戶端與 SDC 那對並列的動作 |
+
+同場稽核一併確認：`volumeSizeInKb`／`volumeSizeInGb` 雙拼法（既有的文件化備援
+已同時涵蓋）、`snapshotDefs` 元素鍵、`setVolumeSize` 的 `sizeInGB`、
+`removeVolume` 的 `removeMode`。
+
+
 | 欄位 | 用途 | 狀態 |
 |---|---|---|
 | `id`、`name`、`sizeInKb`、`volumeSizeInKb` | volume | 已旁證 |
