@@ -406,4 +406,67 @@ for my $file (sort @files) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# A declared option has to be read by something
+#
+# An option that PVE accepts and no code reads is a silent misconfiguration:
+# the operator sets it, `pvesm add` takes it, and the behaviour it names never
+# changes. Nothing fails, so nothing gets reported. This is the same shape as
+# lesson 41, where a shared option was accepted by a family that could not
+# honour it.
+#
+# The read may be literal ($scfg->{'dell-portal'}) or through BlockBase's
+# _opt helper, which prepends 'dell-' to a bare suffix — so both spellings
+# count. Checking this statically keeps it in CI.
+# ---------------------------------------------------------------------------
+
+{
+    my (%declared, %text);
+    my @sources;
+    find({ no_chdir => 1, wanted => sub {
+        push @sources, $File::Find::name if /\.pm\z/;
+    } }, 'lib');
+
+    for my $file (sort @sources) {
+        my $src = do { open my $fh, '<', $file or die "$file: $!"; local $/; <$fh> };
+        $text{$file} = $src;
+
+        while ($src =~ /'((?:dell|pstore|pvault|unity|pflex)-[a-z0-9-]+)'\s*=>\s*\{\s*\n\s*description\s*=>/g) {
+            $declared{$1} //= $file;
+        }
+    }
+
+    ok(scalar(keys %declared) > 10, 'the option declarations were found')
+        or diag('nothing was parsed, so this test is not testing anything');
+
+    my @dead;
+    for my $option (sort keys %declared) {
+        my ($suffix) = $option =~ /^(?:dell|pstore|pvault|unity|pflex)-(.*)\z/;
+
+        # A READ, not a mention. The declaration and the options list are
+        # exactly two subs, and neither of them reads anything; everywhere
+        # else that names the option is a use of it. Matching the name rather
+        # than a hash access matters because several options are read through
+        # a table — ['pstore-protection-policy' => 'protection_policy_id']
+        # and then $scfg->{$option} — which no pattern for '{' . $option
+        # would ever find.
+        my $read = 0;
+        for my $file (sort keys %text) {
+            my $src = $text{$file};
+            $src =~ s/^sub \s*(?:family_)?(?:properties|options)\s*\{.*?^\}//msg;
+
+            $read = 1 if index($src, "'$option'") >= 0;
+            $read = 1 if $src =~ /_opt\(\s*\$\w+(?:\[\d\])?\s*,\s*'\Q$suffix\E'/;
+            last if $read;
+        }
+
+        push @dead, $option unless $read;
+    }
+
+    is_deeply(\@dead, [],
+        'every declared option is read by something')
+        or diag("These are accepted by pvesm add and change nothing:\n  "
+              . join("\n  ", @dead));
+}
+
 done_testing();
