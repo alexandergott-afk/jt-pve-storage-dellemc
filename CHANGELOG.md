@@ -7,6 +7,37 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.89~beta1] - 2026-08-06
+
+### Fixed
+- **Starting a VM stat'ed its disk without a time limit.**
+  `qemu_blockdev_options` was inherited from PVE's base class because it does
+  the right thing with a `/dev/...` path — and it gets there through
+  `File::stat::stat($path)`, an unbounded stat on a path under `/dev`. On a
+  dm-multipath device whose paths have all failed while queueing is still on,
+  a stat is uninterruptible sleep that no signal clears: the pvedaemon worker
+  starting the VM would hang there, unkillable, with every later caller
+  queued behind it. Every stat this plugin makes of its own is bounded; this
+  one was made by PVE on its behalf, so the method that makes it is now
+  overridden in all four families. `LVMPlugin` and `RBDPlugin` both answer
+  `host_device` with the path and no stat at all, which is the same
+  conclusion by a shorter route.
+
+  The override also refuses to start on the placeholder path `path()` returns
+  when the array cannot be asked. Handing that to QEMU turns a storage outage
+  into I/O errors inside the guest, several minutes later, with nothing
+  pointing at the cause.
+
+### Added
+- **A test that asks what the other two path-less block plugins found
+  necessary.** `LVMPlugin` and `RBDPlugin` are the two PVE plugins that are
+  also block storage with no filesystem path, so a base method BOTH of them
+  override is one whose default does not fit that shape — and inheriting it
+  here is a question to answer rather than a default to accept. Run against
+  the tree as it was two releases ago, it names `volume_export`,
+  `volume_import` and `qemu_blockdev_options`: the last three defects of this
+  kind, all of which it would have found first.
+
 ## [0.7.88~beta1] - 2026-08-06
 
 ### Fixed

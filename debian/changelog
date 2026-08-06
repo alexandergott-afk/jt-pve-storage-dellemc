@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.89~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: starting a VM stat'ed its disk without a time limit.
+    qemu_blockdev_options was inherited from PVE's base class, which reaches
+    the device through File::stat::stat($path) - an unbounded stat on a path
+    under /dev. On a dm-multipath device whose paths have all failed while
+    queueing is still on, that is uninterruptible sleep no signal clears, in
+    the pvedaemon worker starting the VM. Overridden in all four families,
+    answering host_device with the path and no stat, as LVMPlugin and
+    RBDPlugin do. The override also refuses to start on the placeholder path
+    path() returns when the array cannot be asked.
+  * Added: t/15-pve-contract.t asks what LVMPlugin and RBDPlugin - the two
+    other block plugins with no filesystem path - both found necessary. A
+    base method both of them override is one whose default does not fit that
+    shape; inheriting it here now needs a written reason. Against the tree
+    two releases ago it names volume_export, volume_import and
+    qemu_blockdev_options.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 21:05:00 +0800
+
 jt-pve-storage-dellemc (0.7.88~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

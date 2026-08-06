@@ -2097,6 +2097,42 @@ sub filesystem_path {
       . " not available here. Use PVE::Storage::path() instead.\n";
 }
 
+# QEMU's blockdev options for this volume.
+#
+# The base class handles a '/dev/...' path correctly — and reaches it with
+# File::stat::stat($path), an UNBOUNDED stat on a path under /dev. That is the
+# call rule 9 exists for: on a dm-multipath device whose paths have all failed
+# while queueing is still on, a stat lands in uninterruptible sleep, and here
+# it would take the pvedaemon worker starting the VM with it. Every stat this
+# plugin makes goes through Multipath::is_block_device, which bounds it; the
+# one PVE makes on this plugin's behalf could not, so the method that makes it
+# is overridden instead.
+#
+# LVMPlugin and RBDPlugin (with krbd) both answer 'host_device' with the path
+# and no stat at all, which is the same conclusion by a shorter route: a
+# volume here is always a block device or it is nothing.
+sub qemu_blockdev_options {
+    my ($class, $scfg, $storeid, $volname, $machine_version, $options) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    my ($path) = $class->path($scfg, $volname, $storeid,
+        $options->{'snapshot-name'});
+
+    # path() hands back '/dev/mapper/unknown-<name>' when the array cannot be
+    # asked, because a die there would take out more than one volume on the
+    # status paths. This is not one of those paths: QEMU is about to be given
+    # this filename, and a placeholder would become an I/O error inside the
+    # guest rather than a failure to start.
+    die "Cannot start with volume '$volname': its device could not be"
+      . " resolved. The array did not answer, or the volume is not mapped to"
+      . " this node.\n" if $path =~ m{/unknown-};
+
+    die "Cannot start with volume '$volname': '$path' is not a block device"
+      . " on this node.\n" unless is_block_device($path);
+
+    return { driver => 'host_device', filename => $path };
+}
+
 # A compact, mostly-unique token for a temporary object name. Base 36 keeps it
 # inside the few characters PowerVault and PowerFlex have to spare.
 sub _short_token {

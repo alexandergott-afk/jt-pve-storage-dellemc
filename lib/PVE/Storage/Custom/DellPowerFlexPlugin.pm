@@ -1105,6 +1105,28 @@ sub path {
     return wantarray ? ($device, $parsed->{vmid}, 'raw') : $device;
 }
 
+# QEMU's blockdev options for this volume. Same reasoning as BlockBase's, and
+# spelled out here because this plugin inherits none of it (lesson 40a): the
+# base class reaches the path through an unbounded File::stat::stat, which on
+# a device whose paths are gone is the uninterruptible sleep rule 9 exists
+# for — here in the pvedaemon worker that is starting the VM.
+sub qemu_blockdev_options {
+    my ($class, $scfg, $storeid, $volname, $machine_version, $options) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    my ($path) = $class->path($scfg, $volname, $storeid,
+        $options->{'snapshot-name'});
+
+    die "Cannot start with volume '$volname': its device could not be"
+      . " resolved. The array did not answer, or the volume is not mapped to"
+      . " this node.\n" if $path =~ m{-unknown-};
+
+    die "Cannot start with volume '$volname': '$path' is not a block device"
+      . " on this node.\n" unless is_block_device($path);
+
+    return { driver => 'host_device', filename => $path };
+}
+
 sub filesystem_path {
     my ($class, $scfg, $volname, $snapname) = @_;
 

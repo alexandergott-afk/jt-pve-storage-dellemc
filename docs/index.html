@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.88~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.89~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.89~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Starting a VM stat'ed its disk without a time limit &mdash; PVE's base qemu_blockdev_options reaches the device through an unbounded stat, which on a dead multipath device hangs the worker unkillably. Overridden in all four families, plus a test that asks what LVM and RBD both found necessary.</span>
+            <span class="lang-zh">啟動 VM 時對磁碟做了一次沒有上限的 stat &mdash; PVE 基底的 qemu_blockdev_options 透過無界限的 stat 取得裝置,而在失效的 multipath 裝置上那會讓 worker 卡死且殺不掉。四個家族都已覆寫,並新增一個測試,問 LVM 與 RBD 都認為必要的是什麼。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.88~beta1</div>

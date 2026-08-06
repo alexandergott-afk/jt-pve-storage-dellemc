@@ -452,4 +452,74 @@ SKIP: {
     }
 }
 
+# ---------------------------------------------------------------------------
+# What the other two path-less block plugins both found necessary
+#
+# LVMPlugin and RBDPlugin are the two PVE plugins that are also block storage
+# with no filesystem path, so a base method that BOTH of them override is a
+# base method whose default does not fit that shape. Inheriting it here is
+# therefore a question to answer, not a default to accept.
+#
+# It is the general form of two defects. volume_export/volume_import (0.7.88):
+# the FORMATS methods were overridden to advertise a transfer and the
+# transfer itself left to a base class that refuses it for a storage with no
+# path, so every disk move was offered and then refused one call later — and
+# LVM and RBD both override all four. qemu_blockdev_options (0.7.89): the
+# base implementation works, but reaches the device through an unbounded
+# File::stat::stat on a path under /dev, which is the uninterruptible sleep
+# rule 9 exists for, in the worker starting a VM. LVM and RBD both answer
+# 'host_device' without stat'ing anything.
+#
+# An entry in %BASE_DEFAULT_IS_RIGHT is a decision that has been made and can
+# be read back. Anything else is a question nobody has asked yet.
+# ---------------------------------------------------------------------------
+
+my %BASE_DEFAULT_IS_RIGHT = (
+    # Returns 'qemu' for qcow2 and 'storage' otherwise. Every volume here is
+    # raw, so the base always answers 'storage', which is what this plugin
+    # wants: the array takes the snapshot, not QEMU. LVM overrides it for
+    # qcow2-on-LVM and RBD for the non-krbd case; neither exists here.
+    volume_qemu_snapshot_method => 'always raw, so the base answers "storage"',
+);
+
+{
+    require PVE::Storage::LVMPlugin;
+    require PVE::Storage::RBDPlugin;
+
+    my $base = 'PVE::Storage::Plugin';
+    my @both;
+
+    for my $method (sort keys %body) {
+        my $bc = $base->can($method) or next;
+        next if ($method =~ /^_/);
+        next if (PVE::Storage::LVMPlugin->can($method) // 0) == $bc;
+        next if (PVE::Storage::RBDPlugin->can($method) // 0) == $bc;
+        push @both, $method;
+    }
+
+    ok(scalar(@both) > 0, 'LVMPlugin and RBDPlugin were both readable')
+        or diag('the comparison found nothing to compare, which means it is'
+              . ' not testing anything');
+
+    for my $method (@both) {
+        for my $plugin (@PLUGINS) {
+            my $inherited = ($plugin->can($method) // 0) == $base->can($method);
+
+            if (my $why = $BASE_DEFAULT_IS_RIGHT{$method}) {
+                ok(1, "$plugin: $method inherits the base on purpose — $why");
+                next;
+            }
+
+            ok(!$inherited,
+                "$plugin overrides $method, which LVMPlugin and RBDPlugin"
+              . " both found necessary")
+                or diag("Both of the other path-less block plugins override"
+                      . " $method. Either this one needs it too, or the"
+                      . " reason it does not belongs in"
+                      . " %BASE_DEFAULT_IS_RIGHT, where the next person can"
+                      . " read it.");
+        }
+    }
+}
+
 done_testing();
