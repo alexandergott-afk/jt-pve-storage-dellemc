@@ -41,6 +41,10 @@ sub naming { 'PVE::Storage::Custom::DellEMC::PowerVault::Naming' }
 sub multipath_vendor  { 'DellEMC' }
 sub multipath_product { 'ME[45][0-9]*' }
 
+# multipath-tools ships a minimal built-in for DellEMC/^ME (group_by_prio,
+# prio alua, failback immediate). The fuller block below is the one an
+# ME4024 actually ran the first-run test with - prio groups 50/10, I/O on
+# the owning controller - so it is hardware-proven, not merely compatible.
 sub multipath_defaults {
     return {
         path_selector        => 'queue-length 0',

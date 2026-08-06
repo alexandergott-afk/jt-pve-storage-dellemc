@@ -9,7 +9,7 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 ### 修正
 - **Unity：multipath 設定原本會把三十年的 CLARiiON 調校換成一個通用的猜測。**
-  `conf.d` 的 device 區段對比對到的裝置是**整段取代**核心內建條目的，而 Unity
+  `conf.d` 的 device 區段對比對到的裝置會**逐屬性覆蓋**核心內建條目，而 Unity
   的 drop-in 帶著從 PowerVault 抄來的通用 ALUA 區塊。核心為 `^DGC` 寫的內建
   條目是刻意不同的，而且每一處差異都要命：
 

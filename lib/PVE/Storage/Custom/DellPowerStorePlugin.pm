@@ -41,6 +41,14 @@ sub multipath_product { 'PowerStore' }
 
 # Dell's Linux host connectivity guidance for PowerStore. Every value here
 # still needs checking against the current guide for the firmware in use.
+# multipath-tools ships a built-in for DellEMC/PowerStore: group_by_prio,
+# prio alua, failback immediate, no_path_retry 3, fast_io_fail_tmo 15 - and
+# no hardware_handler. PowerStore is a true ALUA array, so unlike Unity
+# (whose CLARiiON-family built-in this plugin must follow), every deviation
+# below is a same-category tuning choice, not a correction: a longer
+# no_path_retry so a brief SP outage does not fail a guest's I/O, a shorter
+# fast_io_fail so path failover starts sooner, and the explicit alua
+# handler the kernel would auto-attach anyway.
 sub multipath_defaults {
     return {
         path_selector        => 'queue-length 0',

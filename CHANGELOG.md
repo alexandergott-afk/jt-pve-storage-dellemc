@@ -11,8 +11,8 @@ release is a prerelease; 1.0.0 is the on-hardware test pass.
 
 ### Fixed
 - **Unity: the multipath settings would have replaced thirty years of
-  CLARiiON tuning with a generic guess.** A `conf.d` device section
-  *replaces* the kernel's built-in entry wholesale for matching devices,
+  CLARiiON tuning with a generic guess.** A `conf.d` device section's
+  attributes *override* the built-in entry's for matching devices,
   and Unity's drop-in carried the generic ALUA block copied from
   PowerVault. The built-in for `^DGC` is deliberately different, and every
   difference matters:

@@ -49,10 +49,12 @@ sub multipath_vendor  { 'DGC' }
 sub multipath_product { '^(RAID|DISK|VRAID)' }
 
 # These FOLLOW multipath-tools' built-in entry for "^DGC" instead of the
-# generic ALUA settings the other families use, because a conf.d device
-# section REPLACES the built-in entry wholesale for matching devices - and
-# the built-in encodes CLARiiON-family behaviour that generic ALUA gets
-# dangerously wrong:
+# generic ALUA settings the other families use. A conf.d device section's
+# attributes override the built-in's per attribute for matching devices -
+# verified on this node by installing the drop-in and reading the merged
+# `multipath -t`: the final DGC entry came out as the built-in plus our
+# additions, with the LUNZ blacklist intact. The built-in encodes
+# CLARiiON-family behaviour that generic ALUA gets dangerously wrong:
 #
 #   - path_checker emc_clariion, with detect_checker explicitly 'no': the
 #     family checker knows a passive SP and an inactive snapshot LU when it
