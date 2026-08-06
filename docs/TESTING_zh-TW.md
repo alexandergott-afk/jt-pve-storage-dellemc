@@ -285,6 +285,16 @@ drop-in、發出全節點 reconfigure。對它跑一條端到端路徑，應納�
 
 ### PowerStore（出自 4.x REST 文件）
 
+**2026-08-06 已對 `python-powerstore` 逐鍵重新稽核** —— 就是抓到 Unity 儲存池
+鍵錯誤的那一招。比對了八組請求內容（建立、複製、對應、restore、快照、建立
+host、加入 initiator、metrics/generate）：每一個線上鍵都與 Dell 的客戶端一致，
+包括 restore 的 `from_snap_id`（它的 Python 參數名不同 —— 正是 Unity 踩過的
+陷阱，這裡躲開了）以及 initiator 的 `port_name`／`port_type`（由 Dell 自己的
+測試證實）。與 Unity 的一個刻意差異：PowerStore 的 restore 明確送出
+`create_backup_snap: false`，所以讓 Unity 付出 0.7.74 一版代價的「未命名備份
+快照」陷阱，在這個系列不可能發生。
+
+
 請求的結構有一部分**確實是**從《Dell PowerStore REST API Developers Guide》讀出來的。為了讓第一位實測者能把它與其餘推測區分開來，列在這裡：
 
 | 從指南讀到的 | 內容 |

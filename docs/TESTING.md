@@ -328,6 +328,18 @@ future family's bring-up.
 
 ### PowerStore (from the 4.x REST documentation)
 
+**Re-audited 2026-08-06 key-for-key against `python-powerstore`** — the
+technique that caught Unity's wrong pool key. Eight request bodies compared
+(create, clone, attach, restore, snapshot, host create, add-initiators,
+metrics/generate): every wire key matches Dell's client, including
+`from_snap_id` on restore (whose Python parameter is named differently — the
+same trap Unity fell into, dodged here) and `port_name`/`port_type` on
+initiators (confirmed by Dell's own tests). One deliberate contrast with
+Unity: PowerStore's restore sends `create_backup_snap: false` explicitly, so
+the unnamed-backup-snapshot trap that cost Unity release 0.7.74 cannot occur
+on this family.
+
+
 Some of the request shape *was* read from the Dell PowerStore REST API
 Developers Guide, and is quoted here so a first tester can tell it apart from
 the rest:
