@@ -62,6 +62,8 @@ pvesm add dellpowerstore ps1 \
 
 使用 Fibre Channel 請改為 `--dell-protocol fc`。若只有部分節點接上 fabric，請加上 `--nodes node1,node2`。
 
+若是 **PowerVault ME**，請把 `--dell-portal` 以逗號填入兩個控制器的管理 IP（`192.168.1.60,192.168.1.61`）：ME 沒有浮動管理位址，而 `dell-portal` 在儲存建立後不能修改。
+
 完整參數說明：[CONFIGURATION_zh-TW.md](CONFIGURATION_zh-TW.md)。
 
 ## 5. 驗證

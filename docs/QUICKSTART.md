@@ -80,6 +80,11 @@ Run this once, on any node — `/etc/pve/storage.cfg` is cluster-wide.
 For Fibre Channel use `--dell-protocol fc`. If only some nodes are on the
 fabric, add `--nodes node1,node2`.
 
+On a **PowerVault ME**, give `--dell-portal` both controllers'
+management IPs, comma-separated (`192.168.1.60,192.168.1.61`): an ME has no
+floating management address, and `dell-portal` cannot be changed after the
+storage exists.
+
 Full parameter reference: [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 5. Verify

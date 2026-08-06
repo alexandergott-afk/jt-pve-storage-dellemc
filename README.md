@@ -300,13 +300,20 @@ to keep every volume in one group, and `--dell-protocol fc` for Fibre Channel.
 
 ```bash
 pvesm add dellpowervault me5 \
-    --dell-portal 192.168.1.60 \
+    --dell-portal 192.168.1.60,192.168.1.61 \
     --dell-username manage \
     --dell-password 'SecurePassword' \
     --pvault-pool A \
     --content images,rootdir \
     --shared 1
 ```
+
+**List both controllers' management IPs, comma-separated.** An ME has one
+fixed IP per controller and no floating management address — a failed
+controller's IP disappears with it — and `dell-portal` cannot be changed
+after the storage exists, so both belong in it from the start. The plugin
+fails over between them; the data path needs nothing, dm-multipath handles
+that on its own. Find the pair with `show network-parameters` on the array.
 
 `--pvault-pool` is required on an array with more than one pool. Keep the
 storage id short: this family limits names to 32 bytes, and a name that would

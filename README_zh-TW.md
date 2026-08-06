@@ -199,13 +199,15 @@ pvesm add dellpowerstore ps1 \
 
 ```bash
 pvesm add dellpowervault me5 \
-    --dell-portal 192.168.1.60 \
+    --dell-portal 192.168.1.60,192.168.1.61 \
     --dell-username manage \
     --dell-password 'SecurePassword' \
     --pvault-pool A \
     --content images,rootdir \
     --shared 1
 ```
+
+**請以逗號把兩個控制器的管理 IP 都列入。** ME 每個控制器各有一個固定 IP、沒有浮動管理位址 —— 控制器故障時它的 IP 會跟著消失 —— 而 `dell-portal` 在儲存建立後不能修改，所以兩個一開始就要都填進去。外掛會在其間自動容錯；資料路徑不需要任何處理，dm-multipath 會自己接手。兩個位址可在陣列上以 `show network-parameters` 查得。
 
 陣列有多個 pool 時 `--pvault-pool` 為必填。storage id 請取短一點：這個系列的名稱上限是 32 bytes，放不下的名稱會被拒絕而不是截斷。
 
