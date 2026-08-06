@@ -1,3 +1,24 @@
+jt-pve-storage-dellemc (0.7.88~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: moving a disk off this storage was advertised and then refused.
+    volume_export_formats declared raw+size and nothing implemented the
+    transfer, so PVE::Storage::Plugin::volume_export - which opens with
+    "if ($scfg->{path} && ...)" and dies for a storage without a path - is
+    what answered. qm move_disk to another storage type, pvesm export,
+    pvesm import and remote migration all failed one call after the plugin
+    offered them. All four families. volume_export and volume_import are now
+    implemented, for the SAN families and for PowerFlex separately: the
+    volume is activated first, the export header's size is read from the
+    kernel, and the device is refused unless the kernel's own identification
+    of it agrees with the volume the array named - an import writes a whole
+    disk image, and path() falls back to a placeholder device when the array
+    cannot be reached.
+  * t/11-imports.t fails any plugin that declares a transfer format without
+    implementing the transfer.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 20:10:00 +0800
+
 jt-pve-storage-dellemc (0.7.87~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

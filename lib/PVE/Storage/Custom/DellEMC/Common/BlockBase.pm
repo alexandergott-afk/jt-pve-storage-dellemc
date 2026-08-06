@@ -44,6 +44,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     udev_refresh
     multipath_reload
     device_matches_wwid
+    device_size_bytes
     multipath_resize_map
     get_multipath_device
     get_device_by_wwid
@@ -2789,8 +2790,12 @@ sub volume_snapshot_needs_fsfreeze { return 1 }
 # refused before reaching any code here.
 #
 # A volume here is a raw block device, exactly as it is for LVM and RBD, and
-# both of those declare 'raw+size' and let the base class do the transfer
-# through path(). This does the same.
+# both of those declare 'raw+size'. What they do NOT do is leave the transfer
+# to the base class: volume_export and volume_import are implemented right
+# below, because the base class cannot do it for a storage without a 'path'
+# either. Declaring the format without implementing the transfer moves the
+# refusal one call later and makes it incomprehensible — see the comment on
+# volume_export.
 sub volume_import_formats {
     my ($class, $scfg, $storeid, $volname, $snapshot, $base_snapshot,
         $with_snapshots) = @_;
@@ -2816,6 +2821,168 @@ sub volume_export_formats {
 
     return $class->volume_import_formats($scfg, $storeid, $volname, $snapshot,
         $base_snapshot, $with_snapshots);
+}
+
+# Declaring a transfer format is half of it, and the half that is visible.
+#
+# PVE::Storage::Plugin::volume_export opens with "if ($scfg->{path} && ...)"
+# and falls through to a die for a storage that has no path — which this one
+# has not, and cannot have (rule 24). So between 0.7.x and 0.7.88 every
+# transfer was advertised as available and then refused one call later, by
+# the base class, naming the very format this plugin had just offered:
+# "volume export format raw+size not available for ...Custom::DellUnityPlugin".
+# LVMPlugin, RBDPlugin and ZFSPoolPlugin all implement BOTH halves; only the
+# formats half was read when the override was written, and the comment above
+# recorded the wrong conclusion for four months.
+#
+# The transfer itself is a dd across a pipe PVE owns. It is deliberately NOT
+# wrapped in an alarm: it is a foreground, user-initiated bulk copy that
+# legitimately runs for hours, and rule 5's bound exists for the poll paths
+# that must never hang pvestatd. Everything AROUND the copy — resolving the
+# device, sizing it, confirming it — is bounded as usual.
+sub volume_export {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    die "volume export format '$format' is not available for $class\n"
+        if !defined($format) || $format ne 'raw+size';
+    die "cannot export a volume together with its snapshots here: the"
+      . " snapshots live on the array, not in the volume\n" if $with_snapshots;
+    die "cannot export the snapshot '$snapshot' here: reading a snapshot needs"
+      . " a temporary clone on the array\n" if defined $snapshot;
+    die "cannot export an incremental stream here\n" if defined $base_snapshot;
+
+    # Nothing activates the volume for us: PVE::Storage::volume_export goes
+    # straight from the storage config to the plugin. On a node that has never
+    # opened this volume there is no mapping and no device at all.
+    $class->activate_volume($storeid, $scfg, $volname);
+
+    my ($device, $wwid) = $class->_transfer_device($scfg, $storeid, $volname);
+
+    my $size = _device_size_bytes($device);
+    die "Cannot export volume '$volname': the size of device $device could"
+      . " not be read. Refusing rather than sending a stream with a size"
+      . " nobody checked.\n" unless defined $size && $size > 0;
+
+    PVE::Storage::Plugin::write_common_header($fh, $size);
+    PVE::Tools::run_command(
+        ['dd', "if=$device", 'bs=64k', 'status=progress'],
+        output => '>&' . fileno($fh),
+    );
+
+    return;
+}
+
+sub volume_import {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots, $allow_rename) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    die "volume import format '$format' is not available for $class\n"
+        if !defined($format) || $format ne 'raw+size';
+    die "cannot import a volume together with its snapshots here\n"
+        if $with_snapshots;
+    die "cannot import into the snapshot '$snapshot'\n" if defined $snapshot;
+    die "cannot import an incremental stream here\n" if defined $base_snapshot;
+
+    my ($vtype, $name, $vmid, undef, undef, undef, $file_format) =
+        $class->parse_volname($volname);
+
+    die "cannot import a volume of type '$vtype' here: this storage holds"
+      . " images only\n" if $vtype ne 'images';
+    die "cannot import format '$format' into a volume of format"
+      . " '$file_format'\n" if $file_format ne 'raw';
+
+    # "Already there" and "could not ask" are different answers (rule 21a).
+    # _array_get_volume dies when the array cannot be reached, and that die is
+    # deliberately not caught: importing over an unreachable array would mean
+    # allocating a second volume on top of one that may already hold data.
+    my $array_name = $class->_array_volname($storeid, $name);
+    if ($class->_array_get_volume($scfg, $array_name)) {
+        die "Volume '$name' already exists on storage '$storeid'\n"
+            unless $allow_rename;
+        warn "Volume '$name' already exists on storage '$storeid' —"
+           . " importing under a different name\n";
+    }
+
+    my ($bytes) = PVE::Storage::Plugin::read_common_header($fh);
+    die "Cannot import volume '$name': the stream carries no size\n"
+        unless defined $bytes && $bytes > 0;
+    # alloc_image takes KiB, and the stream's size is bytes. Round UP: a
+    # volume one byte short of the stream is filled and then fails.
+    my $size_kb = int(($bytes + 1023) / 1024);
+
+    # alloc_image moves to the next free disk id when the name is taken, which
+    # is the rename this contract allows — but only when the caller allows it.
+    my $allocname = $class->alloc_image($storeid, $scfg, $vmid, 'raw', $name,
+        $size_kb);
+
+    eval {
+        if ($allocname ne $name && !$allow_rename) {
+            die "internal error: the volume was allocated as '$allocname'"
+              . " rather than '$name', and the caller cannot follow a"
+              . " rename\n";
+        }
+
+        $class->activate_volume($storeid, $scfg, $allocname);
+
+        my ($device) = $class->_transfer_device($scfg, $storeid, $allocname);
+
+        # conv=sparse skips runs of zeroes instead of writing them. That is
+        # only safe because the target was created by the alloc_image call
+        # directly above: every family creates a thin volume, an unwritten
+        # region of one reads as zeroes, and so the skipped writes are writes
+        # of what is already there. It must never be used to write over a
+        # volume that existed before this call.
+        PVE::Tools::run_command(
+            ['dd', "of=$device", 'conv=sparse', 'bs=64k'],
+            input => '<&' . fileno($fh),
+        );
+    };
+    if (my $err = $@) {
+        # A half-written volume with no VM configuration pointing at it is an
+        # orphan on the array; free_image unmaps before it deletes.
+        eval { $class->free_image($storeid, $scfg, $allocname, 0) };
+        warn "Cleaning up the partly imported volume '$allocname' failed: $@"
+            if $@;
+        die $err;
+    }
+
+    return "$storeid:$allocname";
+}
+
+# The device for a transfer, confirmed by the kernel rather than by the lookup
+# that produced it.
+#
+# path() has a documented fallback: when the WWID cannot be read it hands back
+# '/dev/mapper/unknown-<name>' so that callers on the status paths get an
+# ENOENT instead of a die. An import would then dd a whole disk image into
+# whatever that resolved to, and an export would send whatever it read. Both
+# are the case _write_config_volume already refuses by name, so both get the
+# same guard: the kernel's own identification of the device has to agree with
+# the WWID the array gave for this volume.
+sub _transfer_device {
+    my ($class, $scfg, $storeid, $volname) = @_;
+
+    my $array_name = $class->_array_volname($storeid, $volname);
+    my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
+    die "Cannot transfer volume '$volname': the array did not give a WWID for"
+      . " '$array_name', so the device cannot be confirmed.\n"
+        unless defined $wwid && length $wwid;
+
+    my $device = get_device_by_wwid($wwid);
+    die "Cannot transfer volume '$volname': no device for WWID $wwid is"
+      . " present on this node.\n"
+        unless $device && is_block_device($device);
+
+    die "Refusing to transfer volume '$volname' through '$device': the kernel"
+      . " does not confirm it is the device for WWID $wwid. A transfer reads"
+      . " or writes the whole volume, so an unconfirmed answer is treated as"
+      . " a wrong one.\n"
+        unless device_matches_wwid($device, $wwid);
+
+    return ($device, $wwid);
 }
 
 # The protocols this storage type actually speaks.
@@ -3083,23 +3250,12 @@ sub _backup_vm_config {
 # Anything that cannot be confirmed is refused. The caller already treats a
 # failed config backup as non-fatal and says so, so refusing costs a skipped
 # backup — against formatting a running VM's disk.
-# Size in bytes, bounded, or undef when it cannot be read. Reads sysfs rather
-# than opening the device: an open on a dm device whose paths are all down is
-# the uninterruptible sleep this module exists to avoid.
+# Size in bytes, bounded, or undef when it cannot be read. The implementation
+# is in Common::Multipath so PowerFlex, which inherits nothing from here, uses
+# the same one.
 sub _device_size_bytes {
     my ($device) = @_;
-
-    my $name = eval {
-        PVE::Storage::Custom::DellEMC::Common::Multipath::_resolve_block_device_name($device)
-    };
-    return undef unless defined $name && length $name;
-
-    my $sectors = sysfs_read_with_timeout("/sys/block/$name/size", 3);
-    return undef unless defined $sectors && $sectors =~ /^\s*(\d+)\s*$/;
-
-    # /sys/block/*/size is always in 512-byte sectors, whatever the device's
-    # own logical block size is.
-    return $1 * 512;
+    return device_size_bytes($device);
 }
 
 sub _write_config_volume {

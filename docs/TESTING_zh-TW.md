@@ -421,6 +421,8 @@ make test                    # 以上全部
 | 24 | LUN ID 攀升 | 反覆對應與解除對應 300 次 | ID 維持在低位且密集 | — |
 | 25 | Fibre Channel | FC fabric | 重跑第 1〜24 項 | — |
 | 26 | PVE 9.1 升級到 9.2 | — | 外掛仍正常，`get_identity` 正常回傳 | — |
+| 27 | 把磁碟移到其他類型的儲存 | VM 已停 | `qm move_disk` 移到 LVM 或 ZFS 儲存可完成，來源磁碟區已移除 | — |
+| 28 | `pvesm export`／`pvesm import` | — | 串流可來回轉換；同名再匯入一次會被拒絕，除非允許改名 | — |
 
 ## 1.0.0 的長時間測試門檻
 

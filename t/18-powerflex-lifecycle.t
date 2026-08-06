@@ -387,4 +387,67 @@ ok($P->volume_rollback_is_possible($scfg, $store, 'vm-300-disk-0', 'second', [])
         'and accepts one of this storage\'s own');
 }
 
+{
+    # volume_export / volume_import: the refusals, and the guard in front of
+    # the one operation that writes over a whole volume. PowerFlex inherits
+    # none of BlockBase's, so it has its own (lesson 40a).
+    reset_array();
+
+    ok(!eval { $P->volume_export($scfg, $store, undef, 'vm-100-disk-0',
+            'qcow2+size', undef, undef, 0); 1 },
+        'volume_export refuses a format this storage does not speak');
+    like($@ // '', qr/not available/, 'and says so');
+
+    ok(!eval { $P->volume_export($scfg, $store, undef, 'vm-100-disk-0',
+            'raw+size', undef, undef, 1); 1 },
+        'volume_export refuses a stream carrying snapshots');
+
+    ok(!eval { $P->volume_import($scfg, $store, undef, 'vm-100-disk-0',
+            'raw+size', undef, 'base', 0, 1); 1 },
+        'volume_import refuses an incremental stream');
+
+    $P->alloc_image($store, $scfg, 100, 'raw', undef, 1024);
+    ok(!eval { $P->volume_import($scfg, $store, undef, 'vm-100-disk-0',
+            'raw+size', undef, undef, 0, 0); 1 },
+        'volume_import refuses an existing volume when the caller cannot'
+      . ' follow a rename');
+    like($@ // '', qr/already exists on storage/, 'and says which');
+}
+
+{
+    # The device a transfer would read or write has to come from the volume
+    # id, not from path()'s placeholder.
+    reset_array();
+    $P->alloc_image($store, $scfg, 100, 'raw', undef, 1024);
+
+    no warnings 'redefine', 'once';
+
+    {
+        local *PVE::Storage::Custom::DellPowerFlexPlugin::_device_lookup =
+            sub { sub { undef } };
+        ok(!eval { $P->_transfer_device($scfg, $store, 'vm-100-disk-0'); 1 },
+            'a transfer refuses when the kernel has no device for the volume'
+          . ' id — the case that would dd an image into a placeholder path');
+        like($@ // '', qr/no device for/, 'and says so');
+    }
+
+    {
+        local *PVE::Storage::Custom::DellPowerFlexPlugin::_device_lookup =
+            sub { sub { '/dev/nvme0n42' } };
+        local *PVE::Storage::Custom::DellPowerFlexPlugin::is_block_device =
+            sub { 0 };
+        ok(!eval { $P->_transfer_device($scfg, $store, 'vm-100-disk-0'); 1 },
+            '... and one that is not a block device');
+
+        local *PVE::Storage::Custom::DellPowerFlexPlugin::is_block_device =
+            sub { 1 };
+        is($P->_transfer_device($scfg, $store, 'vm-100-disk-0'),
+            '/dev/nvme0n42', 'a device resolved from the volume id is used');
+    }
+
+    ok(!eval { $P->_transfer_device($scfg, $store, 'vm-999-disk-0'); 1 },
+        'a volume that is not on the array is refused before any device'
+      . ' lookup');
+}
+
 done_testing();

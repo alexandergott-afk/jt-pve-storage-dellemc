@@ -1313,4 +1313,103 @@ SKIP: {
     rmdir $dir;
 }
 
+# ---------------------------------------------------------------------------
+# volume_export / volume_import
+#
+# The refusals, and the guard in front of the one operation here that writes
+# over a whole volume. The copy itself needs a real device and is not driven
+# from here; what is driven is everything that decides whether the copy runs.
+# ---------------------------------------------------------------------------
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $fh;   # never reached by any of these
+
+    my @refusals = (
+        ['qcow2+size', undef, undef, 0, qr/not available/,
+            'a format this storage does not speak'],
+        ['raw+size',   undef, undef, 1, qr/together with its snapshots/,
+            'a stream carrying snapshots'],
+        ['raw+size',   'snap1', undef, 0, qr/snapshot 'snap1'/,
+            'exporting a snapshot'],
+        ['raw+size',   undef, 'base', 0, qr/incremental/,
+            'an incremental stream'],
+    );
+
+    for my $case (@refusals) {
+        my ($format, $snap, $base, $withsnaps, $re, $what) = @$case;
+
+        eval { Test::Plugin->volume_export($scfg, 't1', $fh, 'vm-100-disk-0',
+            $format, $snap, $base, $withsnaps) };
+        like($@, $re, "volume_export refuses $what");
+
+        eval { Test::Plugin->volume_import($scfg, 't1', $fh, 'vm-100-disk-0',
+            $format, $snap, $base, $withsnaps, 1) };
+        like($@, $re, "volume_import refuses $what")
+            unless $what =~ /exporting/;
+    }
+
+    is_deeply(Test::Plugin->calls(), [],
+        'a refused transfer never reaches the array at all');
+}
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk0'} = { size => 1024, used => 0 };
+
+    eval { Test::Plugin->volume_import($scfg, 't1', undef, 'vm-100-disk-0',
+        'raw+size', undef, undef, 0, 0) };
+    like($@, qr/already exists on storage 't1'/,
+        'importing onto an existing volume is refused when the caller cannot'
+      . ' follow a rename');
+
+    my $calls = join(' | ', @{ Test::Plugin->calls() });
+    unlike($calls, qr/\bcreate\b/,
+        '... and nothing was created before the refusal');
+}
+
+{
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    $Test::Plugin::VOLUMES{'pve-t1-100-disk0'} = { size => 1024, used => 0 };
+
+    # The array cannot say which device this is.
+    eval { Test::Plugin->_transfer_device($scfg, 't1', 'vm-100-disk-0') };
+    like($@, qr/did not give a WWID/,
+        'a transfer refuses a volume whose WWID the array will not give');
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+    local *Test::Plugin::_array_get_wwid = sub { '3600a0980deadbeef' };
+
+    my $BB = 'PVE::Storage::Custom::DellEMC::Common::BlockBase';
+    local *{"${BB}::get_device_by_wwid"}  = sub { undef };
+    local *{"${BB}::is_block_device"}     = sub { 1 };
+    local *{"${BB}::device_matches_wwid"} = sub { 1 };
+
+    eval { Test::Plugin->_transfer_device($scfg, 't1', 'vm-100-disk-0') };
+    like($@, qr/no device for WWID/,
+        '... and one the kernel does not have at all');
+
+    local *{"${BB}::get_device_by_wwid"}  = sub { '/dev/mapper/3600a0980deadbeef' };
+    local *{"${BB}::device_matches_wwid"} = sub { 0 };
+
+    eval { Test::Plugin->_transfer_device($scfg, 't1', 'vm-100-disk-0') };
+    like($@, qr/kernel does not confirm/,
+        '... and one the kernel does not confirm is the volume asked for —'
+      . ' which is the case that would dd an image over the wrong disk');
+
+    local *{"${BB}::device_matches_wwid"} = sub { 1 };
+
+    my ($device, $wwid) = Test::Plugin->_transfer_device($scfg, 't1', 'vm-100-disk-0');
+    is($device, '/dev/mapper/3600a0980deadbeef',
+        'a confirmed device is handed back');
+    is($wwid, '3600a0980deadbeef', '... with the WWID it was confirmed against');
+}
+
 done_testing();

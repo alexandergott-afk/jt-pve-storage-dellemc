@@ -30,6 +30,7 @@ our @EXPORT_OK = qw(
     multipath_claim_wwid
     multipath_path_health
     device_matches_wwid
+    device_size_bytes
     get_multipath_device
     get_device_by_wwid
     wait_for_multipath_device
@@ -155,6 +156,29 @@ sub _resolve_block_device_name {
     }
 
     return _untaint_device_name(basename($device));
+}
+
+# Size in bytes, bounded, or undef when it cannot be read.
+#
+# Reads sysfs rather than opening the device: an open on a dm device whose
+# paths are all down is the uninterruptible sleep this module exists to avoid,
+# and so is `blockdev --getsize64`, which LVMPlugin uses here.
+#
+# It lives in this module rather than in BlockBase because PowerFlex inherits
+# nothing from BlockBase and needs the same answer for the same reason — an
+# export stream whose header size is a guess (lesson 40a).
+sub device_size_bytes {
+    my ($device) = @_;
+
+    my $name = _resolve_block_device_name($device);
+    return undef unless defined $name && length $name;
+
+    my $sectors = sysfs_read_with_timeout("/sys/block/$name/size", 3);
+    return undef unless defined $sectors && $sectors =~ /^\s*(\d+)\s*$/;
+
+    # /sys/block/*/size is always in 512-byte sectors, whatever the device's
+    # own logical block size is.
+    return $1 * 512;
 }
 
 # ---------------------------------------------------------------------------

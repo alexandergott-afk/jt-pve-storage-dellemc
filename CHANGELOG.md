@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.88~beta1] - 2026-08-06
+
+### Fixed
+- **Moving a disk off this storage was advertised and then refused.**
+  `volume_export_formats` said `raw+size` was available, and that was the
+  whole of it: the transfer itself was left to
+  `PVE::Storage::Plugin::volume_export`, which opens with
+  `if ($scfg->{path} && ...)` and dies for a storage that has no path — which
+  this one has not, and cannot have. So `qm move_disk` to an LVM or ZFS
+  storage, `pvesm export`, `pvesm import` and remote migration all failed one
+  call after the plugin had offered them, with a message naming the format the
+  plugin itself had just advertised. All four families, since the override was
+  written. `LVMPlugin`, `RBDPlugin` and `ZFSPoolPlugin` all implement both
+  halves; only the formats half had been read.
+
+  `volume_export` and `volume_import` are now implemented, for the SAN
+  families and for PowerFlex separately. Around the copy: the volume is
+  activated first, because nothing does it for the plugin here; the export
+  header's size is read from the kernel rather than guessed; and the device is
+  refused unless the kernel's own identification of it agrees with the volume
+  the array named. That last one is the guard that matters — an import writes
+  a whole disk image, `path()` has a documented fallback to a placeholder
+  device when the array cannot be reached, and writing an image into whatever
+  that resolves to is the worst thing in this release's reach.
+
+  `t/11-imports.t` now fails any plugin that declares a transfer format
+  without implementing the transfer.
+
 ## [0.7.87~beta1] - 2026-08-06
 
 ### Security

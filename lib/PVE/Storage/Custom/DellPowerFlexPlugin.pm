@@ -17,7 +17,7 @@ use PVE::Storage::Custom::DellEMC::Common::Health;
 use PVE::Storage::Custom::DellEMC::PowerFlex::API;
 use PVE::Storage::Custom::DellEMC::PowerFlex::Naming;
 use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
-    is_block_device is_device_in_use
+    is_block_device is_device_in_use device_size_bytes
 );
 use PVE::Storage::Custom::DellEMC::PowerFlex::Host qw(
     sdc_available sdc_guid sdc_device_for_volume
@@ -1502,8 +1502,11 @@ sub volume_snapshot_needs_fsfreeze { return 1 }
 # refused before reaching any code here.
 #
 # A volume here is a raw block device, exactly as it is for LVM and RBD, and
-# both of those declare 'raw+size' and let the base class do the transfer
-# through path(). This does the same.
+# both of those declare 'raw+size'. What they do NOT do is leave the transfer
+# to the base class, whose volume_export opens with "if ($scfg->{path} && ...)"
+# and falls through to a die for a storage that has no path. Declaring the
+# format without implementing the transfer only moves the refusal one call
+# later; volume_export and volume_import are below.
 sub volume_import_formats {
     my ($class, $scfg, $storeid, $volname, $snapshot, $base_snapshot,
         $with_snapshots) = @_;
@@ -1529,6 +1532,144 @@ sub volume_export_formats {
 
     return $class->volume_import_formats($scfg, $storeid, $volname, $snapshot,
         $base_snapshot, $with_snapshots);
+}
+
+# The same two methods BlockBase gained in 0.7.88, spelled out here because
+# this plugin inherits none of it (lesson 40a). The differences are the data
+# path: the device is an NVMe namespace or an SDC device rather than a
+# dm-multipath map, and the kernel's own identification of it is the by-id
+# link that carries the PowerFlex volume id — which is what _device_lookup
+# resolves, and why the placeholder path() falls back to must be refused here
+# rather than written to.
+#
+# The dd is deliberately not wrapped in an alarm: a bulk copy of a whole disk
+# legitimately runs for hours, and rule 5's bound is for the poll paths.
+sub volume_export {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    die "volume export format '$format' is not available for $class\n"
+        if !defined($format) || $format ne 'raw+size';
+    die "cannot export a volume together with its snapshots here: the"
+      . " snapshots live on the array, not in the volume\n" if $with_snapshots;
+    die "cannot export the snapshot '$snapshot' here\n" if defined $snapshot;
+    die "cannot export an incremental stream here\n" if defined $base_snapshot;
+
+    # Nothing activates the volume for us: PVE::Storage::volume_export goes
+    # straight from the storage config to the plugin.
+    $class->activate_volume($storeid, $scfg, $volname);
+
+    my $device = $class->_transfer_device($scfg, $storeid, $volname);
+
+    my $size = device_size_bytes($device);
+    die "Cannot export volume '$volname': the size of device $device could"
+      . " not be read. Refusing rather than sending a stream with a size"
+      . " nobody checked.\n" unless defined $size && $size > 0;
+
+    PVE::Storage::Plugin::write_common_header($fh, $size);
+    PVE::Tools::run_command(
+        ['dd', "if=$device", 'bs=64k', 'status=progress'],
+        output => '>&' . fileno($fh),
+    );
+
+    return;
+}
+
+sub volume_import {
+    my ($class, $scfg, $storeid, $fh, $volname, $format, $snapshot,
+        $base_snapshot, $with_snapshots, $allow_rename) = @_;
+    local $CURRENT_STOREID = $storeid;
+
+    die "volume import format '$format' is not available for $class\n"
+        if !defined($format) || $format ne 'raw+size';
+    die "cannot import a volume together with its snapshots here\n"
+        if $with_snapshots;
+    die "cannot import into the snapshot '$snapshot'\n" if defined $snapshot;
+    die "cannot import an incremental stream here\n" if defined $base_snapshot;
+
+    my ($vtype, $name, $vmid, undef, undef, undef, $file_format) =
+        $class->parse_volname($volname);
+
+    die "cannot import a volume of type '$vtype' here: this storage holds"
+      . " images only\n" if $vtype ne 'images';
+    die "cannot import format '$format' into a volume of format"
+      . " '$file_format'\n" if $file_format ne 'raw';
+
+    # "Already there" and "could not ask" are different answers (rule 21a):
+    # volume_id_by_name dies when the array cannot be reached, and that die is
+    # deliberately not caught here.
+    my $api = $class->_api($scfg, storeid => $storeid);
+    my $array_name = $class->_array_name($storeid, $name);
+    if ($api->volume_id_by_name($array_name, storeid => $storeid)) {
+        die "Volume '$name' already exists on storage '$storeid'\n"
+            unless $allow_rename;
+        warn "Volume '$name' already exists on storage '$storeid' —"
+           . " importing under a different name\n";
+    }
+
+    my ($bytes) = PVE::Storage::Plugin::read_common_header($fh);
+    die "Cannot import volume '$name': the stream carries no size\n"
+        unless defined $bytes && $bytes > 0;
+    # alloc_image takes KiB. Round UP: a volume one byte short of the stream
+    # is filled and then fails. PowerFlex rounds further, to 8 GiB.
+    my $size_kb = int(($bytes + 1023) / 1024);
+
+    my $allocname = $class->alloc_image($storeid, $scfg, $vmid, 'raw', $name,
+        $size_kb);
+
+    eval {
+        if ($allocname ne $name && !$allow_rename) {
+            die "internal error: the volume was allocated as '$allocname'"
+              . " rather than '$name', and the caller cannot follow a"
+              . " rename\n";
+        }
+
+        $class->activate_volume($storeid, $scfg, $allocname);
+
+        my $device = $class->_transfer_device($scfg, $storeid, $allocname);
+
+        # conv=sparse skips runs of zeroes instead of writing them, which is
+        # only safe because the target was created by the alloc_image call
+        # directly above: an unwritten region of a new volume reads as zeroes,
+        # so the skipped writes are writes of what is already there. It must
+        # never be used over a volume that existed before this call.
+        PVE::Tools::run_command(
+            ['dd', "of=$device", 'conv=sparse', 'bs=64k'],
+            input => '<&' . fileno($fh),
+        );
+    };
+    if (my $err = $@) {
+        eval { $class->free_image($storeid, $scfg, $allocname, 0) };
+        warn "Cleaning up the partly imported volume '$allocname' failed: $@"
+            if $@;
+        die $err;
+    }
+
+    return "$storeid:$allocname";
+}
+
+# The device for a transfer, resolved from the volume id the array gave and
+# refused unless the kernel actually has it. path() falls back to a
+# '/dev/disk/by-id/emc-vol-unknown-*' placeholder when the array cannot be
+# reached, and an import would otherwise dd a whole disk image into it.
+sub _transfer_device {
+    my ($class, $scfg, $storeid, $volname) = @_;
+
+    my $array_name = $class->_array_name($storeid, $volname);
+    my $id = $class->_api($scfg, storeid => $storeid)
+                   ->volume_id_by_name($array_name, storeid => $storeid);
+    die "Cannot transfer volume '$volname': '$array_name' is not on the"
+      . " array.\n" unless $id;
+
+    my $device = $class->_device_lookup($scfg, $id)->();
+    die "Cannot transfer volume '$volname': the kernel has no device for"
+      . " PowerFlex volume $id on this node. A transfer reads or writes the"
+      . " whole volume, so a path that was not resolved from the volume id"
+      . " is treated as a wrong one.\n"
+        unless $device && is_block_device($device);
+
+    return $device;
 }
 
 # The protocols this storage type actually speaks.

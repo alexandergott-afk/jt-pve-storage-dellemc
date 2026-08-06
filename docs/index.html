@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.87~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.88~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.88~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Moving a disk to another storage type, pvesm export/import and remote migration were advertised and then refused one call later: only the format was declared, not the transfer. Both are implemented now, and the device an import writes to must be confirmed by the kernel.</span>
+            <span class="lang-zh">把磁碟移到其他類型的儲存、pvesm export/import 與跨叢集移轉,先被宣告可用、下一個呼叫就被拒絕:當初只宣告了格式,沒有實作傳輸。兩者現已實作,而且匯入要寫入的裝置必須經核心確認。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.87~beta1</div>

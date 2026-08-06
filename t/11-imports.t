@@ -299,4 +299,42 @@ for my $file (sort @files) {
     }
 }
 
+# ---------------------------------------------------------------------------
+# A declared transfer format has to have a transfer behind it
+#
+# PVE::Storage::Plugin::volume_export begins "if ($scfg->{path} && ...)" and
+# falls through to a die for a storage without a path, which every storage
+# here is (rule 24). So a plugin that overrides volume_export_formats to
+# advertise 'raw+size' and stops there has not enabled the disk move, the
+# `pvesm export` or the remote migration it appears to have enabled: it has
+# moved the refusal one call later, into a message that names the format the
+# plugin itself had just offered. That is what shipped from the first
+# override until 0.7.88, in all four families at once, because the override
+# was written from the base class's FORMATS method and LVMPlugin's - which
+# implement both halves - were not read to the end.
+#
+# The pairing is the rule: declare the format, implement the transfer.
+# ---------------------------------------------------------------------------
+
+{
+    my @plugins;
+    find({ no_chdir => 1, wanted => sub {
+        push @plugins, $File::Find::name if /\.pm\z/;
+    } }, 'lib');
+
+    for my $file (sort @plugins) {
+        my $src = do { open my $fh, '<', $file or die "$file: $!"; local $/; <$fh> };
+
+        next unless $src =~ /^sub \s*volume_(?:ex|im)port_formats\b/m;
+
+        for my $half (qw(volume_export volume_import)) {
+            ok($src =~ /^sub \s*\Q$half\E\s*\{/m,
+                "$file declares transfer formats, so it implements $half")
+                or diag("  $file advertises a transfer format but leaves"
+                      . " $half to the base class, which refuses it for a"
+                      . " storage with no 'path'");
+        }
+    }
+}
+
 done_testing();
