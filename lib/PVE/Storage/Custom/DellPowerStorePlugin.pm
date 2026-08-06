@@ -177,7 +177,7 @@ sub _api {
     my %args = (
         portal     => $scfg->{'dell-portal'},
         username   => $scfg->{'dell-username'},
-        password   => $scfg->{'dell-password'},
+        password   => $class->_password($scfg, $opts{storeid}),
         ssl_verify => $scfg->{'dell-ssl-verify'} // 0,
         type       => $class->type(),
         storeid    => $opts{storeid},

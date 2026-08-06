@@ -5,6 +5,34 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.86~beta1] - 2026-08-06
+
+### 安全性
+- **陣列密碼原本以明文存放在 `/etc/pve/storage.cfg`。** 本外掛宣告了
+  `sensitive_properties` **方法** —— 但 PVE 從不呼叫方法。它呼叫的是
+  `PVE::Storage::Plugin::sensitive_properties($type)` 這個**函式**，而答案是
+  從 `plugindata` 查的。我們在那裡什麼都沒寫，於是 PVE 退回內建清單，
+  `dell-password` 不在其中，密碼就進了設定檔：**www-data 群組讀得到**、由
+  pmxcfs **複製到叢集每個節點**、**`GET /storage/<id>` 原樣回傳**，也會進入
+  任何 `/etc/pve` 備份。
+
+  四個系列現在都在 `plugindata` 中宣告，密碼改以 0600 寫入
+  `/etc/pve/priv/storage/<storeid>.pw` —— 那正是 PBS 使用的目錄，權限
+  `0700 root:www-data`，web server 連進都進不去。
+
+  **升級不會弄壞任何東西。** 在此之前建立的儲存照常運作：密碼優先讀 priv
+  檔，沒有就讀設定檔，並每小時提醒一次。要完成搬移，每個儲存執行一次：
+
+  ```bash
+  pvesm set <storeid> --dell-password '<密碼>'
+  ```
+
+  這道指令會寫入 priv 檔，**並在同一次操作中把 `storage.cfg` 裡的明文那行
+  刪除**。與密碼無關的 `pvesm set` 則完全不會動到它。
+
+  這是教訓 36 第四次出現 —— 一條被記錄、被測試、卻從未被呼叫的規則。測試
+  現在斷言的是 PVE 真正讀取的東西。
+
 ## [0.7.85~beta1] - 2026-08-06
 
 ### 修正

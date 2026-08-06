@@ -63,13 +63,44 @@ ok($props->{'pstore-appliance'}, 'and the PowerStore ones too');
 
 ok($opts->{'dell-portal'}{fixed}, 'the portal cannot be changed after creation');
 ok(!$opts->{'dell-username'}{optional}, 'username is required');
-ok(!$opts->{'dell-password'}{optional}, 'password is required');
+# Optional in the OPTION list precisely BECAUSE it is sensitive: PVE strips
+# a sensitive property out of the parameters before validating them against
+# the schema, so a required entry here fails every 'pvesm add' with "missing
+# value for required option". PBS declares its password the same way.
+ok($opts->{'dell-password'}{optional},
+    'password is optional in the schema, because it never reaches the config');
 ok($opts->{'pstore-appliance'}{optional}, 'appliance placement is optional');
 ok($opts->{content}{optional}, 'content is optional');
 ok($opts->{shared}{optional}, 'shared is optional');
 
-ok(grep({ $_ eq 'dell-password' } $P->sensitive_properties()),
-    'the password is marked sensitive so the API does not echo it back');
+# THE thing PVE actually reads. It calls
+# PVE::Storage::Plugin::sensitive_properties($type) as a function and looks
+# the answer up in plugindata - a sensitive_properties METHOD on the class
+# is never called, and one shipped here for months while the password went
+# to /etc/pve/storage.cfg in clear text.
+{
+    my $sensitive = $P->plugindata()->{'sensitive-properties'} // {};
+    ok($sensitive->{'dell-password'},
+        "plugindata declares the password sensitive - the method form is never called");
+
+    SKIP: {
+        # PVE answers from its registry, which is populated when PVE::Storage
+        # loads the INSTALLED plugins - so this asks about the installed
+        # version, not the working tree, and skips when they differ.
+        skip 'PVE::Storage::Plugin::sensitive_properties is not available', 1
+            unless PVE::Storage::Plugin->can('sensitive_properties');
+        skip 'the installed plugin is older than this tree', 1
+            unless eval { require PVE::Storage; 1 };
+
+        my $list = PVE::Storage::Plugin::sensitive_properties($P->type()) // [];
+        skip 'this type is not registered on this node', 1 unless @$list;
+
+        ok(grep({ $_ eq 'dell-password' } @$list),
+            '... and PVE agrees, asked the way PVE asks')
+            or diag('installed plugin predates the sensitive-properties fix;'
+                  . ' reinstall and re-run');
+    }
+}
 
 my $pd = $P->plugindata();
 is_deeply($pd->{format}, [{ raw => 1 }, 'raw'], 'raw only: these are block volumes');

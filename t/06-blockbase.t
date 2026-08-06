@@ -251,7 +251,8 @@ ok(!$props2->{'dell-portal'},
     'and does NOT redeclare the shared ones, which PVE would reject');
 
 like($P->get_identity($scfg, $storeid), qr/^delltest:10\.0\.0\.5:/, 'identity string');
-ok(grep({ $_ eq 'dell-password' } $P->sensitive_properties()), 'password is sensitive');
+ok($P->plugindata()->{'sensitive-properties'}{'dell-password'},
+    'plugindata declares the password sensitive - which is where PVE looks');
 
 # ---------------------------------------------------------------------------
 # Volume names
@@ -1257,6 +1258,59 @@ SKIP: {
     is($conf_written, 0,
         'and the multipath drop-in was never written for it - no node-wide'
       . ' reconfigure was paid for a storage that never came to exist');
+}
+
+# ---------------------------------------------------------------------------
+# The array password never reaches storage.cfg
+#
+# PVE reads the sensitive list out of plugindata, by calling
+# sensitive_properties($type) as a FUNCTION. A sensitive_properties METHOD on
+# the class is never called - one shipped here for months, and the password
+# went to /etc/pve/storage.cfg in clear text: group-readable by www-data,
+# replicated to every node, and returned verbatim by GET /storage/<id>.
+# ---------------------------------------------------------------------------
+
+{
+    my $sensitive = Test::Plugin->plugindata()->{'sensitive-properties'} // {};
+    ok($sensitive->{'dell-password'},
+        'plugindata declares the password sensitive - where PVE looks');
+
+    my $opts = Test::Plugin->options();
+    ok($opts->{'dell-password'}{optional},
+        'and the option is optional, or PVE fails every add on the value it'
+      . ' just stripped out');
+}
+
+{
+    # The priv file wins; the config is the fallback that keeps a storage
+    # created before this change working after an upgrade.
+    my $dir = "/tmp/dellemc-pw-$$";
+    mkdir $dir;
+
+    no warnings 'redefine', 'once';
+    local *Test::Plugin::_password_file = sub { "$dir/$_[1].pw" };
+
+    my $scfg = { 'dell-password' => 'from-the-config' };
+
+    is(Test::Plugin->_password($scfg, 'st1'), 'from-the-config',
+        'a storage whose password is still in storage.cfg keeps working');
+
+    Test::Plugin->_set_password('st1', 'from-the-priv-file');
+    is(Test::Plugin->_password($scfg, 'st1'), 'from-the-priv-file',
+        '... and the priv file takes over once it exists');
+
+    my $mode = (stat("$dir/st1.pw"))[2] & 07777;
+    is($mode, 0600, 'the priv file is readable only by root');
+
+    Test::Plugin->_delete_password('st1');
+    ok(!-e "$dir/st1.pw", 'deleting a storage removes its password file');
+    is(Test::Plugin->_password($scfg, 'st1'), 'from-the-config',
+        '... and the config fallback is what is left');
+
+    is(Test::Plugin->_password({}, 'st1'), undef,
+        'no file and no config value is undef, not an empty password');
+
+    rmdir $dir;
 }
 
 done_testing();

@@ -65,10 +65,23 @@ sub api {
 }
 sub type { return 'dellpowerflex' }
 
+# The storeid of the storage being worked on: $scfg never carries it, and
+# the _api call sites cannot all be given one. Every entry point that has it
+# announces it here. Localised per operation so a forked worker cannot
+# inherit a stale one.
+our $CURRENT_STOREID;
+
 sub plugindata {
     return {
         content => [ { images => 1, rootdir => 1 }, { images => 1 } ],
         format  => [ { raw => 1 }, 'raw' ],
+
+        # PVE reads the sensitive list from HERE, not from the
+        # sensitive_properties method that used to sit below - it calls
+        # PVE::Storage::Plugin::sensitive_properties($type) as a function
+        # and looks the answer up in plugindata. Without this the array
+        # password is written to /etc/pve/storage.cfg in clear text.
+        'sensitive-properties' => { 'dell-password' => 1 },
     };
 }
 
@@ -138,13 +151,9 @@ sub family_options {
     };
 }
 
-sub sensitive_properties {
-    my ($class) = @_;
-    return ('dell-password', $class->SUPER::sensitive_properties());
-}
-
 sub get_identity {
     my ($class, $scfg, $storeid) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     return join(':', 'dellpowerflex',
         $scfg->{'dell-portal'} // '',
@@ -214,7 +223,7 @@ sub _api {
     my %args = (
         portal     => $scfg->{'dell-portal'},
         username   => $scfg->{'dell-username'},
-        password   => $scfg->{'dell-password'},
+        password   => $class->_password($scfg, $opts{storeid}),
         ssl_verify => $scfg->{'dell-ssl-verify'} // 0,
         type       => 'dellpowerflex',
         storeid    => $opts{storeid},
@@ -429,6 +438,7 @@ sub _host_id {
 
 sub activate_storage {
     my ($class, $storeid, $scfg, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $mode = $class->_access_mode($scfg);
 
@@ -622,6 +632,7 @@ sub _mark_check {
 
 sub deactivate_storage {
     my ($class, $storeid, $scfg, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     # Deliberately does not disconnect NVMe sessions or unmap volumes: other
     # storages may share the same subsystem, and unmapping would break a
@@ -631,6 +642,7 @@ sub deactivate_storage {
 
 sub status {
     my ($class, $storeid, $scfg, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my ($total, $used, $available);
 
@@ -657,6 +669,7 @@ sub status {
 
 sub alloc_image {
     my ($class, $storeid, $scfg, $vmid, $fmt, $name, $size) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     die "unsupported format '$fmt' - this storage only holds raw volumes\n"
         if defined $fmt && $fmt ne 'raw';
@@ -718,6 +731,7 @@ sub alloc_image {
 
 sub free_image {
     my ($class, $storeid, $scfg, $volname, $isBase, $format) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -842,6 +856,7 @@ sub _purge_own_snapshots {
 
 sub list_images {
     my ($class, $storeid, $scfg, $vmid, $vollist, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $prefix = $NAMING->volume_prefix($storeid);
     $prefix .= "${vmid}-" if $vmid;
@@ -912,6 +927,7 @@ sub list_images {
 
 sub volume_size_info {
     my ($class, $scfg, $storeid, $volname, $timeout) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -926,6 +942,7 @@ sub volume_size_info {
 
 sub volume_resize {
     my ($class, $scfg, $storeid, $volname, $size, $running, $snapname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     # Storage API 14 added $snapname; a PowerFlex snapshot is a volume in its
     # own right and resizing one is not what the caller means here.
@@ -960,6 +977,7 @@ sub volume_resize {
 
 sub rename_volume {
     my ($class, $scfg, $storeid, $source_volname, $target_vmid, $target_volname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
 
@@ -1061,6 +1079,7 @@ sub _assert_not_in_use {
 
 sub path {
     my ($class, $scfg, $volname, $storeid, $snapname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $parsed = $class->_parse_volname($volname);
     die "unable to parse volume name '$volname'\n" unless $parsed;
@@ -1096,6 +1115,7 @@ sub filesystem_path {
 
 sub activate_volume {
     my ($class, $storeid, $scfg, $volname, $snapname, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
 
@@ -1138,6 +1158,7 @@ sub activate_volume {
 
 sub deactivate_volume {
     my ($class, $storeid, $scfg, $volname, $snapname, $cache) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     # Volumes stay mapped: unmapping here would break live migration, which
     # needs the volume present on the target before the source releases it.
@@ -1153,6 +1174,7 @@ sub deactivate_volume {
 
 sub volume_snapshot {
     my ($class, $scfg, $storeid, $volname, $snap) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -1172,6 +1194,7 @@ sub volume_snapshot {
 
 sub volume_snapshot_delete {
     my ($class, $scfg, $storeid, $volname, $snap, $running) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -1205,6 +1228,7 @@ sub volume_snapshot_delete {
 # snapshot may be rolled back to.
 sub volume_rollback_is_possible {
     my ($class, $scfg, $storeid, $volname, $snap, $blockers) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     $blockers //= [];
 
@@ -1244,6 +1268,7 @@ sub volume_rollback_is_possible {
 
 sub volume_snapshot_rollback {
     my ($class, $scfg, $storeid, $volname, $snap) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $array_name = $class->_array_name($storeid, $volname);
@@ -1282,6 +1307,7 @@ sub volume_snapshot_rollback {
 
 sub volume_snapshot_list {
     my ($class, $scfg, $storeid, $volname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $array_name = $class->_array_name($storeid, $volname);
     my $volumes = $class->_list_own_volumes($scfg, $storeid,
@@ -1308,6 +1334,7 @@ sub volume_snapshot_list {
 # for.
 sub volume_snapshot_info {
     my ($class, $scfg, $storeid, $volname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $info = { current => {} };
 
@@ -1329,6 +1356,7 @@ sub rename_snapshot {
 
 sub create_base {
     my ($class, $storeid, $scfg, $volname) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my ($vtype, undef, $vmid, undef, undef, $isBase) = $class->parse_volname($volname);
 
@@ -1361,6 +1389,7 @@ sub create_base {
 
 sub clone_image {
     my ($class, $scfg, $storeid, $volname, $vmid, $snap) = @_;
+    local $CURRENT_STOREID = $storeid;
 
     my $api = $class->_api($scfg, storeid => $storeid);
     my $parsed = $class->_parse_volname($volname)
@@ -1591,11 +1620,75 @@ sub _check_prefix_collision {
     return 1;
 }
 
+# The array's password lives in /etc/pve/priv, not in storage.cfg. This
+# family does not inherit BlockBase, so it carries its own copy of the four
+# helpers - deliberately duplicated rather than moved to a shared module the
+# BlockBase families would then reach into sideways.
+sub _password_file {
+    my ($class, $storeid) = @_;
+    return "/etc/pve/priv/storage/${storeid}.pw";
+}
+
+sub _set_password {
+    my ($class, $storeid, $password) = @_;
+
+    mkdir '/etc/pve/priv/storage';
+    PVE::Tools::file_set_contents($class->_password_file($storeid),
+        "$password\n", 0600, 1);
+
+    return;
+}
+
+sub _delete_password {
+    my ($class, $storeid) = @_;
+
+    unlink $class->_password_file($storeid);
+
+    return;
+}
+
+# The priv file first, then the config: a storage created before this
+# changed still carries the password in storage.cfg, and refusing those
+# would take working storages offline on upgrade.
+sub _password {
+    my ($class, $scfg, $storeid) = @_;
+
+    $storeid = $CURRENT_STOREID unless defined $storeid && length $storeid;
+
+    if (defined $storeid && length $storeid) {
+        my $file = $class->_password_file($storeid);
+        if (-f $file) {
+            my $password = eval { PVE::Tools::file_get_contents($file) };
+            if (defined $password) {
+                chomp $password;
+                return $password if length $password;
+            }
+        }
+    }
+
+    my $legacy = $scfg->{'dell-password'};
+    return undef unless defined $legacy && length $legacy;
+
+    $class->_warn_once($storeid // '?', 'password-in-config',
+        "Storage '" . ($storeid // '?') . "': the array password is stored in"
+      . " /etc/pve/storage.cfg, which is readable by the www-data group and"
+      . " replicated to every node. To move it into /etc/pve/priv run:\n"
+      . "    pvesm set " . ($storeid // '<storeid>')
+      . " --dell-password '<the password>'")
+        if defined $storeid && length $storeid;
+
+    return $legacy;
+}
+
 sub on_add_hook {
     my ($class, $storeid, $scfg, %param) = @_;
 
     $class->_check_protocol($storeid, $scfg);
     $class->_check_prefix_collision($storeid, $scfg);
+
+    if (defined(my $password = $param{'dell-password'})) {
+        $class->_set_password($storeid, $password);
+    }
 
     return undef;
 }
@@ -1605,7 +1698,52 @@ sub on_update_hook {
 
     $class->_check_protocol($storeid, $update);
 
+    if (defined(my $password = $param{'dell-password'})) {
+        $class->_set_password($storeid, $password);
+    }
+
     return undef;
+}
+
+# The one place the legacy plaintext password can be removed from the config.
+#
+# PVE hands the EXISTING $scfg here, and writes it back after this returns -
+# so deleting the key completes the migration a 'pvesm set --dell-password'
+# starts. Without it a migrating storage ends up with the password in both
+# places: the priv file wins, but the clear-text copy lingers in a
+# group-readable, cluster-replicated file, which is the whole problem.
+#
+# Only ever when the priv file actually holds something. An unrelated
+# 'pvesm set --content images' on a storage that never migrated must not
+# take its only copy of the password away.
+sub on_update_hook_full {
+    my ($class, $storeid, $scfg, $update, $delete, $sensitive) = @_;
+
+    my $res = $class->on_update_hook($storeid, $update, %{ $sensitive // {} });
+
+    if (defined $scfg->{'dell-password'}) {
+        my $stored = eval {
+            PVE::Tools::file_get_contents($class->_password_file($storeid));
+        };
+        chomp $stored if defined $stored;
+
+        if (defined $stored && length $stored) {
+            delete $scfg->{'dell-password'};
+            warn "Storage '$storeid': the array password has moved to"
+               . " /etc/pve/priv/storage/${storeid}.pw and the clear-text"
+               . " copy has been removed from /etc/pve/storage.cfg.\n";
+        }
+    }
+
+    return $res;
+}
+
+sub on_delete_hook {
+    my ($class, $storeid, $scfg) = @_;
+
+    $class->_delete_password($storeid);
+
+    return;
 }
 
 sub storage_can_replicate { return 0 }

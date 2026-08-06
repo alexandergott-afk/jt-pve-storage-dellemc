@@ -7,6 +7,40 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.86~beta1] - 2026-08-06
+
+### Security
+- **The array password was stored in clear text in
+  `/etc/pve/storage.cfg`.** This plugin declared a `sensitive_properties`
+  *method* — but PVE never calls one. It calls
+  `PVE::Storage::Plugin::sensitive_properties($type)` as a **function** and
+  looks the answer up in `plugindata`. Ours said nothing there, so PVE fell
+  back to its built-in list, `dell-password` was not on it, and the password
+  went into the config file: readable by the **www-data** group, replicated
+  to **every node** by pmxcfs, returned verbatim by **`GET /storage/<id>`**,
+  and carried into any `/etc/pve` backup.
+
+  All four families now declare it in `plugindata`, and the password is
+  written to `/etc/pve/priv/storage/<storeid>.pw` at mode 0600 — the
+  directory PBS uses, which is `0700 root:www-data`, so the web server
+  cannot even enter it.
+
+  **Upgrading does not break anything.** A storage created before this keeps
+  working: the password is read from the priv file if it exists and from the
+  config otherwise, and a reminder is logged once an hour. To finish the
+  move, run this once per storage:
+
+  ```bash
+  pvesm set <storeid> --dell-password '<the password>'
+  ```
+
+  That writes the priv file **and removes the clear-text line from
+  `storage.cfg`** in the same operation. An unrelated `pvesm set` never
+  touches the password.
+
+  This is the fourth appearance of lesson 36 — a rule documented, tested,
+  and never called. The test now asserts what PVE actually reads.
+
 ## [0.7.85~beta1] - 2026-08-06
 
 ### Fixed

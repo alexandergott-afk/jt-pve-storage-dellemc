@@ -1,3 +1,28 @@
+jt-pve-storage-dellemc (0.7.86~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * SECURITY: the array password was stored in clear text in
+    /etc/pve/storage.cfg. This plugin declared a sensitive_properties
+    METHOD, but PVE never calls one - it calls
+    PVE::Storage::Plugin::sensitive_properties($type) as a FUNCTION and
+    looks the answer up in plugindata. So dell-password was never on the
+    sensitive list, and the password went into the config file: readable by
+    the www-data group, replicated to every node by pmxcfs, returned
+    verbatim by GET /storage/<id>, and carried into any /etc/pve backup.
+    All four families now declare it in plugindata, and the password is
+    written to /etc/pve/priv/storage/<storeid>.pw at mode 0600 - the
+    directory PBS uses, 0700 root:www-data, which the web server cannot
+    enter.
+  * UPGRADING IS SAFE. A storage created before this keeps working: the
+    password is read from the priv file if present and from the config
+    otherwise, with an hourly reminder. Run
+    "pvesm set <storeid> --dell-password '<the password>'" once per storage
+    to finish the move - it writes the priv file AND removes the clear-text
+    line from storage.cfg in the same operation. An unrelated pvesm set
+    never touches the password.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 18:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.85~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

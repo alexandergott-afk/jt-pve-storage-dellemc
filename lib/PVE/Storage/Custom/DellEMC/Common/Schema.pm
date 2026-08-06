@@ -171,7 +171,13 @@ sub common_options {
     return {
         'dell-portal'                => { fixed => 1 },
         'dell-username'              => {},
-        'dell-password'              => {},
+        # Optional in the OPTION list because it is a sensitive property: PVE
+        # strips it out of the parameters before validating them against this
+        # schema, so a required entry here fails every 'pvesm add' with
+        # "missing value for required option". PBS declares its password the
+        # same way, for the same reason. The password is not optional in
+        # practice - _api dies without one - it is simply never in the config.
+        'dell-password'              => { optional => 1 },
         'dell-ssl-verify'            => { optional => 1 },
         'dell-protocol'              => { optional => 1 },
         'dell-host-mode'             => { optional => 1 },
