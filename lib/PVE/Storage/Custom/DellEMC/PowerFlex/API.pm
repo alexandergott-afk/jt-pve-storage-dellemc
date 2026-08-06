@@ -627,9 +627,33 @@ sub snapshot_create {
 
 # Overwrite a volume with the contents of one of its snapshots.
 #
-# NOT VERIFIED: the action name and its parameters.
+# The action name is GENERATION-SPECIFIC, and the login has already
+# determined which generation this array speaks:
+#
+#   - 4.x: 'restore' with { srcVolumeId } — read from Dell's own gen2
+#     client (PyPowerFlex/objects/gen2/volume.py), same URL shape.
+#   - 3.x: 'overwriteVolumeContent' — the ScaleIO REST reference's form,
+#     which Dell's gen1 client never implemented, so it remains NOT
+#     VERIFIED. It is only ever sent to an array that answered the 3.x
+#     login.
+#
+# This is the most destructive call in the family, which is why the split
+# matters: on the 4.x arrays anyone deploys today, the rollback now runs a
+# form read out of Dell's own code instead of a guess.
 sub snapshot_rollback {
     my ($self, $volume_id, $snapshot_id, %opts) = @_;
+
+    # The generation is only known after a login, and the action name is
+    # chosen from it BEFORE post() would trigger one - a fresh client would
+    # pick the default and send a 4.x action to a 3.x array. The test that
+    # drives a cold client against a 3.x fake is what caught this.
+    $self->ensure_session();
+
+    if (($self->{_generation} // 4) == 4) {
+        return $self->post(
+            "/api/instances/Volume::$volume_id/action/restore",
+            { srcVolumeId => $snapshot_id }, %opts);
+    }
 
     return $self->post(
         "/api/instances/Volume::$volume_id/action/overwriteVolumeContent",

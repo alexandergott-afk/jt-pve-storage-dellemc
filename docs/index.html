@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.81~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.82~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1069,6 +1069,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.82~beta1</div>
+        <div class="changelog-date">2026-08-06</div>
+        <div class="changelog-summary">
+            <span class="lang-en">PowerFlex's most destructive call - the snapshot rollback - was resting on a 3.x form Dell's client never implemented. On 4.x it now uses the 'restore' action read from Dell's own gen2 client, chosen after the login has told us which generation the array speaks.</span>
+            <span class="lang-zh">PowerFlex 最具破壞性的呼叫 —— 快照倒回 —— 原本建立在一個 Dell 客戶端從未實作的 3.x 寫法上。在 4.x 上它現在改用讀自 Dell gen2 客戶端的 restore 動作，並在登入告訴我們陣列說哪一代語言之後才做選擇。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.81~beta1</div>

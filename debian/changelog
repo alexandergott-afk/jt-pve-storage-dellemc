@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.82~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * POWERFLEX: the rollback now speaks the generation the array runs. The
+    family's most destructive call sent overwriteVolumeContent - the
+    ScaleIO 3.x reference's form, which Dell's own client never implemented
+    - to every array. Dell's gen2 client shows 4.x uses 'restore' with
+    srcVolumeId at the same URL shape. The rollback follows the generation
+    the login detected: restore on 4.x (read from Dell's own code),
+    overwriteVolumeContent kept for 3.x only. The test caught a second bug
+    in the first draft: the action was chosen before any login had run, so
+    a fresh client picked the default generation - the session is now
+    ensured before the choice. Found by turning the key-for-key audit on
+    PowerFlex; the rest of that audit was clean, and PowerStore's earlier
+    in the day was clean throughout.
+
+ -- Jason Cheng <jason@jason.tools>  Thu, 06 Aug 2026 12:10:00 +0800
+
 jt-pve-storage-dellemc (0.7.81~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

@@ -7,6 +7,29 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.82~beta1] - 2026-08-06
+
+### Fixed
+- **PowerFlex: the rollback now speaks the generation the array actually
+  runs.** The family's most destructive call — overwriting a volume with a
+  snapshot — sent `overwriteVolumeContent` to every array: the ScaleIO 3.x
+  reference's form, which Dell's own client never implemented, marked NOT
+  0.7.82~beta1IFIED since the day it was written. Dell's gen2 client shows that 4.x
+  — the only generation anyone deploys today — uses **`restore`** with
+  `{srcVolumeId}` at the same URL shape.
+
+  The rollback now follows the generation the login detected: `restore` on
+  4.x (read from Dell's own code), `overwriteVolumeContent` kept for 3.x
+  (still unverified, but only ever sent to an array that answered the 3.x
+  login). Writing the test caught a second bug in the first draft: the
+  action was chosen before any login had run, so a fresh client picked the
+  default generation — the session is now ensured before the choice.
+
+  Found by turning the key-for-key audit on PowerFlex, the last family the
+  technique had not visited. The rest of the audit was clean: create's
+  dual size spelling already has its documented fallback, the mapping
+  actions and `snapshotDefs` match Dell's client exactly.
+
 ## [0.7.81~beta1] - 2026-08-06
 
 ### Fixed

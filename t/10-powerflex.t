@@ -992,4 +992,42 @@ SKIP: {
         'the 3.x login was NOT: both addresses had already failed to connect');
 }
 
+# ---------------------------------------------------------------------------
+# The rollback action follows the array's generation
+#
+# 4.x has 'restore' (read from Dell's own gen2 client); 3.x has the ScaleIO
+# reference's 'overwriteVolumeContent', which Dell's gen1 client never
+# implemented. Sending the 3.x guess to a 4.x array - the only kind anyone
+# deploys today - would leave the family's most destructive call resting on
+# a form nothing has confirmed.
+# ---------------------------------------------------------------------------
+
+{
+    my ($api, $ua) = make_v4(handler => sub {
+        my ($req, $path) = @_;
+        return reply({}) if $path =~ m{action/restore};
+        return reply({ error => 'wrong action' }, 404);
+    });
+
+    ok(eval { $api->snapshot_rollback('vol-1', 'snap-1'); 1 },
+        'a 4.x array gets the restore action') or diag($@);
+    like($ua->last_request->uri->path, qr{Volume::vol-1/action/restore\z},
+        '... at the gen2 URL Dell\'s own client uses');
+    is($ua->body_of->{srcVolumeId}, 'snap-1', '... with srcVolumeId only');
+    ok(!exists $ua->body_of->{allowOnExtManagedVol},
+        '... and no 3.x-only parameter riding along');
+}
+
+{
+    my ($api, $ua) = make_v3(handler => sub {
+        my ($req, $path) = @_;
+        return reply({}) if $path =~ m{action/overwriteVolumeContent};
+        return reply({ error => 'wrong action' }, 404);
+    });
+
+    ok(eval { $api->snapshot_rollback('vol-1', 'snap-1'); 1 },
+        'a 3.x array keeps the documented overwriteVolumeContent') or diag($@);
+    is($ua->body_of->{srcVolumeId}, 'snap-1', '... with the same source key');
+}
+
 done_testing();
