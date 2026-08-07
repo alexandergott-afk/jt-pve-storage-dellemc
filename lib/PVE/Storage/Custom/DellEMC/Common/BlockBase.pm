@@ -405,8 +405,8 @@ sub _rescan_interval  { $_[0]->_opt($_[1], 'rescan-interval', 300) }
 
 sub _is_fc { my ($class, $scfg) = @_; return $class->_protocol($scfg) eq 'fc' ? 1 : 0 }
 
-# Host object name for this node, or the cluster-wide one in shared mode.
-sub _host_name {
+# The name this plugin GENERATES for this node's host object.
+sub _generated_host_name {
     my ($class, $scfg) = @_;
 
     my $cluster = $class->_cluster_name($scfg);
@@ -415,6 +415,85 @@ sub _host_name {
         if $class->_host_mode($scfg) eq 'shared';
 
     return $class->naming->encode_host_name($cluster, PVE::INotify::nodename());
+}
+
+# Where this node records the host object it resolved to, when that is not the
+# generated name.
+#
+# Node-local on purpose: a host object represents ONE node, so this is not
+# cluster state and must not be replicated. It is written only after the array
+# has confirmed the object holds this node's initiators and nothing else's.
+sub _resolved_host_file {
+    my ($class, $storeid) = @_;
+    return $WWID_STATE->state_dir . '/'
+         . $WWID_STATE->safe_storeid($storeid) . '-host';
+}
+
+sub _record_resolved_host {
+    my ($class, $storeid, $name) = @_;
+
+    return 0 unless defined $storeid && length $storeid;
+    return 0 unless defined $name && length $name;
+
+    eval { $WWID_STATE->ensure_dirs };
+    my $file = $class->_resolved_host_file($storeid);
+    my $tmp  = "$file.tmp.$$";
+
+    open(my $fh, '>', $tmp) or return 0;
+    print {$fh} "$name\n";
+    close($fh);
+
+    rename($tmp, $file) or do { unlink($tmp); return 0 };
+
+    return 1;
+}
+
+sub _forget_resolved_host {
+    my ($class, $storeid) = @_;
+    return unless defined $storeid && length $storeid;
+    unlink($class->_resolved_host_file($storeid));
+    return;
+}
+
+# The recorded name, or undef. Validated on the way out: this ends up in a
+# request to the array, and a state file is something an operator can edit.
+sub _resolved_host_name {
+    my ($class, $storeid) = @_;
+
+    return undef unless defined $storeid && length $storeid;
+
+    open(my $fh, '<', $class->_resolved_host_file($storeid)) or return undef;
+    my $name = <$fh>;
+    close($fh);
+
+    return undef unless defined $name;
+    chomp $name;
+
+    # The match returns the value, so a wrong file fails as "nothing recorded"
+    # rather than travelling into a request (rule 36).
+    return undef unless $name =~ /\A([A-Za-z0-9][A-Za-z0-9._\-]{0,126})\z/;
+
+    return $1;
+}
+
+# Host object name for this node, or the cluster-wide one in shared mode.
+#
+# An array often already has a host object for this node, built by whatever
+# tool set the fabric up, holding exactly this node's initiators under a name
+# of its own. The initiators cannot be registered twice — PowerStore refuses
+# outright — so the choice is to use that object or to have the operator take
+# it apart. _array_ensure_host resolves which object this node really is and
+# records it here; everything that maps, unmaps or asks about a mapping goes
+# through this method, so the answer follows.
+sub _host_name {
+    my ($class, $scfg, $storeid) = @_;
+
+    $storeid = $CURRENT_STOREID unless defined $storeid && length $storeid;
+
+    my $recorded = $class->_resolved_host_name($storeid);
+    return $recorded if defined $recorded;
+
+    return $class->_generated_host_name($scfg);
 }
 
 # Array object name for a PVE volume name.
@@ -3216,6 +3295,7 @@ sub _forget_local_state {
     return unless defined $storeid && length $storeid;
 
     eval { $HEALTH->forget($storeid) };
+    $class->_forget_resolved_host($storeid);
 
     my $safe = $WWID_STATE->safe_storeid($storeid);
     my $run  = $WWID_STATE->lock_dir;

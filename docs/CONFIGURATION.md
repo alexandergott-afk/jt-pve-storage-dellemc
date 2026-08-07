@@ -248,3 +248,28 @@ pvesm status                     # capacity and whether it is active
 pvesm list ps1                   # volumes PVE knows about
 journalctl -t pvestatd | grep dellpowerstore    # what the plugin is saying
 ```
+
+## Host objects the array already has
+
+An array usually has a host object for each node before this plugin ever runs
+— built by whoever zoned the fabric — holding that node's WWPNs or IQN under a
+name of its own. An initiator can belong to only one host object, so the
+plugin cannot simply create its own beside it.
+
+It does not have to. On PowerStore, when there is no host under the name this
+plugin uses (`pve-<cluster>-<node>`), it looks for one that already holds this
+node's initiators and uses that instead, recording the name locally so every
+later mapping goes to the same object. Nothing is renamed, nothing is removed,
+and no initiator is moved.
+
+It adopts only a host whose initiators are a **subset of this node's**. One
+that also carries another host's ports is a shared or foreign object, and a
+volume mapped to it would be visible to whatever else is in it — so the plugin
+refuses and says which port made it refuse. Ports split across two host
+objects are refused as well: a node is one host object.
+
+One consequence worth knowing. Volumes are pre-mapped to the other nodes'
+hosts by searching for the `pve-<cluster>-` prefix, so a node whose host was
+adopted under a different name is not pre-mapped from elsewhere. It maps
+itself when it activates the storage, which is what happens before a migration
+completes, so nothing breaks — the mapping simply happens a moment later.

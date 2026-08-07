@@ -365,4 +365,70 @@ SKIP: {
         '... from either spelling');
 }
 
+{
+    # Adopting the host object the array already has for this node.
+    #
+    # An array usually has one before this plugin runs, built by whoever
+    # zoned the fabric, holding this node's WWPNs under a name of its own.
+    # They cannot be registered twice, so either that object is used or the
+    # operator takes it apart. Adopted only when it holds THIS node's ports
+    # and no others.
+    my $P = 'PVE::Storage::Custom::DellPowerStorePlugin';
+    my $want = [ { port_name => '21:00:f4:c7:aa:a0:a2:50', port_type => 'FC' },
+                 { port_name => '21:00:f4:c7:aa:a0:a2:86', port_type => 'FC' } ];
+
+    my $mine_only = { id => 'h1', name => 'tpepve-01-fc', host_initiators => [
+        { port_name => '21:00:F4:C7:AA:A0:A2:50' },
+        { port_name => '2100f4c7aaa0a286' },
+    ] };
+
+    my $shared = { id => 'h2', name => 'esx-and-pve', host_initiators => [
+        { port_name => '21:00:f4:c7:aa:a0:a2:50' },
+        { port_name => '21:00:00:00:00:00:00:99' },
+    ] };
+
+    my $split_a = { id => 'h3', name => 'half-one', host_initiators => [
+        { port_name => '21:00:f4:c7:aa:a0:a2:50' } ] };
+    my $split_b = { id => 'h4', name => 'half-two', host_initiators => [
+        { port_name => '21:00:f4:c7:aa:a0:a2:86' } ] };
+
+    my @hosts;
+    {
+        package Test::AdoptApi;
+        sub new { bless {}, shift }
+        sub host_list { return [@hosts] }
+        sub host_get_by_name {
+            my ($self, $name) = @_;
+            for my $h (@hosts) { return $h if $h->{name} eq $name }
+            return undef;
+        }
+    }
+
+    no warnings 'redefine', 'once';
+    my $api = Test::AdoptApi->new;
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_api = sub { $api };
+
+    @hosts = ($mine_only);
+    my $found = $P->_adoptable_host({}, $want);
+    is($found && $found->{name}, 'tpepve-01-fc',
+        'a host holding exactly this node\'s ports is adopted, whichever way'
+      . ' the array spells them');
+
+    @hosts = ($shared);
+    ok(!eval { $P->_adoptable_host({}, $want); 1 },
+        'a host that also holds someone else\'s port is REFUSED — a volume'
+      . ' mapped there would be visible to whatever that is');
+    like($@ // '', qr/together with others/, 'and says which');
+    like($@ // '', qr/21:00:00:00:00:00:00:99/, 'naming the foreign port');
+
+    @hosts = ($split_a, $split_b);
+    ok(!eval { $P->_adoptable_host({}, $want); 1 },
+        'ports split across two host objects are refused: a node is one host');
+    like($@ // '', qr/more than one host/, 'and says so');
+
+    @hosts = ();
+    is($P->_adoptable_host({}, $want), undef,
+        'nothing to adopt when the array has never seen these ports');
+}
+
 done_testing();

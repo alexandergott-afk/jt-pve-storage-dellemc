@@ -1576,4 +1576,52 @@ SKIP: {
         '... and the operator is told, rather than it being silent');
 }
 
+{
+    # The recorded host name, which is how an adopted host object survives
+    # into every later mapping call.
+    Test::Plugin->reset_state();
+
+    my $dir = "$TMP/resolved";
+    mkdir $dir;
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+    my $WS = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+    local *{"${WS}::state_dir"} = sub { $dir };
+    local *{"${WS}::lock_dir"}  = sub { $dir };
+
+    my $scfg = { 'dell-cluster-name' => 'pve' };
+
+    # Test::Plugin overrides _host_name with a fixed string, so this drives
+    # BlockBase's own implementation directly.
+    my $BB = 'PVE::Storage::Custom::DellEMC::Common::BlockBase';
+    my $host_name = sub { $BB->can('_host_name')->('Test::Plugin', @_) };
+
+    my $generated = Test::Plugin->_generated_host_name($scfg);
+    is($host_name->($scfg, 'st1'), $generated,
+        'with nothing recorded, the generated name is used');
+
+    Test::Plugin->_record_resolved_host('st1', 'tpepve-01-fc');
+    is($host_name->($scfg, 'st1'), 'tpepve-01-fc',
+        'a recorded host object is what every mapping call then uses —'
+      . ' otherwise the volume would be mapped to a host this node is not');
+    is($host_name->($scfg, 'st2'), $generated,
+        '... and only for the storage it was recorded for');
+
+    # A state file is something an operator can edit, and this ends up in a
+    # request to the array.
+    for my $bad ("../../etc/passwd", "name with space", "", "x" x 200) {
+        open(my $fh, '>', Test::Plugin->_resolved_host_file('st3')) or die;
+        print {$fh} "$bad\n";
+        close($fh);
+        is($host_name->($scfg, 'st3'), $generated,
+            "a recorded name that does not look like one is ignored: '"
+          . substr($bad, 0, 20) . "'");
+    }
+
+    Test::Plugin->_forget_resolved_host('st1');
+    is($host_name->($scfg, 'st1'), $generated,
+        'and removing the storage forgets it');
+}
+
 done_testing();

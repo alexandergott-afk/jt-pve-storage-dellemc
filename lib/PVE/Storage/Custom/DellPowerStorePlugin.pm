@@ -615,14 +615,90 @@ sub _initiator_owners {
     return \%found;
 }
 
+# The host object on the array that already holds exactly this node's
+# initiators, if there is one.
+#
+# An array usually has one before this plugin ever runs — built by whoever
+# zoned the fabric — under a name of its own, holding this node's WWPNs. They
+# cannot be registered a second time, so either that object is used or the
+# operator has to take it apart.
+#
+# Adopted ONLY when its initiators are a subset of this node's. A host that
+# also carries someone else's ports is a shared or foreign object, and mapping
+# a volume to it would hand that volume to whatever else is in it — which is
+# not a decision a storage plugin gets to make quietly.
+sub _adoptable_host {
+    my ($class, $scfg, $want, %opts) = @_;
+
+    my $owners = $class->_initiator_owners($scfg, $want, %opts);
+    return undef unless $owners && %$owners;
+
+    my %names = map { $_ => 1 } values %$owners;
+    if (keys(%names) > 1) {
+        die "This node's initiators are registered to more than one host"
+          . " object on the array: "
+          . join(', ', map { "$_ -> '$owners->{$_}'" } sort keys %$owners)
+          . ".\n  A node is one host object. Consolidate them in PowerStore"
+          . " Manager before adding this storage.\n";
+    }
+
+    my ($name) = keys %names;
+    my $host = eval { $class->_api($scfg, %opts)->host_get_by_name($name, %opts) };
+    return undef unless $host;
+
+    my %mine = map { $class->_initiator_key($_->{port_name}) => 1 } @$want;
+    my @extra = grep { !$mine{ $class->_initiator_key($_) } }
+                map  { $_->{port_name} // () }
+                @{ $host->{host_initiators} // [] };
+
+    if (@extra) {
+        die "Host '$name' on the array holds this node's initiators together"
+          . " with others: " . join(', ', @extra) . ".\n  A volume mapped to"
+          . " it would be visible to whatever those belong to, so this plugin"
+          . " will not use it. Give this node a host object of its own, or"
+          . " use 'dell-host-mode shared' if one object for the whole cluster"
+          . " is what you meant.\n";
+    }
+
+    return $host;
+}
+
 sub _array_ensure_host {
     my ($class, $scfg, $storeid, %opts) = @_;
 
-    my $api  = $class->_api($scfg, %opts);
-    my $name = $class->_host_name($scfg);
-    my $want = $class->_initiator_records($scfg);
+    my $api       = $class->_api($scfg, %opts);
+    my $generated = $class->_generated_host_name($scfg);
+    my $name      = $class->_host_name($scfg, $storeid);
+    my $want      = $class->_initiator_records($scfg);
 
     my $host = eval { $api->host_get_by_name($name, %opts) };
+
+    # A recorded name that is no longer on the array: the object was renamed
+    # or removed. Forget it rather than creating one under its name.
+    if (!$host && $name ne $generated) {
+        $class->_forget_resolved_host($storeid);
+        $name = $generated;
+        $host = eval { $api->host_get_by_name($name, %opts) };
+    }
+
+    # No object under the name this plugin uses: before creating one, find out
+    # whether this node already IS a host object under another name. Its
+    # initiators can only be in one place, so creating would fail anyway.
+    if (!$host) {
+        my $existing = $class->_adoptable_host($scfg, $want, %opts);
+        if ($existing) {
+            $class->_warn_once($storeid, 'adopted-host',
+                "Storage '$storeid': this node's initiators are already"
+              . " registered to host '$existing->{name}' on the array, so"
+              . " that object is used instead of creating"
+              . " '$generated'. It holds this node's ports and no others."
+              . " Volumes are mapped to it as they would be to one this"
+              . " plugin had created.");
+            $class->_record_resolved_host($storeid, $existing->{name});
+            $name = $existing->{name};
+            $host = $existing;
+        }
+    }
 
     unless ($host) {
         my $id = eval { $api->host_create($name, $want, %opts) };

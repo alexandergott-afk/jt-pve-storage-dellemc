@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.98~beta1] - 2026-08-07
+
+### Added
+- **The host object the array already has for this node is used, rather than
+  a second one being created.** An array usually has one before this plugin
+  runs — built by whoever zoned the fabric — holding this node's WWPNs under a
+  name of its own, and an initiator can belong to only one host object. On
+  PowerStore, when there is no host under the name this plugin uses, it now
+  looks for one that already holds this node's initiators and uses that,
+  recording the name locally so every later mapping goes to the same object.
+  Nothing is renamed, nothing is removed, no initiator is moved.
+
+  It adopts only a host whose initiators are a **subset of this node's**. One
+  that also carries another host's ports is a shared or foreign object, and a
+  volume mapped to it would be visible to whatever else is in it — so the
+  plugin refuses, and names the port that made it refuse. Ports split across
+  two host objects are refused too: a node is one host object.
+
+  The recorded name is validated on the way back out, because a state file is
+  something an operator can edit and the value ends up in a request to the
+  array. A record naming a host the array no longer has is dropped, and the
+  plugin falls back to its own name.
+
+  Volumes are still pre-mapped to other nodes by searching for the
+  `pve-<cluster>-` prefix, so a node whose host was adopted under another name
+  is not pre-mapped from elsewhere; it maps itself when it activates the
+  storage, which happens before a migration completes.
+
 ## [0.7.97~beta1] - 2026-08-07
 
 ### Fixed

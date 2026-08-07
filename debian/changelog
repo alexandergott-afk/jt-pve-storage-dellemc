@@ -1,3 +1,18 @@
+jt-pve-storage-dellemc (0.7.98~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Added: on PowerStore, the host object the array already has for this node
+    is used rather than a second one being created. An initiator can belong
+    to only one host object, so when there is no host under the name this
+    plugin uses, it looks for one holding this node's initiators and uses
+    that, recording the name locally. Nothing is renamed, removed or moved.
+    Adopted only when the host's initiators are a subset of this node's - one
+    that also carries another host's ports is refused, by name, because a
+    volume mapped there would be visible to whatever else is in it. Ports
+    split across two host objects are refused as well.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 11:40:00 +0800
+
 jt-pve-storage-dellemc (0.7.97~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.
