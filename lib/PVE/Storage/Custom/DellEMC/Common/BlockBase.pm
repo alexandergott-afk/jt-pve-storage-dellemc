@@ -3184,10 +3184,69 @@ sub on_update_hook_full {
     return $res;
 }
 
+# Local bookkeeping for a storage that is being removed.
+#
+# Health::forget existed from the start and nothing ever called it (the same
+# shape as lesson 36). The files are small, so the cost of leaving them is not
+# disk: it is that a storage id RE-created later inherits them. An inherited
+# health state makes the new storage report "RECOVERED after 4 days" on its
+# first successful poll, and inherited warn flags silence the first hour of
+# warnings about a storage nobody has ever seen before.
+#
+# The WWID and temp-clone tracking is treated differently, and deliberately:
+# each entry names a device this node actually has or an object this plugin
+# created on the array. If any remain, the files stay and the operator is told
+# what is in them — deleting the only record of a device that is still on the
+# node would leave nothing to clean it up with.
+sub _forget_local_state {
+    my ($class, $storeid) = @_;
+
+    return unless defined $storeid && length $storeid;
+
+    eval { $HEALTH->forget($storeid) };
+
+    my $safe = $WWID_STATE->safe_storeid($storeid);
+    my $run  = $WWID_STATE->lock_dir;
+
+    # The _warn_once flags, which are named warned-<storeid>-<topic>.
+    if (opendir(my $dh, $run)) {
+        for my $entry (readdir($dh)) {
+            next unless $entry =~ /^(warned-\Q$safe\E-.+)\z/;
+            unlink("$run/$1");
+        }
+        closedir($dh);
+    }
+    eval { $WWID_STATE->cleanup_lock_file($storeid) };
+
+    my @kept;
+    my $wwids = eval { $WWID_STATE->tracked_wwids($storeid) } // {};
+    if (ref($wwids) eq 'HASH' && keys %$wwids) {
+        push @kept, scalar(keys %$wwids) . " device(s) still tracked in "
+                  . $WWID_STATE->state_file($storeid);
+    } else {
+        unlink($WWID_STATE->state_file($storeid));
+    }
+
+    my $clones = eval { $WWID_STATE->stale_temp_clones($storeid, 0) } // [];
+    if (ref($clones) eq 'ARRAY' && @$clones) {
+        push @kept, scalar(@$clones) . " temporary clone(s) recorded in "
+                  . $WWID_STATE->temp_clone_file($storeid);
+    } else {
+        unlink($WWID_STATE->temp_clone_file($storeid));
+    }
+
+    warn "Storage '$storeid' has been removed, but this node still has "
+       . join(' and ', @kept) . ". Those files are left in place: they are the"
+       . " only record of what is still here.\n" if @kept;
+
+    return;
+}
+
 sub on_delete_hook {
     my ($class, $storeid, $scfg) = @_;
 
     $class->_delete_password($storeid);
+    $class->_forget_local_state($storeid);
 
     return;
 }

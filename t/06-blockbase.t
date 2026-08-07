@@ -1513,4 +1513,53 @@ SKIP: {
       . ' includes a check that timed out');
 }
 
+{
+    # on_delete_hook: what a removed storage leaves behind on this node.
+    Test::Plugin->reset_state();
+
+    my $dir = "$TMP/forget";
+    mkdir $dir;
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+    my $WS = 'PVE::Storage::Custom::DellEMC::Common::WwidState';
+    my $HL = 'PVE::Storage::Custom::DellEMC::Common::Health';
+    local *{"${WS}::state_dir"} = sub { $dir };
+    local *{"${WS}::lock_dir"}  = sub { $dir };
+    local *Test::Plugin::_delete_password = sub { 1 };
+
+    # Health state, a warn flag, and an EMPTY wwid file: all local bookkeeping.
+    $HL->record_status_failure('gone1', 'unreachable');
+    open(my $f, '>', "$dir/warned-gone1-some-topic") or die; close $f;
+    $WS->write_state('gone1', {});
+
+    ok(-f $HL->state_file('gone1'), 'the health state exists to begin with');
+
+    Test::Plugin->on_delete_hook('gone1', {});
+
+    ok(!-f $HL->state_file('gone1'),
+        'removing a storage forgets its outage state — a storage id created'
+      . ' again later must not inherit "down" and report a recovery from an'
+      . ' outage it never had');
+    ok(!-f "$dir/warned-gone1-some-topic",
+        '... and its warning throttles, which would otherwise silence the'
+      . ' first hour of a new storage\'s warnings');
+    ok(!-f $WS->state_file('gone1'),
+        '... and an empty tracking file');
+
+    # A storage that still has devices tracked keeps its file.
+    $WS->track_wwid('gone2', '3600a0980deadbeef');
+    my @w;
+    {
+        local $SIG{__WARN__} = sub { push @w, $_[0] };
+        Test::Plugin->on_delete_hook('gone2', {});
+    }
+    ok(-f $WS->state_file('gone2'),
+        'a tracking file that still names a device on this node is KEPT —'
+      . ' deleting the only record of it would leave nothing to clean it up'
+      . ' with');
+    like(join('', @w), qr/still tracked|still has/,
+        '... and the operator is told, rather than it being silent');
+}
+
 done_testing();

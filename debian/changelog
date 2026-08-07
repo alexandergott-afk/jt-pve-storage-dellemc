@@ -1,3 +1,25 @@
+jt-pve-storage-dellemc (0.7.94~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: the test suite wrote over this node's own tracking files. The
+    lifecycle tests use storage ids a real installation would also use
+    (u480, me5) and the plugin names its state files after the storage, so
+    `make test` on a node overwrote the WWID tracking of a storage with the
+    same name - the files the orphan reaper reads to decide which devices
+    belong to this node. The state directories now honour
+    PVE_DELLEMC_STATE_DIR and PVE_DELLEMC_RUN_DIR, which every test target
+    points at a throwaway directory. Nothing in production sets either.
+  * Fixed: on_delete_hook left a removed storage's outage state and warning
+    throttles behind forever, so a storage id created again later inherited
+    them - a first successful poll reporting "RECOVERED after four days" and
+    an hour of silence on warnings. Cleared now in all four families. WWID
+    and temporary-clone tracking is kept and reported instead of deleted when
+    it still names something that exists.
+  * The release notes template no longer says the ME4024 has only passed the
+    first-run test; it has passed the lifecycle items beyond it since 0.7.66.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 08:20:00 +0800
+
 jt-pve-storage-dellemc (0.7.93~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

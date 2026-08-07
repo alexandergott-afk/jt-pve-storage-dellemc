@@ -56,10 +56,20 @@ use constant {
     LOCK_WAIT_SECONDS => 10,
 };
 
-sub state_dir { '/var/lib/pve-storage-dellemc' }
+# Where this node's own tracking lives.
+#
+# The environment override exists for the test suite, and it was earned: the
+# lifecycle tests use storage ids like 'u480' and 'me5' — exactly what a
+# customer with a Unity 480 or an ME5 would call theirs — and without it
+# `make test` on a node wrote {} over that storage's real tracking file. The
+# orphan reaper reads those files to decide which devices are this node's, and
+# `docs/RELEASE_TESTING.md` tells a tester to run the suite on the node they
+# are testing on. Nothing in production sets these; pvestatd and pvedaemon
+# inherit no such variable.
+sub state_dir { $ENV{PVE_DELLEMC_STATE_DIR} // '/var/lib/pve-storage-dellemc' }
 
 # Runtime state that should not survive a reboot.
-sub lock_dir { '/var/run/pve-storage-dellemc' }
+sub lock_dir { $ENV{PVE_DELLEMC_RUN_DIR} // '/var/run/pve-storage-dellemc' }
 
 # A storeid reaches us from storage.cfg and ends up in a file name.
 sub safe_storeid {

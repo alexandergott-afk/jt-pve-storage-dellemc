@@ -15,3 +15,6 @@ ref/
 # equivalents out of their repositories too.
 jt-pve-storage-dellemc.md
 CLAUDE.md
+
+# Throwaway state directory the test suite writes to (see Makefile).
+.test-state/

@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.94~beta1] - 2026-08-07
+
+### Fixed
+- **The test suite wrote over this node's own tracking files.** The lifecycle
+  tests use storage ids a real installation would also use — `u480`, `me5` —
+  and the plugin names its state files after the storage, under
+  `/var/lib/pve-storage-dellemc`. Running `make test` on a node therefore
+  wrote `{}` over the WWID tracking of a storage with the same name, and the
+  orphan reaper reads exactly those files to decide which devices belong to
+  this node. `docs/RELEASE_TESTING.md` asks a tester to run the suite on the
+  node being tested, so this was reachable by following the project's own
+  instructions. The state directories now honour `PVE_DELLEMC_STATE_DIR` and
+  `PVE_DELLEMC_RUN_DIR`, and every test target points them at a throwaway
+  directory. Nothing in production sets either.
+
+- **A removed storage left its local bookkeeping behind forever.**
+  `on_delete_hook` deleted the password and nothing else, so a storage id
+  created again later inherited the previous one's outage state and warning
+  throttles: a first successful poll reporting *RECO0.7.94~beta1ED after four days*,
+  and an hour of silence on warnings about a storage nobody had ever seen.
+  Both are cleared now, in all four families.
+
+  The WWID and temporary-clone tracking is treated differently on purpose: if
+  it still names a device on this node or an object on the array, the file is
+  KEPT and the operator is told what is in it. Deleting the only record of
+  something that is still there leaves nothing to clean it up with.
+
 ## [0.7.93~beta1] - 2026-08-07
 
 ### Fixed

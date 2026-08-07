@@ -4,7 +4,7 @@ PACKAGE = jt-pve-storage-dellemc
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.7.93~beta1
+VERSION = 0.7.94~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -102,7 +102,21 @@ critic:
 		echo "  perlcritic is not installed (apt install libperl-critic-perl)"; \
 	fi
 
+# The suite runs against a throwaway state directory, never the node's own.
+#
+# The lifecycle tests use storage ids a real installation would also use —
+# 'u480', 'me5' — and the plugin's tracking files are named after the storage.
+# Without this, `make test` on a node wrote over the tracking of a storage
+# with the same name, and the orphan reaper reads exactly those files to
+# decide which devices belong to this node. RELEASE_TESTING.md asks a tester
+# to run the suite on the node being tested, so this is not hypothetical.
+TEST_STATE_DIR := $(CURDIR)/.test-state
+export PVE_DELLEMC_STATE_DIR = $(TEST_STATE_DIR)/lib
+export PVE_DELLEMC_RUN_DIR   = $(TEST_STATE_DIR)/run
+
 unit:
+	@rm -rf $(TEST_STATE_DIR)
+	@mkdir -p $(PVE_DELLEMC_STATE_DIR) $(PVE_DELLEMC_RUN_DIR)
 	@if [ -n "$(strip $(UNIT_TESTS))" ]; then \
 		echo "Running unit tests..."; \
 		prove -Ilib $(UNIT_TESTS); \
@@ -148,6 +162,8 @@ nopve-stub:
 # every release was a syntax failure, not a test failure.
 unit-nopve: nopve-stub
 	@echo "Running checks as they run without Proxmox VE (as in CI)..."
+	@rm -rf $(TEST_STATE_DIR)
+	@mkdir -p $(PVE_DELLEMC_STATE_DIR) $(PVE_DELLEMC_RUN_DIR)
 	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" $(MAKE) --no-print-directory syntax
 	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" prove -Ilib $(UNIT_TESTS)
 	@rm -rf $(NOPVE_STUB)
@@ -229,6 +245,7 @@ deb:
 	dpkg-buildpackage -us -uc -b
 
 clean:
+	rm -rf $(TEST_STATE_DIR)
 	rm -rf debian/$(PACKAGE)/
 	rm -rf debian/.debhelper/
 	rm -f  debian/debhelper-build-stamp

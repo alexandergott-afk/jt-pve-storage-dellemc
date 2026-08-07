@@ -173,11 +173,14 @@ jobs:
             ## ⚠️ Beta software — read before installing
 
             **One array has run this plugin**, and only one: a PowerVault
-            ME4024 (firmware `GT280R011-01`) over Fibre Channel, which as of
-            0.7.65 passes the whole of the first-run test. Everything else
-            remains unverified against hardware — **PowerStore and PowerFlex
-            entirely**, and on PowerVault the iSCSI and SAS paths, since that
-            array ran FC.
+            ME4024 (firmware `GT280R011-01`) over Fibre Channel. It passes
+            the whole of the first-run test, and as of 0.7.66 the lifecycle
+            items beyond it — a guest OS booting off an array volume,
+            growing a disk, `vzdump --mode snapshot` with a restore, an LXC
+            container, and a node reboot. Everything else remains unverified
+            against hardware — **PowerStore, PowerFlex and Unity entirely**,
+            and on PowerVault the iSCSI and SAS paths, live migration and a
+            path failure, since that array ran FC and one node.
 
             Read [what has and has not been verified](https://github.com/jasoncheng7115/jt-pve-storage-dellemc/blob/main/docs/TESTING.md)
             before trusting any of it: that page names each item and says

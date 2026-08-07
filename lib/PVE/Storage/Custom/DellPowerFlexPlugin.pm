@@ -1962,6 +1962,14 @@ sub on_delete_hook {
 
     $class->_delete_password($storeid);
 
+    # The outage state, so a storage id re-created later does not inherit it
+    # and report "RECOVERED after four days" on its first successful poll.
+    # There is nothing else to clear here: this family keeps no WWID tracking
+    # (no dm-multipath) and its _warn_once throttle is process-wide rather
+    # than file-backed. BlockBase's equivalent has more to do; grepped for
+    # rather than assumed (lesson 40a).
+    eval { $HEALTH->forget($storeid) };
+
     return;
 }
 

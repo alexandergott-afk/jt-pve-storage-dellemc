@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.93~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.94~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.94~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The test suite wrote over this node's own tracking files &mdash; the lifecycle tests use storage ids a real installation would also use, and the orphan reaper reads exactly those files. Also: a removed storage left its outage state behind, so a storage created again later inherited it.</span>
+            <span class="lang-zh">測試套件會覆寫本節點自己的追蹤檔案 &mdash; 生命週期測試用的儲存 id 正是真實環境也會用的名字,而孤兒回收器讀的就是那些檔案。另修正:被移除的儲存會留下中斷狀態,之後同名的新儲存會繼承它。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.93~beta1</div>
