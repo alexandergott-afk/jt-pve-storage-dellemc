@@ -792,6 +792,29 @@ sub _array_map_to_host {
     my ($host_id, $group_id) = $class->_host_identity($scfg, $host_name, %opts);
     die "Host '$host_name' is not registered on the array\n" unless $host_id;
 
+    # A host that belongs to a host group is mapped THROUGH the group.
+    #
+    # PowerStore's own Map dialog offers groups and not the hosts inside them,
+    # and one group mapping reaches every member — which is what a PVE cluster
+    # wants, and what makes a migration find its disk without a mapping of its
+    # own. Attaching the member host instead leaves the other nodes without
+    # the volume, which is what a customer saw: a new disk mapped to the node
+    # that created it and to nothing else.
+    if (defined $group_id && length $group_id) {
+        $class->_warn_once($opts{storeid} // '', "hostgroup-$group_id",
+            "Host '$host_name' belongs to a host group on the array, so"
+          . " volumes are mapped to the GROUP. One mapping serves every host"
+          . " in it — which is what a cluster wants, and also means every"
+          . " member can see these volumes.");
+
+        return $api->volume_attach($volume_id,
+            host_group_id => $group_id,
+            host_id       => $host_id,
+            lun_base      => $scfg->{'pstore-lun-id-base'} // 1,
+            %opts,
+        );
+    }
+
     return $api->volume_attach($volume_id,
         host_id  => $host_id,
         group_id => $group_id,
@@ -811,23 +834,19 @@ sub _array_unmap_from_host {
     my ($host_id, $group_id) = $class->_host_identity($scfg, $host_name, %opts);
     return 1 unless $host_id;
 
-    # Deliberately without the group: a detach names a host or a group, and
-    # sending a host for a mapping the group holds is refused. What this asks
-    # is whether there is a host-level mapping to remove.
-    unless ($api->is_mapped($volume_id, $host_id, %opts)) {
-        # There may still be one at group level, and this plugin did not make
-        # it and will not remove it. Saying so beats a later 'volume is still
-        # attached' from the array with nothing to explain it.
-        if (defined $group_id && length $group_id
-            && $api->is_mapped($volume_id, $host_id, %opts, group_id => $group_id)) {
-            $class->_warn_once($opts{storeid} // '', "hostgroup-map",
-                "volume '$name' is mapped to host group '$group_id', not to"
-              . " host '$host_name' directly. This plugin does not change"
-              . " group mappings; remove it in PowerStore Manager if the"
-              . " volume needs to be detached from this node.");
-        }
-        return 1;
+    # A mapping this plugin made through a host group is removed through the
+    # same group — it is the mapping, and leaving it behind is how a deleted
+    # volume keeps a live path on every member.
+    #
+    # The detach names a host or a group, never both: sending a host for a
+    # mapping the group holds is refused.
+    if (defined $group_id && length $group_id
+        && $api->is_mapped($volume_id, undef, %opts, group_id => $group_id)) {
+        return $api->volume_detach($volume_id, host_group_id => $group_id,
+            %opts);
     }
+
+    return 1 unless $api->is_mapped($volume_id, $host_id, %opts);
 
     return $api->volume_detach($volume_id, host_id => $host_id, %opts);
 }

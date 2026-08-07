@@ -787,7 +787,7 @@ sub is_mapped {
     my $group_id = $opts{group_id};
 
     for my $mapping (@$mappings) {
-        return 1 if ($mapping->{host_id} // '') eq $host_id;
+        return 1 if defined $host_id && ($mapping->{host_id} // '') eq $host_id;
         return 1 if defined $group_id && length $group_id
                  && ($mapping->{host_group_id} // '') eq $group_id;
     }
@@ -809,7 +809,9 @@ sub next_free_lun {
     my $base = $opts{base} // MIN_LUN_ID;
     $base = MIN_LUN_ID if $base < MIN_LUN_ID;
 
-    my $mappings = $self->mapping_list(host_id => $host_id, %opts);
+    my $mappings = defined $host_id
+        ? $self->mapping_list(host_id => $host_id, %opts)
+        : [];
 
     # A LUN id is unique per host, and a mapping made to a host GROUP occupies
     # one on every host in it. Those rows carry host_group_id instead of
@@ -856,9 +858,13 @@ sub volume_attach {
     # Always pass the LUN id explicitly; see next_free_lun.
     if (defined $opts{lun}) {
         $body->{logical_unit_number} = 0 + $opts{lun};
-    } elsif (defined $opts{host_id}) {
+    } elsif (defined $opts{host_id} || defined $opts{host_group_id}) {
+        # A group mapping occupies its LUN id on every member, so the id has
+        # to be free across the group AND on the host this node is, which may
+        # carry mappings of its own from before it joined.
         $body->{logical_unit_number} = 0 + $self->next_free_lun($opts{host_id},
-            base => $opts{lun_base}, group_id => $opts{group_id});
+            base     => $opts{lun_base},
+            group_id => $opts{group_id} // $opts{host_group_id});
     }
 
     return $self->post("/volume/$volume_id/attach", $body, %opts);

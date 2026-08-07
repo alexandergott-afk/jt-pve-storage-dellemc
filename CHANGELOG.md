@@ -7,6 +7,26 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.2~beta1] - 2026-08-07
+
+### Fixed
+- **A host inside a host group is now mapped through the group.** PowerStore's
+  own Map dialog offers host groups and not the hosts inside them: once a host
+  joins a group, the group is the mapping target. The plugin was attaching the
+  member host, which left every other node in the group without the volume —
+  a new disk was mapped to the node that created it and to nothing else, and a
+  migrated VM arrived on a node that could not see its disk.
+
+  One group mapping reaches every member, which is what a cluster wants and
+  what makes a migration find its disk without a mapping of its own. The
+  operator is told once, by name, that the group is what volumes are mapped to
+  — every member can see them, and that is worth knowing rather than
+  discovering.
+
+  The same mapping is what gets removed: a group mapping this plugin made is
+  detached through the group, because leaving it behind is how a deleted
+  volume keeps a live path on every member.
+
 ## [0.8.1~beta1] - 2026-08-07
 
 ### Fixed

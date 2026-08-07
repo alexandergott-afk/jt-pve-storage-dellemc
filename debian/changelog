@@ -1,3 +1,16 @@
+jt-pve-storage-dellemc (0.8.2~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: a host inside a host group is now mapped through the group.
+    PowerStore's Map dialog offers host groups and not the hosts inside them -
+    once a host joins a group, the group is the mapping target. Attaching the
+    member host left every other node in the group without the volume: a new
+    disk was mapped to the node that created it and to nothing else, and a
+    migrated VM arrived on a node that could not see its disk. A group mapping
+    made by this plugin is also detached through the group.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 15:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.1~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

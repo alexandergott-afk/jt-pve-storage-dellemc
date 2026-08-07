@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.1~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.2~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1115,6 +1115,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.2~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A host inside a host group is mapped through the group, which is the only target PowerStore offers once a host joins one. Attaching the member host left every other node in the group without the volume.</span>
+            <span class="lang-zh">屬於 host group 的 host 改為透過 group 對應 &mdash; host 一旦加入 group，那就是 PowerStore 唯一提供的對應對象。接上成員 host 會讓 group 裡其他節點都拿不到該磁碟區。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.1~beta1</div>

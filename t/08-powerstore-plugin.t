@@ -431,4 +431,72 @@ SKIP: {
         'nothing to adopt when the array has never seen these ports');
 }
 
+{
+    # A host inside a host group is mapped THROUGH the group.
+    #
+    # PowerStore's own Map dialog offers groups and not the hosts inside them:
+    # once a host joins a group, the group is the mapping target. One group
+    # mapping reaches every member, which is what a PVE cluster wants — and
+    # attaching the member host instead is what left a customer with a disk
+    # mapped to the node that created it and to nothing else.
+    my $P = 'PVE::Storage::Custom::DellPowerStorePlugin';
+
+    my @attached;
+    my @detached;
+    my $mapped_group = 0;
+
+    {
+        package Test::GroupApi;
+        sub new { bless {}, shift }
+        sub host_get_by_name {
+            my ($self, $name) = @_;
+            return { id => 'h1', name => $name, host_group_id => 'g-pve-fc' }
+                if $name eq 'tpepve-01-fc';
+            return undef;
+        }
+        sub volume_attach {
+            my ($self, $vol, %opts) = @_;
+            push @attached, { volume => $vol, %opts };
+            $mapped_group = 1 if $opts{host_group_id};
+            return 1;
+        }
+        sub volume_detach {
+            my ($self, $vol, %opts) = @_;
+            push @detached, { volume => $vol, %opts };
+            return 1;
+        }
+        sub is_mapped {
+            my ($self, $vol, $host_id, %opts) = @_;
+            return 1 if $mapped_group && ($opts{group_id} // '') eq 'g-pve-fc';
+            return 0;
+        }
+        sub mapping_list { return [] }
+    }
+
+    no warnings 'redefine', 'once';
+    my $api = Test::GroupApi->new;
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_api = sub { $api };
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_require_volume_id =
+        sub { 'v1' };
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_volume_id = sub { 'v1' };
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_warn_once = sub { 1 };
+
+    $P->_array_map_to_host({}, 'pve-ps1-100-disk0', 'tpepve-01-fc');
+
+    is(scalar(@attached), 1, 'one attach');
+    is($attached[0]{host_group_id}, 'g-pve-fc',
+        'the volume is attached to the GROUP, which is the only thing'
+      . " PowerStore offers once a host is in one");
+
+    # And the same mapping is what has to be removed: leaving it behind is how
+    # a deleted volume keeps a live path on every member of the group.
+    $P->_array_unmap_from_host({}, 'pve-ps1-100-disk0', 'tpepve-01-fc');
+
+    is(scalar(@detached), 1, 'one detach');
+    is($detached[0]{host_group_id}, 'g-pve-fc',
+        '... and it names the group, because that is the mapping that exists');
+    ok(!exists $detached[0]{host_id},
+        '... and not the host: a detach names one or the other, never both');
+}
+
 done_testing();
