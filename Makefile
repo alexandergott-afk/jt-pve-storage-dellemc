@@ -244,6 +244,12 @@ release-check: check-multipath-flush syntax unit unit-nopve
 deb:
 	dpkg-buildpackage -us -uc -b
 
+# The social preview for the documentation site. Regenerated on a version
+# bump because the badge in it carries the version; the related projects do
+# the same.
+og-image:
+	python3 docs/scripts/gen_og_image.py $(VERSION)
+
 clean:
 	rm -rf $(TEST_STATE_DIR)
 	rm -rf debian/$(PACKAGE)/
