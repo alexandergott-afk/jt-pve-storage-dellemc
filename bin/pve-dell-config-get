@@ -17,7 +17,7 @@ use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(
     get_initiator_name probe_portal discover_targets login_target
 );
 use PVE::Storage::Custom::DellEMC::Common::FC qw(
-    is_fc_available get_fc_wwpns_raw
+    is_fc_available get_fc_wwpns
 );
 use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
     wait_for_multipath_device get_device_by_wwid cleanup_lun_devices
@@ -33,7 +33,7 @@ use PVE::Storage::Custom::DellEMC::Common::Multipath qw(
 # /etc/pve is gone or pvedaemon will not start. It parses storage.cfg itself
 # when it can, and takes credentials on the command line when it cannot.
 
-my $VERSION = '0.7.95~beta1';
+my $VERSION = '0.7.96~beta1';
 
 my $NAMING = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
 
@@ -482,7 +482,9 @@ sub ensure_host {
     if ($protocol eq 'fc') {
         die "Protocol 'fc' was selected but this node has no FC HBA.\n"
             unless is_fc_available();
-        my $wwpns = get_fc_wwpns_raw(online_only => 1);
+        # Colon-separated, as PowerStore requires; see _initiator_records in
+        # DellPowerStorePlugin.
+        my $wwpns = get_fc_wwpns(online_only => 1);
         die "No online FC HBA ports on this node.\n" unless @$wwpns;
         $initiators = [ map { { port_name => $_, port_type => 'FC' } } @$wwpns ];
     } else {

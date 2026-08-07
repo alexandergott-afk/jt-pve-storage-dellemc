@@ -470,6 +470,12 @@ sub _initiator_ids {
     my ($class, $scfg) = @_;
 
     if ($class->_is_fc($scfg)) {
+        # The run-together form, and deliberately NOT the colon-separated one
+        # the other two families need. This is the only FC path that has run
+        # against hardware: an ME4024 accepted these WWPNs, created the host
+        # and mapped volumes through it. PowerStore refuses this form and
+        # Unity wants the node WWN with it, so the three genuinely differ —
+        # do not unify them without an array to say so.
         my $wwpns = get_fc_wwpns_raw(online_only => 1);
         die "No online FC HBA ports found on this node.\n" unless @$wwpns;
         return $wwpns;

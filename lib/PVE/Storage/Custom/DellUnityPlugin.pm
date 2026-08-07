@@ -11,7 +11,7 @@ use base qw(PVE::Storage::Custom::DellEMC::Common::BlockBase);
 
 use PVE::Storage::Custom::DellEMC::Unity::API;
 use PVE::Storage::Custom::DellEMC::Unity::Naming;
-use PVE::Storage::Custom::DellEMC::Common::FC qw(get_fc_wwpns_raw);
+use PVE::Storage::Custom::DellEMC::Common::FC qw(get_fc_wwn_pairs);
 use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(get_initiator_name);
 
 # Unity XT. The host-side work is BlockBase's; this module translates between
@@ -700,10 +700,17 @@ sub _initiator_records {
     my ($class, $scfg) = @_;
 
     if ($class->_is_fc($scfg)) {
-        my $wwpns = get_fc_wwpns_raw(online_only => 1);
-        die "No online FC HBA ports found on this node.\n" unless @$wwpns;
+        # Unity identifies an FC initiator by the NODE WWN and the PORT WWN
+        # together, colon-separated:
+        #   20:00:00:00:c9:29:0f:fd:10:00:00:00:c9:29:0f:fd
+        # which is what Unisphere and uemcli show. Sending the port WWN alone,
+        # and without colons, is what this did until 0.7.96 — the same defect
+        # a PowerStore rejected outright on its first hardware run. NOT
+        # VERIFIED against a Unity: no array has run this.
+        my $wwns = get_fc_wwn_pairs(online_only => 1);
+        die "No online FC HBA ports found on this node.\n" unless @$wwns;
         # '1' is the FC initiator type, as a string.
-        return [ map { { id => $_, type => '1' } } @$wwpns ];
+        return [ map { { id => $_, type => '1' } } @$wwns ];
     }
 
     return [ { id => get_initiator_name(), type => '2' } ];

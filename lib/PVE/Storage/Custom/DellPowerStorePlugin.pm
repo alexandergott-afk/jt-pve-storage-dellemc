@@ -13,7 +13,7 @@ use Time::Local ();
 
 use PVE::Storage::Custom::DellEMC::PowerStore::API;
 use PVE::Storage::Custom::DellEMC::PowerStore::Naming;
-use PVE::Storage::Custom::DellEMC::Common::FC qw(get_fc_wwpns_raw);
+use PVE::Storage::Custom::DellEMC::Common::FC qw(get_fc_wwpns);
 use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(get_initiator_name);
 
 # The PowerStore half of the plugin: everything here is about translating
@@ -558,7 +558,14 @@ sub _initiator_records {
     my ($class, $scfg) = @_;
 
     if ($class->_is_fc($scfg)) {
-        my $wwpns = get_fc_wwpns_raw(online_only => 1);
+        # COLON-SEPARATED, and the array checks. Dell's own ansible-powerstore
+        # module documents the port name as '21:00:00:24:ff:31:e9:fc', and a
+        # PowerStore refuses the run-together form with
+        #   "the format of the port name ... is incorrect. Please use a valid
+        #    IQN for iSCSI, WWN for FC, or NQN for NVMe. (0xE0A01001002F)"
+        # — quoting the HOST name back rather than the port, which is what
+        # made this look like a host-naming problem on the first hardware run.
+        my $wwpns = get_fc_wwpns(online_only => 1);
         die "No online FC HBA ports found on this node.\n" unless @$wwpns;
         return [ map { { port_name => $_, port_type => 'FC' } } @$wwpns ];
     }

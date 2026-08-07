@@ -623,4 +623,51 @@ my %BASE_DEFAULT_IS_RIGHT = (
     }
 }
 
+# ---------------------------------------------------------------------------
+# The FC identifier each array actually accepts
+#
+# A customer's first PowerStore run was refused at POST /host:
+#   "the format of the port name pve-pve-<node> is incorrect. Please use a
+#    valid IQN for iSCSI, WWN for FC, or NQN for NVMe. (0xE0A01001002F)"
+# The array quoted the HOST name back instead of the port, which is why it
+# read as a host-naming problem. The cause was the WWPN spelling: everything
+# used the run-together form, because that is the function every call site had
+# picked, while the one that formats with colons was called nowhere.
+#
+# The three arrays genuinely differ, so this asserts three different answers
+# rather than one shared one:
+#   PowerStore  21:00:00:0e:1e:1d:2b:3c              (Dell's ansible module)
+#   Unity       20:00:...:3c:21:00:...:3c            (node WWN and port WWN)
+#   PowerVault  2100000e1e1d2b3c                     (accepted by an ME4024)
+# ---------------------------------------------------------------------------
+
+{
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+
+    my $PS = 'PVE::Storage::Custom::DellPowerStorePlugin';
+    my $UN = 'PVE::Storage::Custom::DellUnityPlugin';
+    my $PV = 'PVE::Storage::Custom::DellPowerVaultPlugin';
+
+    local *{"${PS}::get_fc_wwpns"} = sub { ['21:00:00:0e:1e:1d:2b:3c'] };
+    local *{"${UN}::get_fc_wwn_pairs"} =
+        sub { ['20:00:00:0e:1e:1d:2b:3c:21:00:00:0e:1e:1d:2b:3c'] };
+    local *{"${PV}::get_fc_wwpns_raw"} = sub { ['2100000e1e1d2b3c'] };
+
+    my $fc = { 'dell-protocol' => 'fc' };
+
+    is_deeply($PS->_initiator_records($fc),
+        [ { port_name => '21:00:00:0e:1e:1d:2b:3c', port_type => 'FC' } ],
+        'PowerStore sends the colon-separated WWPN it refuses to do without');
+
+    is_deeply($UN->_initiator_records($fc),
+        [ { id => '20:00:00:0e:1e:1d:2b:3c:21:00:00:0e:1e:1d:2b:3c',
+            type => '1' } ],
+        'Unity sends the node WWN and the port WWN together');
+
+    is_deeply($PV->_initiator_ids($fc), ['2100000e1e1d2b3c'],
+        'PowerVault keeps the run-together form, which is the only one an'
+      . ' array has actually accepted');
+}
+
 done_testing();

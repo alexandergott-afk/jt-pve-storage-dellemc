@@ -32,7 +32,6 @@ use PVE::Storage::Custom::DellEMC::Common::ISCSI qw(
 );
 use PVE::Storage::Custom::DellEMC::Common::FC qw(
     is_fc_available
-    get_fc_wwpns_raw
     get_fc_targets
     rescan_fc_hosts
     normalize_wwn
@@ -416,22 +415,6 @@ sub _host_name {
         if $class->_host_mode($scfg) eq 'shared';
 
     return $class->naming->encode_host_name($cluster, PVE::INotify::nodename());
-}
-
-# ('iqn', $iqn) or ('wwn', @wwpns)
-sub _get_initiators {
-    my ($class, $scfg) = @_;
-
-    if ($class->_is_fc($scfg)) {
-        my $wwpns = get_fc_wwpns_raw(online_only => 1);
-        die "No online FC HBA ports found on this node. Check that an HBA is"
-          . " installed, its ports are online, and the fabric is up. Use"
-          . " 'dell-protocol iscsi' if this node is not on the FC fabric.\n"
-            unless @$wwpns;
-        return ('wwn', @$wwpns);
-    }
-
-    return ('iqn', get_initiator_name());
 }
 
 # Array object name for a PVE volume name.
@@ -3256,7 +3239,12 @@ sub _forget_local_state {
         unlink($WWID_STATE->state_file($storeid));
     }
 
-    my $clones = eval { $WWID_STATE->stale_temp_clones($storeid, 0) } // [];
+    # grace => 0: every recorded clone counts here, not only the ones old
+    # enough to reap. Passing a bare 0 made it a key of %opts with no
+    # value — 'Odd number of elements in hash assignment', and the grace
+    # stayed at its 15-minute default, so a clone created minutes ago was
+    # not counted and its record was deleted as if there were none.
+    my $clones = eval { $WWID_STATE->stale_temp_clones($storeid, grace => 0) } // [];
     if (ref($clones) eq 'ARRAY' && @$clones) {
         push @kept, scalar(@$clones) . " temporary clone(s) recorded in "
                   . $WWID_STATE->temp_clone_file($storeid);

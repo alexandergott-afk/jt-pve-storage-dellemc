@@ -5,6 +5,37 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.7.96~beta1] - 2026-08-07
+
+### 已修正
+- **PowerStore 拒絕建立 host：FC 的 WWPN 送出時沒有冒號。** 這是在客戶第一次跑
+  PowerStore 時發現的，它讓 `pvesm add` 直接失敗：
+
+  > The operation on host pve-pve-&lt;node&gt; (id: null) cannot be completed,
+  > because the format of the port name pve-pve-&lt;node&gt; is incorrect. Please
+  > use a valid IQN for iSCSI, WWN for FC, or NQN for NVMe. (0xE0A01001002F)
+
+  陣列在「port name」的位置回填的是 **host 名稱**，所以這則訊息讀起來像是命名問題。
+  它真正不接受的是 WWPN：我們送 `2100000e1e1d2b3c`，而 PowerStore 要的是
+  `21:00:00:0e:1e:1d:2b:3c` —— Dell 自己的 `ansible-powerstore` 模組就是這樣寫的。
+
+  `Common::FC` 從一開始就同時有兩種寫法，而每一個呼叫點都挑了無冒號那個 —— 有格式化
+  的那個函式從來沒有被呼叫過。三個系列需要的其實是三種不同的東西，現在也就送三種：
+  PowerStore 用冒號形式、PowerVault 維持無冒號形式（那是唯一真的被陣列接受過的 ——
+  一台 ME4024 以它建立 host 並完成對應）、Unity 用節點 WWN 加上埠 WWN 相接的形式，
+  也就是 Unisphere 顯示的那種。`bin/pve-dell-config-get` 說的是 PowerStore，同樣修正。
+
+- **Unity 的 FC initiator 少了一半身分。** Unity 是以節點 WWN 與埠 WWN 相接來識別
+  一個 FC initiator（`20:00:…:3c:21:00:…:3c`）；外掛只送了埠 WWN，而且沒有冒號。
+  若改成把現有的節點名稱清單接上去，會錯得另一種樣子 —— 同一張卡的兩個埠共用一個
+  節點名稱，而兩份清單各自去重，按位置配對會把錯的節點 WWN 接到第二個埠上。現在這
+  一對是從同一個 sysfs 目錄讀出來的。仍為 NOT 0.7.96~beta1IFIED：還沒有任何 Unity 跑過。
+
+- **`pvesm add` 失敗時出現 `Odd number of elements in hash assignment`。**
+  0.7.94 引進：本機狀態清理呼叫 `stale_temp_clones` 時，把一個裸的 `0` 傳給收具名
+  選項的參數，於是 15 分鐘的寬限期仍然生效，幾分鐘前才建立的臨時複製不被計入 ——
+  它的紀錄接著就被當成「沒有東西」刪掉了。
+
 ## [0.7.95~beta1] - 2026-08-07
 
 ### 已修正

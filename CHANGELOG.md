@@ -7,6 +7,46 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.96~beta1] - 2026-08-07
+
+### Fixed
+- **PowerStore refused to create a host: the FC WWPN was sent without
+  colons.** Found on a customer's first PowerStore run, where it stopped
+  `pvesm add` outright:
+
+  > The operation on host pve-pve-&lt;node&gt; (id: null) cannot be completed,
+  > because the format of the port name pve-pve-&lt;node&gt; is incorrect. Please
+  > use a valid IQN for iSCSI, WWN for FC, or NQN for NVMe. (0xE0A01001002F)
+
+  The array quotes the HOST name back where the port name belongs, which is
+  why this reads as a host-naming problem. What it disliked was the WWPN:
+  `2100000e1e1d2b3c` where PowerStore requires `21:00:00:0e:1e:1d:2b:3c`, the
+  form Dell's own `ansible-powerstore` module documents.
+
+  `Common::FC` has always had both spellings, and every caller had picked the
+  run-together one — the formatted function was called nowhere at all. The
+  three families need three different things, so they now send three:
+  PowerStore the colon form, PowerVault the run-together form (the only one an
+  array has actually accepted — an ME4024 creates hosts and maps volumes
+  through it), and Unity the node WWN and the port WWN joined, which is what
+  Unisphere shows. `bin/pve-dell-config-get` speaks PowerStore and got the
+  same fix.
+
+- **Unity's FC initiator was missing half of its identity.** Unity names an FC
+  initiator by the node WWN and the port WWN together
+  (`20:00:…:3c:21:00:…:3c`); the plugin sent the port WWN alone, without
+  colons. Reading the node WWN from the existing node-name list would have
+  been wrong in its own way — two ports of one adapter share a node name and
+  both lists deduplicate, so pairing by position attaches the wrong node WWN
+  to the second port. The pair is read from one sysfs directory. Still NOT
+  0.7.96~beta1IFIED: no Unity has run this.
+
+- **`Odd number of elements in hash assignment` on a failed `pvesm add`.**
+  Introduced in 0.7.94: the local-state cleanup called `stale_temp_clones`
+  with a bare `0` where the function takes named options, so the 15-minute
+  grace stayed in force and a temporary clone recorded minutes earlier was not
+  counted — its record was then deleted as if there were none.
+
 ## [0.7.95~beta1] - 2026-08-07
 
 ### Fixed

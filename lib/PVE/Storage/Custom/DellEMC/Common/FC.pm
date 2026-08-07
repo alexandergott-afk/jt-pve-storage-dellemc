@@ -19,6 +19,7 @@ our @EXPORT_OK = qw(
     get_fc_host_info
     get_fc_wwpns
     get_fc_wwpns_raw
+    get_fc_wwn_pairs
     get_fc_wwnns
     get_fc_targets
     rport_name
@@ -197,6 +198,36 @@ sub get_fc_wwpns {
 sub get_fc_wwpns_raw {
     my (%opts) = @_;
     return _wwpns(\&parse_wwn, %opts);
+}
+
+# ['20:00:...:fd:10:00:...:fd', ...] — the node WWN and the port WWN of the
+# SAME port, joined, which is how Unity identifies an FC initiator.
+#
+# Not get_fc_wwnns() joined to get_fc_wwpns(): both of those deduplicate
+# independently, and several ports of one adapter share a node name — so
+# pairing them by position would attach the wrong node WWN to a port on a
+# two-port HBA. The pair has to be read from the same directory.
+sub get_fc_wwn_pairs {
+    my (%opts) = @_;
+
+    my @out;
+    for my $host (@{ get_fc_hosts() }) {
+        my $base = FC_HOST_PATH . "/$host";
+
+        if ($opts{online_only}) {
+            my $state = _read_attr("$base/port_state") // '';
+            next unless $state =~ /online/i;
+        }
+
+        my $wwnn = format_wwn(_read_attr("$base/node_name"));
+        my $wwpn = format_wwn(_read_attr("$base/port_name"));
+        next unless defined $wwnn && defined $wwpn;
+
+        push @out, "$wwnn:$wwpn";
+    }
+
+    my %seen;
+    return [ grep { !$seen{$_}++ } @out ];
 }
 
 # Node names. Several ports of the same adapter share one, so the list is

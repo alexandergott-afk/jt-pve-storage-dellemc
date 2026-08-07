@@ -16,6 +16,7 @@ use PVE::Storage::Custom::DellEMC::Common::FC qw(
     wwn_equal
     is_fc_available
     get_fc_hosts
+    get_fc_wwn_pairs
     get_fc_wwpns
     get_fc_wwpns_raw
     get_fc_wwnns
@@ -123,6 +124,30 @@ unless ($available) {
     is(scalar(@$formatted), scalar(@$raw), 'both WWPN forms list the same ports');
     for my $i (0 .. $#$formatted) {
         ok(wwn_equal($formatted->[$i], $raw->[$i]), "WWPN $i agrees across forms");
+    }
+}
+
+# ---------------------------------------------------------------------------
+# get_fc_wwn_pairs: what Unity identifies an FC initiator by
+#
+# The node WWN and the port WWN of the SAME port, joined. Not two lists
+# zipped: both deduplicate independently, and the two ports of one adapter
+# share a node name, so pairing by position would attach the wrong node WWN
+# to the second port. Whatever this host has, the shape has to hold.
+# ---------------------------------------------------------------------------
+
+{
+    my $pairs = get_fc_wwn_pairs();
+    is(ref($pairs), 'ARRAY', 'get_fc_wwn_pairs returns an arrayref');
+
+    for my $pair (@$pairs) {
+        like($pair, qr/\A(?:[0-9a-f]{2}:){15}[0-9a-f]{2}\z/,
+            "'$pair' is two colon-separated WWNs, which is the form"
+          . " Unisphere shows");
+
+        my ($wwnn, $wwpn) = $pair =~ /\A((?:[0-9a-f]{2}:){7}[0-9a-f]{2}):(.*)\z/;
+        ok(grep({ $_ eq $wwpn } @{ get_fc_wwpns() }),
+            'the port half is one of this host\'s WWPNs');
     }
 }
 

@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.95~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.96~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.96~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">First defect found on a PowerStore, and it stopped pvesm add: the FC WWPN was sent without colons, and the array quoted the host name back where the port name belongs. The three families need three different FC identifier formats and now send three. Unity's was missing the node WWN entirely.</span>
+            <span class="lang-zh">第一個在 PowerStore 上找到的缺陷，而且它讓 pvesm add 直接失敗：FC 的 WWPN 送出時沒有冒號，而陣列在「port name」的位置回填了 host 名稱。三個系列需要三種不同的 FC 識別格式，現在也就送三種。Unity 那個更是整個少了節點 WWN。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.95~beta1</div>
