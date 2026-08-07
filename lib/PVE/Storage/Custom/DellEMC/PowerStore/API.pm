@@ -495,14 +495,20 @@ sub get_managed_capacity {
 # PowerStore rejects a size that is not a multiple of 8 KiB. Round up: a
 # volume slightly larger than requested is harmless, one slightly smaller
 # would silently truncate whatever PVE intends to put in it.
+# NUMERIC, always. '0 +' is not decoration: PVE hands sizes in from a config
+# file or a command line, where they are strings, and Perl's JSON encoder
+# writes a scalar as a string whenever it carries one — which PowerStore
+# rejects with "Instance type (string) does not match any allowed primitive
+# type (allowed: [integer])". See next_free_lun for how a value that WAS a
+# number acquires a string as well.
 sub align_size {
     my ($class, $bytes) = @_;
 
     my $granularity = SIZE_GRANULARITY;
     my $remainder = $bytes % $granularity;
 
-    return $bytes unless $remainder;
-    return $bytes + ($granularity - $remainder);
+    return 0 + $bytes unless $remainder;
+    return 0 + ($bytes + ($granularity - $remainder));
 }
 
 sub volume_create {
@@ -821,7 +827,15 @@ sub next_free_lun {
     }
 
     for my $lun ($base .. MAX_LUN_ID) {
-        return $lun unless $used{$lun};
+        # '0 +' because $used{$lun} has just used $lun as a hash key, which
+        # stringifies it in place: the scalar then carries both an integer and
+        # a string, and Perl's JSON encoder prefers the string. PowerStore
+        # answers that with
+        #   Validation failed: [Path '/logical_unit_number'] Instance type
+        #   (string) does not match any allowed primitive type
+        # and no volume can be mapped at all. Found on a customer's first
+        # PowerStore run.
+        return 0 + $lun unless $used{$lun};
     }
 
     die $self->_msg("host $host_id already uses every LUN id from $base to "
@@ -841,9 +855,9 @@ sub volume_attach {
 
     # Always pass the LUN id explicitly; see next_free_lun.
     if (defined $opts{lun}) {
-        $body->{logical_unit_number} = $opts{lun};
+        $body->{logical_unit_number} = 0 + $opts{lun};
     } elsif (defined $opts{host_id}) {
-        $body->{logical_unit_number} = $self->next_free_lun($opts{host_id},
+        $body->{logical_unit_number} = 0 + $self->next_free_lun($opts{host_id},
             base => $opts{lun_base}, group_id => $opts{group_id});
     }
 

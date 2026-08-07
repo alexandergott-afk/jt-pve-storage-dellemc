@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.99~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.0~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1115,6 +1115,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.0~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Every volume attach on PowerStore failed: the LUN id was sent as a string, because using it as a hash key stringifies the scalar in place and Perl's JSON encoder then writes the string. Every number in a request body is coerced where it goes in now.</span>
+            <span class="lang-zh">PowerStore 上每一次磁碟區對應都失敗：LUN id 以字串送出 &mdash; 把它當雜湊鍵會就地字串化該純量，Perl 的 JSON 編碼器接著就寫出字串。現在請求主體裡的每個數字都在放進去的當下強制轉為數值。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.99~beta1</div>

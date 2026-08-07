@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.8.0~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: every volume attach on PowerStore failed with "Validation failed:
+    [Path '/logical_unit_number'] Instance type (string) does not match any
+    allowed primitive type (allowed: [integer])". The LUN id is an integer
+    when computed; next_free_lun returns it from a loop that uses it as a
+    hash key, which stringifies the scalar in place, and Perl's JSON encoder
+    then writes the string. Every number in a request body is coerced where
+    it goes in now, including align_size, which returns its argument
+    unchanged when the size is already aligned and so passed a string from
+    storage.cfg straight through.
+  * The guard drives the real client through a capturing transport and reads
+    the bytes it would put on the wire.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 13:00:00 +0800
+
 jt-pve-storage-dellemc (0.7.99~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

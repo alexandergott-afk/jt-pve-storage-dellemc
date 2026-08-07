@@ -7,6 +7,30 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.0~beta1] - 2026-08-07
+
+### Fixed
+- **Every volume attach on PowerStore failed: the LUN id was sent as a
+  string.** Found on a customer's first PowerStore run, immediately after the
+  host object was resolved:
+
+  > `Validation failed: [Path '/logical_unit_number'] Instance type (string)
+  > does not match any allowed primitive type (allowed: ["integer"])`
+
+  The id is an integer when it is computed. `next_free_lun` returns it from a
+  loop whose body reads `$used{$lun}` — and using a scalar as a hash key
+  stringifies it in place, so it carries both an integer and a string, and
+  Perl's JSON encoder writes the string. Nothing in the code looks wrong;
+  the value simply remembers having been a key.
+
+  Every number in a request body is now coerced where it goes in. `align_size`
+  got the same treatment: it returns its argument unchanged when the size is
+  already aligned, which passed a size that arrived from `storage.cfg` — where
+  every value is a string — straight through to the array.
+
+  The new guard drives the real client through a capturing transport and reads
+  the bytes it would put on the wire. Nothing short of that sees a JSON type.
+
 ## [0.7.99~beta1] - 2026-08-07
 
 ### Changed

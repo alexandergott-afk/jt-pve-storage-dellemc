@@ -5,6 +5,27 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.8.0~beta1] - 2026-08-07
+
+### 已修正
+- **PowerStore 上每一次磁碟區對應都失敗：LUN id 以字串送出。** 在客戶第一次跑
+  PowerStore、host 物件剛解析完之後立刻發生：
+
+  > `Validation failed: [Path '/logical_unit_number'] Instance type (string)
+  > does not match any allowed primitive type (allowed: ["integer"])`
+
+  這個 id 在計算出來時是整數。`next_free_lun` 是從一個迴圈裡回傳它的，而迴圈內
+  用了 `$used{$lun}` —— 把一個純量當作雜湊鍵，會**就地把它字串化**，於是它同時帶著
+  整數與字串，而 Perl 的 JSON 編碼器會寫出字串。程式碼看起來沒有一處不對；那個值
+  只是記得自己曾經當過鍵。
+
+  現在請求主體裡的每一個數字都在放進去的當下強制轉為數值。`align_size` 也一併處理：
+  當大小本來就已經對齊時它會原樣回傳參數，而那會把來自 `storage.cfg`（那裡每個值都是
+  字串）的大小直接送給陣列。
+
+  新的守衛會以會攔截的傳輸層驅動真正的客戶端，讀出它實際會送上線的位元組。低於這個
+  程度的做法看不到 JSON 的型別。
+
 ## [0.7.99~beta1] - 2026-08-07
 
 ### 變更

@@ -963,4 +963,62 @@ my $long = $N->encode_snapshot_name('pve-ps1-100-disk0', 'x' x 300);
 ok(length($long) <= 128, 'snapshot names stay within the PowerStore limit');
 ok(length($long) > 63, 'and do use the room PowerStore allows');
 
+# ---------------------------------------------------------------------------
+# JSON types: PowerStore validates them, and Perl loses them
+#
+# A customer's first PowerStore run failed at every attach with
+#   Validation failed: [Path '/logical_unit_number'] Instance type (string)
+#   does not match any allowed primitive type (allowed: ["integer"])
+# The LUN id was an integer when it was computed and a STRING by the time it
+# was encoded, because next_free_lun uses it as a hash key on the way out —
+# which stringifies the scalar in place, and Perl's JSON encoder writes the
+# string when a scalar carries one. The same is true of anything that reached
+# the plugin from storage.cfg or a command line, where every value is a
+# string.
+#
+# This drives the real client and reads the bytes it would put on the wire.
+# ---------------------------------------------------------------------------
+
+{
+    my @bodies;
+    my $ua = FakeArray->new(handler => sub {
+        my ($req, $key) = @_;
+
+        if ($key eq 'GET /api/rest/login_session') {
+            my $h = HTTP::Headers->new('DELL-EMC-TOKEN' => 'tok');
+            $h->header('Content-Type' => 'application/json');
+            return HTTP::Response->new(200, undef, $h, '[]');
+        }
+
+        push @bodies, $req->content if $req->method ne 'GET';
+
+        # The mapping listing next_free_lun reads.
+        return json_response(200, [ { logical_unit_number => 1 } ])
+            if $key =~ m{/host_volume_mapping};
+
+        return json_response(200, { id => 'v1' });
+    });
+
+    my $api = $API->new(portal => '10.0.0.5', username => 'u', password => 'p',
+        ua => $ua);
+
+    # Sizes as they arrive from PVE: a string, because storage.cfg and the
+    # command line have nothing else.
+    eval { $api->volume_create('vol1', "8192", pool_id => 'p1') };
+    eval { $api->volume_resize('v1', "10000") };
+    eval { $api->volume_attach('v1', host_id => 'h1', lun_base => "1") };
+
+    my $all = join("\n", @bodies);
+
+    unlike($all, qr/"size"\s*:\s*"/,
+        'a volume size is encoded as a number even when PVE handed it in as'
+      . ' a string');
+    unlike($all, qr/"logical_unit_number"\s*:\s*"/,
+        'and so is the LUN id, which next_free_lun has just used as a hash'
+      . ' key — the defect that stopped every attach on the first PowerStore');
+
+    like($all, qr/"logical_unit_number"\s*:\s*\d/,
+        'the LUN id is still sent');
+}
+
 done_testing();
