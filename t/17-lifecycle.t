@@ -554,4 +554,50 @@ is_deeply(volumes_on_array(), [], 'which then deletes cleanly');
         'Remove takes it off the array');
 }
 
+# ---------------------------------------------------------------------------
+# Clone from a snapshot
+#
+# `qm clone <vmid> <new> --snapshot <name>`, and the GUI's Clone button when
+# a snapshot is selected. Two different paths depending on the mode: a linked
+# clone goes to clone_image with the snapshot name, and a full clone reads the
+# snapshot through path(), which makes a temporary clone on the array to read
+# from. Both are offered only because volume_has_feature says 'snap'.
+# ---------------------------------------------------------------------------
+
+{
+    $A->reset_array();
+
+    $A->alloc_image($store, $scfg, 900, 'raw', undef, 1024);
+    $A->volume_snapshot($scfg, $store, 'vm-900-disk-0', 'before-upgrade');
+
+    ok($A->volume_has_feature($scfg, 'clone', $store, 'vm-900-disk-0',
+            'before-upgrade'),
+        'a linked clone from a snapshot is offered — without this the GUI'
+      . ' does not show the option at all');
+    ok($A->volume_has_feature($scfg, 'copy', $store, 'vm-900-disk-0',
+            'before-upgrade'),
+        'and so is a full clone');
+
+    my $clone = $A->clone_image($scfg, $store, 'vm-900-disk-0', 901,
+        'before-upgrade');
+    is($clone, 'vm-901-disk-0', 'the clone is allocated for the target VM');
+
+    my $array_clone = 'pve-ps1-901-disk0';
+    my $snap = 'pve-ps1-900-disk0.pve-snap-before-upgrade';
+    is($Test::Array::VOL{$array_clone}{parent}, $snap,
+        'and it is a clone OF THE SNAPSHOT, not of the volume as it is now —'
+      . ' cloning the live volume would give the guest the wrong state');
+
+    # The snapshot cannot be deleted while the clone reads from it; the array
+    # refuses, and that refusal is what keeps the clone's data alive.
+    ok(!eval { $A->volume_snapshot_delete($scfg, $store, 'vm-900-disk-0',
+            'before-upgrade'); 1 },
+        'the snapshot cannot be deleted while a clone depends on it');
+
+    $A->free_image($store, $scfg, 'vm-901-disk-0', 0, 'raw');
+    ok(eval { $A->volume_snapshot_delete($scfg, $store, 'vm-900-disk-0',
+            'before-upgrade'); 1 },
+        '... and can be once the clone is gone');
+}
+
 done_testing();
