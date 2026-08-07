@@ -736,6 +736,7 @@ sub _array_ensure_host {
 
             die "Failed to create host '$name' on the array: $err\n";
         }
+        $class->_publish_resolved_host($storeid, $name);
         return $name;
     }
 
@@ -751,6 +752,11 @@ sub _array_ensure_host {
         my $port = $initiator->{port_name} // next;
         $present{ $class->_initiator_key($port) } = 1;
     }
+
+    # Published for the other nodes: they pre-map new volumes to every host
+    # they can see, and a host adopted under the array's own naming is not
+    # findable by this plugin's prefix.
+    $class->_publish_resolved_host($storeid, $name);
 
     my @missing = grep { !$present{ $class->_initiator_key($_->{port_name}) } } @$want;
     return $name unless @missing;

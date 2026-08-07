@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.0~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.1~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1115,6 +1115,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.1~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A migrated VM could arrive on a node that could not see its disk: activate_volume mapped to the generated host name without first working out which host object the node actually is. New volumes were also mapped only to the node that created them &mdash; each node now publishes its resolved host for the others to pre-map to.</span>
+            <span class="lang-zh">遷移過去的 VM 可能落在看不到自己磁碟的節點上：activate_volume 直接用產生的 host 名稱去對應，沒有先判定這台節點實際上是哪個 host 物件。新磁碟區也只會對應到建立它的那台 &mdash; 現在每台節點都會發布自己解析到的 host，供其他節點預先對應。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.0~beta1</div>

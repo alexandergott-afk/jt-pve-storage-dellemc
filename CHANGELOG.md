@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.1~beta1] - 2026-08-07
+
+### Fixed
+- **A migrated VM could arrive on a node that could not see its disk.**
+  `activate_volume` is the first thing a migration target does with a volume,
+  and it took the host name as final. On a node that had not yet worked out
+  WHICH host object it is — because the array's hosts were built by someone
+  else and adopted rather than created — that name is the generated one,
+  which does not exist on the array. The map failed with *Host … is not
+  registered on the array*, `activate_volume` died, and the guest was left
+  without its disk.
+
+  The volume's host object is now resolved before it is mapped to, and only
+  on the path where the volume is not mapped yet — so it costs nothing on an
+  ordinary poll.
+
+- **A new volume was mapped only to the node that created it.** Volumes are
+  pre-mapped to the other nodes' hosts so a migration does not have to wait
+  for a mapping, and the other nodes are found by the `pve-<cluster>-` prefix
+  this plugin's own names carry. A host adopted under the array's own naming
+  is invisible to that search.
+
+  Each node now publishes the host object it resolved to, in the cluster
+  filesystem, one file per node — a node only ever writes its own, so there is
+  no lock and no race — and the pre-mapping reads them. The file is removed
+  when the storage is removed.
+
 ## [0.8.0~beta1] - 2026-08-07
 
 ### Fixed

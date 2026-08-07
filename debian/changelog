@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.8.1~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: a migrated VM could arrive on a node that could not see its disk.
+    activate_volume took the host name as final, and on a node that had not
+    yet resolved which host object it is - because the array's hosts were
+    adopted rather than created - that is the generated name, which does not
+    exist on the array. The host object is now resolved before the volume is
+    mapped to it, on the path where the volume is not mapped yet.
+  * Fixed: a new volume was mapped only to the node that created it. The
+    other nodes are found by the pve-<cluster>- prefix, which cannot find an
+    adopted host. Each node now publishes the host object it resolved to in
+    the cluster filesystem, one file per node, and the pre-mapping reads
+    them.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 14:20:00 +0800
+
 jt-pve-storage-dellemc (0.8.0~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

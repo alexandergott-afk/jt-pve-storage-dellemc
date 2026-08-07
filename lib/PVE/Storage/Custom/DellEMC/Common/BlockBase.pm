@@ -476,6 +476,83 @@ sub _resolved_host_name {
     return $1;
 }
 
+# Where every node publishes the host object it resolved to.
+#
+# _map_to_all_hosts pre-maps a new volume to the other nodes' hosts so that a
+# migration does not have to wait for a mapping, and it finds them by the
+# 'pve-<cluster>-' prefix this plugin's own names carry. A node whose host was
+# ADOPTED — because the array already had one for it under another name — is
+# invisible to that search, and a customer saw exactly that: a new disk mapped
+# to the node that created it and to nothing else.
+#
+# So each node writes the name it resolved to where the others can read it.
+# One file per node, in the cluster filesystem: a node only ever writes its
+# own, so there is no lock and no race. It is not a secret, but /etc/pve/priv
+# is where this plugin already keeps per-storage files and it is root-only,
+# which is the safer default.
+sub _published_host_file {
+    my ($class, $storeid, $node) = @_;
+
+    $node //= eval { PVE::INotify::nodename() } // 'unknown';
+    $node =~ s/[^A-Za-z0-9._-]/_/g;
+
+    return '/etc/pve/priv/storage/dellemc-'
+         . $WWID_STATE->safe_storeid($storeid) . "-host-$node";
+}
+
+sub _publish_resolved_host {
+    my ($class, $storeid, $name) = @_;
+
+    return 0 unless defined $storeid && length $storeid;
+    return 0 unless defined $name && length $name;
+
+    my $file = $class->_published_host_file($storeid);
+
+    # Unchanged is the common case, by a long way: this runs on the throttled
+    # host-ensure path. Reading first keeps a cluster-filesystem write off it.
+    my $current = eval { PVE::Tools::file_get_contents($file) };
+    if (defined $current) {
+        chomp $current;
+        return 1 if $current eq $name;
+    }
+
+    eval { File::Path::make_path('/etc/pve/priv/storage') };
+    eval { PVE::Tools::file_set_contents($file, "$name\n") };
+
+    return $@ ? 0 : 1;
+}
+
+# Every node's resolved host name, this one included.
+sub _published_hosts {
+    my ($class, $storeid) = @_;
+
+    return [] unless defined $storeid && length $storeid;
+
+    my $pattern = '/etc/pve/priv/storage/dellemc-'
+                . $WWID_STATE->safe_storeid($storeid) . '-host-*';
+
+    my @names;
+    for my $file (glob($pattern)) {
+        my $value = eval { PVE::Tools::file_get_contents($file) };
+        next unless defined $value;
+        chomp $value;
+        # The match returns the name, so a file someone edited fails as
+        # "nothing published" rather than travelling into a request.
+        next unless $value =~ /\A([A-Za-z0-9][A-Za-z0-9._\-]{0,126})\z/;
+        push @names, $1;
+    }
+
+    my %seen;
+    return [ grep { !$seen{$_}++ } @names ];
+}
+
+sub _unpublish_resolved_host {
+    my ($class, $storeid) = @_;
+    return unless defined $storeid && length $storeid;
+    unlink($class->_published_host_file($storeid));
+    return;
+}
+
 # Host object name for this node, or the cluster-wide one in shared mode.
 #
 # An array often already has a host object for this node, built by whatever
@@ -1577,9 +1654,16 @@ sub _map_to_all_hosts {
     my $prefix = 'pve-' . $class->naming->sanitize($class->_cluster_name($scfg), 20) . '-';
     my $hosts = eval { $class->_array_list_hosts($scfg, $prefix) } // [];
 
-    for my $host (@$hosts) {
-        my $name = ref($host) ? $host->{name} : $host;
-        next unless $name;
+    # The prefix finds the hosts this plugin named. It cannot find one that
+    # was ADOPTED under the array's own naming, so the other nodes publish
+    # theirs and this reads them: without it, a new disk is mapped to the node
+    # that created it and to nothing else, and every migration waits for a
+    # mapping it could have had already.
+    my @names = map { ref($_) ? $_->{name} : $_ } @$hosts;
+    push @names, @{ $class->_published_hosts($storeid) };
+
+    my %seen;
+    for my $name (grep { defined && length && !$seen{$_}++ } @names) {
         next if $name eq $current;
 
         eval {
@@ -2005,12 +2089,35 @@ sub activate_volume {
     die "Cannot activate volume '$volname': '$array_name' is not on the array."
       . " It may have been deleted outside PVE.\n" unless $vol;
 
-    my $host = $class->_host_name($scfg);
+    my $host = $class->_host_name($scfg, $storeid);
     my $was_mapped = eval { $class->_array_is_mapped($scfg, $array_name, $host) };
 
     unless ($was_mapped) {
-        eval { $class->_array_map_to_host($scfg, $array_name, $host) };
-        die "Failed to map volume '$array_name' to host '$host': $@" if $@;
+        # Resolve the host object before mapping to it, not after.
+        #
+        # This is the first thing a migration target does with a volume, and
+        # on a node that has not yet worked out WHICH host object it is, the
+        # name above is the generated one — which does not exist on an array
+        # whose hosts were built by someone else. The map then fails with
+        # "Host ... is not registered on the array", activate_volume dies, and
+        # the VM arrives on a node that cannot see its disk. A customer's
+        # first migration did exactly that.
+        #
+        # _array_ensure_host resolves and records it; it is throttled, and
+        # this path is only reached when the volume is not mapped yet, so it
+        # costs nothing on the ordinary poll.
+        eval { $class->_array_ensure_host($scfg, $storeid) };
+        my $resolved = $class->_host_name($scfg, $storeid);
+
+        if ($resolved ne $host) {
+            $host = $resolved;
+            $was_mapped = eval { $class->_array_is_mapped($scfg, $array_name, $host) };
+        }
+
+        unless ($was_mapped) {
+            eval { $class->_array_map_to_host($scfg, $array_name, $host) };
+            die "Failed to map volume '$array_name' to host '$host': $@" if $@;
+        }
     }
 
     my $wwid = $vol->{wwid} // eval { $class->_array_get_wwid($scfg, $array_name) };
@@ -3296,6 +3403,7 @@ sub _forget_local_state {
 
     eval { $HEALTH->forget($storeid) };
     $class->_forget_resolved_host($storeid);
+    $class->_unpublish_resolved_host($storeid);
 
     my $safe = $WWID_STATE->safe_storeid($storeid);
     my $run  = $WWID_STATE->lock_dir;

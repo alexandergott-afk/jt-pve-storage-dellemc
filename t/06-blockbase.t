@@ -1624,4 +1624,50 @@ SKIP: {
         'and removing the storage forgets it');
 }
 
+{
+    # A migration target that has not yet worked out which host object it is.
+    #
+    # activate_volume is the first thing a migration target does with a
+    # volume. Until 0.8.1 it took _host_name's answer as final: on a node
+    # whose host had not been resolved, that is the GENERATED name, which does
+    # not exist on an array whose host objects were built by someone else. The
+    # map failed, activate_volume died, and the VM arrived on a node that
+    # could not see its disk.
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '10.0.0.1' };
+    my $vol  = 'pve-t1-100-disk0';
+    $Test::Plugin::VOLUMES{$vol} = { size => 1024, used => 0, wwid => undef };
+
+    my @ensured;
+    my $resolved = 'pve-test-node1';   # what Test::Plugin::_host_name returns
+
+    no warnings 'redefine', 'once';
+    # The host object the array actually has is not the generated one.
+    local *Test::Plugin::_host_name = sub { $resolved };
+    local *Test::Plugin::_array_ensure_host = sub {
+        my ($class, $scfg, $storeid) = @_;
+        push @ensured, $storeid;
+        $resolved = 'tpepve-01-fc';    # resolution records the real one
+        return $resolved;
+    };
+    local *Test::Plugin::_array_map_to_host = sub {
+        my ($class, $scfg, $name, $host) = @_;
+        die "Host '$host' is not registered on the array\n"
+            unless $host eq 'tpepve-01-fc';
+        $Test::Plugin::MAPPINGS{$name}{$host} = 1;
+        return 1;
+    };
+    local *Test::Plugin::_array_get_wwid = sub { undef };
+
+    eval { Test::Plugin->activate_volume('t1', $scfg, 'vm-100-disk-0') };
+
+    is_deeply(\@ensured, ['t1'],
+        'a volume that is not mapped makes the node resolve its host object'
+      . ' FIRST — the generated name does not exist on an array whose hosts'
+      . ' someone else built');
+    ok($Test::Plugin::MAPPINGS{$vol}{'tpepve-01-fc'},
+        '... and the mapping is made to the object the node actually is');
+}
+
 done_testing();
