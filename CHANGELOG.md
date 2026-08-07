@@ -7,6 +7,23 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.99~beta1] - 2026-08-07
+
+### Changed
+- Documentation for the host-object behaviour added in 0.7.98, in both
+  languages: `docs/FIRST_RUN` gains a section on the array already having a
+  host for this node, `docs/TROUBLESHOOTING` covers both refusals and how to
+  see which object a node settled on, `docs/NAMING_CONVENTIONS` says the
+  generated name is not always the name used and why the prefix still matters
+  to the cluster, `docs/CONFIGURATION` has the full rule, and the
+  documentation site has a section of its own. `docs/TESTING` gains two matrix
+  rows for it.
+
+- The full-width punctuation check no longer trips over HTML entities: the
+  semicolon in `&lt;` is markup, not a half-width mark before the Han
+  character that follows it. Entities are blanked before the check rather than
+  the line being skipped, so real marks elsewhere on it are still caught.
+
 ## [0.7.98~beta1] - 2026-08-07
 
 ### Added

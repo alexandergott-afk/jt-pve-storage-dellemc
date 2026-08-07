@@ -511,6 +511,12 @@ for my $file (sort @files) {
             $lineno++;
             for my $seg (split /(`[^`]*`)/, $line) {
                 next if $seg =~ /\A`.*`\z/s;
+
+                # An HTML entity ends in a semicolon that is markup, not
+                # punctuation: '&lt;叢集' is not a half-width mark before a
+                # Han character. Blank them out rather than skipping the
+                # line, so real marks elsewhere on it are still caught.
+                $seg =~ s/&(?:[a-zA-Z][a-zA-Z0-9]{1,9}|\#[0-9]{1,6});/ /g;
                 next unless $seg =~ /\p{Han}[,;:!?]|[,;:!?](?=\p{Han})/;
                 my ($excerpt) = $seg =~ /(.{0,12}(?:\p{Han}[,;:!?]|[,;:!?]\p{Han}).{0,12})/;
                 push @bad, "line $lineno: $excerpt";

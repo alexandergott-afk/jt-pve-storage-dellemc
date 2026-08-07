@@ -299,6 +299,36 @@ surfaces that with the dependent objects named. Delete the clones first.
 
 ---
 
+## `the format of the port name ... is incorrect` when adding a PowerStore
+
+Fixed in 0.7.96: the FC WWPN was sent run-together where PowerStore requires
+`21:00:f4:c7:aa:a0:a2:50`. The array quotes the HOST name back where the port
+name belongs, so the message points at the wrong thing. Upgrade.
+
+## `this node's initiators already belong to another host object`
+
+PowerStore allows an initiator on exactly one host object, and the array
+already has one for this node — usually created when the fabric was zoned.
+From 0.7.98 the plugin uses that object instead of creating its own, so this
+message means one of the two cases it will not decide for you:
+
+- **the host also holds another host's ports.** A volume mapped to it would be
+  visible to whatever those belong to. Give this node a host object of its
+  own, or set `dell-host-mode shared` if one object for the whole cluster is
+  what you meant.
+- **this node's ports are split across two host objects.** Consolidate them in
+  PowerStore Manager; a node is one host object.
+
+To see which object a node settled on:
+
+```bash
+cat /var/lib/pve-storage-dellemc/<storeid>-host
+```
+
+No such file means the plugin created and uses its own
+`pve-<cluster>-<node>`. Removing the file makes the next activation resolve
+again from scratch.
+
 ## Collecting information for a bug report
 
 ```bash

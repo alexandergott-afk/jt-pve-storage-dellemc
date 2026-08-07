@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.98~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.99~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -675,6 +675,23 @@
 <!-- ---- Architecture ---- -->
 <section class="doc-section" id="architecture">
     <h2 class="section-title">
+        <span class="lang-en">Host objects the array already has</span>
+        <span class="lang-zh">陣列上原本就有的 host 物件</span>
+    </h2>
+    <p>
+        <span class="lang-en">An array usually has a host object for each node before this plugin ever runs &mdash; built by whoever zoned the fabric &mdash; holding that node&rsquo;s WWPNs or IQN under a name of its own. An initiator belongs to <strong>one</strong> host object, so the plugin cannot register the same ports a second time under its own name.</span>
+        <span class="lang-zh">在這個外掛跑起來之前，陣列上通常每台節點都已經有一個 host 物件 &mdash; 由當初做 fabric 分區的人建立 &mdash; 以它自己的命名持有該節點的 WWPN 或 IQN。一個 initiator 只能屬於<strong>一個</strong> host 物件，所以外掛沒辦法用自己的名稱把同樣的埠再註冊一次。</span>
+    </p>
+    <p>
+        <span class="lang-en">On PowerStore it does not try. When there is no host under <code>pve-&lt;cluster&gt;-&lt;node&gt;</code>, it asks the array which host holds this node&rsquo;s initiators and uses that one, recording the name in <code>/var/lib/pve-storage-dellemc/&lt;storeid&gt;-host</code>. Nothing is renamed, nothing is removed, and no initiator is moved.</span>
+        <span class="lang-zh">在 PowerStore 上它不會去試。當 <code>pve-&lt;叢集&gt;-&lt;節點&gt;</code> 底下沒有 host 時，它會問陣列「本節點的 initiator 在哪個 host 上」，改用那一個，並把名稱記在 <code>/var/lib/pve-storage-dellemc/&lt;storeid&gt;-host</code>。不改名、不刪除，也不搬動任何 initiator。</span>
+    </p>
+    <p>
+        <span class="lang-en">It adopts only a host whose initiators are a <strong>subset of this node&rsquo;s</strong>. One that also carries another host&rsquo;s ports is refused, by name: a volume mapped there would be visible to whatever those belong to. Ports split across two host objects are refused as well &mdash; a node is one host object, and merging them is the operator&rsquo;s call.</span>
+        <span class="lang-zh">它只會採用 initiator 是<strong>本節點子集</strong>的 host。若那個 host 同時持有別台的埠，就會被拒絕並指名是哪一個：對應到它的磁碟區會被那些東西看見。本節點的埠散在兩個 host 物件上也一樣拒絕 &mdash; 一個節點就是一個 host 物件，要合併是操作者的決定。</span>
+    </p>
+
+    <h2 class="section-title">
         <span class="lang-en">System Architecture</span>
         <span class="lang-zh">系統架構</span>
     </h2>
@@ -1098,6 +1115,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.99~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Documentation for the host-object behaviour added in 0.7.98 &mdash; first run, troubleshooting, naming, configuration and a section on this site, in both languages.</span>
+            <span class="lang-zh">為 0.7.98 的 host 物件行為補上文件 &mdash; 首次執行、疑難排解、命名、設定，以及本站的一節，兩種語言都有。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.98~beta1</div>

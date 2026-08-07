@@ -148,6 +148,38 @@ pvesm add dellunity u480 \
   the `X-EMC-REST-CLIENT` header did not arrive. Look for a proxy between
   the node and the array.
 
+### The array may already have a host object for this node
+
+Before this plugin ever runs, an array usually has one — built by whoever
+zoned the fabric — holding this node's WWPNs or IQN under a name of its own,
+such as `tpepve-01-fc`. An initiator belongs to **one** host object, so the
+plugin cannot register the same ports a second time under its own name.
+
+On PowerStore it does not try. When there is no host under
+`pve-{cluster}-{node}`, it asks the array which host holds this node's
+initiators and uses that one, recording the name in
+`/var/lib/pve-storage-dellemc/{storeid}-host`. Nothing is renamed, nothing is
+removed, and no initiator is moved. You will see this once, in the journal:
+
+```
+Storage 'ps1': this node's initiators are already registered to host
+'tpepve-01-fc' on the array, so that object is used instead of creating
+'pve-pve-tpepve01'. It holds this node's ports and no others.
+```
+
+Two situations are refused rather than guessed at, both with the offending
+name in the message:
+
+- the host also holds **another host's** ports — a volume mapped to it would
+  be visible to whatever that is;
+- this node's ports are split across **two** host objects — a node is one
+  host object, and merging them is your call.
+
+Each node resolves its own host the first time it activates the storage, so
+nothing has to be done per node.
+
+---
+
 ## The first VM
 
 ### 5. A disk

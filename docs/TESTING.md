@@ -492,6 +492,8 @@ and the PowerStore OS version in the Result column.
 | 28 | `pvesm export` / `pvesm import` | — | the stream round-trips; a second import onto the same name is refused unless a rename is allowed. This is the path the transfer formats are for, together with cluster-to-cluster migration | — |
 | 29 | `vzdump --mode snapshot` and `qmrestore` | — | both succeed, and no `-tmp-` or `-vc-` object is left on the array afterwards | **ME4024 FC ✓** |
 | 30 | A guest OS boots from an array volume | — | the installer reads the partition table and starts | **ME4024 FC ✓** |
+| 31 | A host object already exists for this node | PowerStore, host built when the fabric was zoned | the plugin uses it instead of creating one; `/var/lib/pve-storage-dellemc/<storeid>-host` names it; nothing on the array is renamed or removed | — |
+| 32 | That host also holds another host's ports | PowerStore | refused, naming the foreign port | — |
 
 ### What the ME4024 has actually run, and when
 

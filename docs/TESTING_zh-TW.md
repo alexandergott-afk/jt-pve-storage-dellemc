@@ -425,6 +425,8 @@ make test                    # 以上全部
 | 28 | `pvesm export`／`pvesm import` | — | 串流可來回轉換；同名再匯入一次會被拒絕，除非允許改名。這條路徑，以及叢集對叢集的移轉，才是傳輸格式的用途 | — |
 | 29 | `vzdump --mode snapshot` 與 `qmrestore` | — | 兩者都成功，而且結束後陣列上沒有殘留 `-tmp-` 或 `-vc-` 物件 | **ME4024 FC ✓** |
 | 30 | 客體作業系統從陣列 volume 開機 | — | 安裝程式讀得到分割表並啟動 | **ME4024 FC ✓** |
+| 31 | 本節點在陣列上已有 host 物件 | PowerStore，fabric 分區時建立的 host | 外掛直接使用它而不另建；`/var/lib/pve-storage-dellemc/<storeid>-host` 會寫出它的名稱；陣列上沒有任何東西被改名或移除 | — |
+| 32 | 那個 host 同時持有別台的埠 | PowerStore | 被拒絕，並指名是哪一個外來的埠 | — |
 
 
 ### 這台 ME4024 實際跑過什麼、以及是什麼時候跑的

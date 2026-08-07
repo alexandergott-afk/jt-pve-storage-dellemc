@@ -122,6 +122,32 @@ pvesm add dellunity u480 \
 - **錯誤訊息裡的 302 是授權失敗**，不是重新導向：代表 `X-EMC-REST-CLIENT`
   標頭沒有送達。請檢查節點與陣列之間有沒有 proxy。
 
+### 陣列上可能原本就有屬於這台節點的 host 物件
+
+在這個外掛跑起來之前，陣列上通常已經有一個 —— 由當初做 fabric 分區的人建立 ——
+以它自己的命名持有這台節點的 WWPN 或 IQN，例如 `tpepve-01-fc`。一個 initiator 只能
+屬於**一個** host 物件，所以外掛沒辦法用自己的名稱把同樣的埠再註冊一次。
+
+在 PowerStore 上它也不會去試。當 `pve-{叢集}-{節點}` 這個名稱底下沒有 host 時，它會
+問陣列「本節點的 initiator 現在在哪個 host 上」，改用那一個，並把名稱記在
+`/var/lib/pve-storage-dellemc/{storeid}-host`。不改名、不刪除，也不搬動任何
+initiator。journal 裡會看到一次這樣的訊息：
+
+```
+Storage 'ps1': this node's initiators are already registered to host
+'tpepve-01-fc' on the array, so that object is used instead of creating
+'pve-pve-tpepve01'. It holds this node's ports and no others.
+```
+
+有兩種情況會被拒絕而不是自行猜測，訊息裡都會指名是哪一個：
+
+- 那個 host 同時持有**別台的**埠 —— 對應到它的磁碟區會被那台看見；
+- 本節點的埠散在**兩個** host 物件上 —— 一個節點就是一個 host 物件，要合併是您的決定。
+
+每台節點會在自己第一次啟用這個儲存時各自解析，不需要逐台操作。
+
+---
+
 ## 第一台 VM
 
 ### 5. 一顆磁碟

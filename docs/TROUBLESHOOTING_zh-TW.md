@@ -219,6 +219,32 @@ pve-dell-config-get -r --portal 10.0.0.5 --username pveadmin \
 
 ---
 
+## 加入 PowerStore 時出現 `the format of the port name ... is incorrect`
+
+0.7.96 已修正：FC 的 WWPN 以無冒號的形式送出，而 PowerStore 要的是
+`21:00:f4:c7:aa:a0:a2:50`。陣列在「port name」的位置回填的是 host 名稱，所以那則訊息
+指向了錯的東西。請升級。
+
+## `this node's initiators already belong to another host object`
+
+PowerStore 規定一個 initiator 只能屬於一個 host 物件，而陣列上通常早就有一個屬於這台
+節點的 —— 多半是當初做 fabric 分區時建立的。自 0.7.98 起，外掛會直接使用那個物件而
+不是另建一個，所以看到這則訊息，代表遇到了它不會替您決定的兩種情況之一：
+
+- **那個 host 同時持有別台的埠。** 對應到它的磁碟區會被那些東西看見。請給這台節點一個
+  自己的 host 物件；若您本來就想讓整個叢集共用一個，請設 `dell-host-mode shared`。
+- **這台節點的埠散在兩個 host 物件上。** 請在 PowerStore Manager 裡合併；一個節點就是
+  一個 host 物件。
+
+要看某台節點最後認到哪個物件：
+
+```bash
+cat /var/lib/pve-storage-dellemc/<storeid>-host
+```
+
+沒有這個檔案，代表外掛建立並使用自己的 `pve-<叢集>-<節點>`。刪掉這個檔案，下一次啟用
+就會重新解析一次。
+
 ## 回報問題時要收集的資訊
 
 ```bash
