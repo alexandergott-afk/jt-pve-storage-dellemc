@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.96~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.97~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1098,6 +1098,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.7.97~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">"The initiator is already registered" now names the host that holds it, and says how to resolve it &mdash; PowerStore's own refusal names neither. Initiators are also compared by identity rather than spelling, since the array, sysfs and the ME CLI each write a WWPN differently.</span>
+            <span class="lang-zh">「initiator 已被註冊」現在會說出是哪個 host 佔用它，以及該怎麼解決 &mdash; PowerStore 自己的拒絕訊息兩者都沒有說。initiator 也改為以身分而非寫法比對，因為陣列、sysfs 與 ME CLI 各自寫法都不同。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.7.96~beta1</div>

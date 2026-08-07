@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.7.97~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: "the initiator is already registered" now names the host that
+    holds it. PowerStore allows an initiator on exactly one host object and
+    its refusal names neither the initiator nor the holder, so the plugin
+    asks the array who owns each of this node's ports and says so, with the
+    two ways out - rename that host to the name the plugin uses, keeping its
+    initiators and mappings, or remove it. The message also explains that
+    volumes reach the other nodes' hosts through the pve-<cluster>- prefix,
+    so a host outside that convention breaks mapping and live migration.
+  * Fixed: initiators are compared by identity rather than spelling. The same
+    port is written 21:00:f4:c7:aa:a0:a2:50 by PowerStore, 0x2100f4c7aaa0a250
+    by sysfs and 2100f4c7aaa0a250 by an ME, and a string comparison would
+    re-add an initiator the host already had, which the array refuses.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 10:50:00 +0800
+
 jt-pve-storage-dellemc (0.7.96~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

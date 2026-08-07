@@ -573,6 +573,48 @@ sub _initiator_records {
     return [ { port_name => get_initiator_name(), port_type => 'iSCSI' } ];
 }
 
+# A WWPN or IQN as a comparison key.
+#
+# The same port is written several ways: PowerStore shows and requires
+# '21:00:f4:c7:aa:a0:a2:50', sysfs reports '0x2100f4c7aaa0a250', and an ME
+# takes the run-together form. Nothing that compares two identifiers may care
+# which spelling it was handed (lesson 69).
+sub _initiator_key {
+    my ($class, $value) = @_;
+    return '' unless defined $value;
+    my $key = lc($value);
+    $key =~ s/^0x//;
+    $key =~ s/[:\-\s]//g;
+    return $key;
+}
+
+# Which host object, if any, already owns each of this node's initiators.
+# Returns { <port name as this node writes it> => <host name> }.
+sub _initiator_owners {
+    my ($class, $scfg, $want, %opts) = @_;
+
+    my $hosts = eval { $class->_api($scfg, %opts)->host_list(undef, %opts) } // [];
+    return {} unless ref($hosts) eq 'ARRAY';
+
+    my %owner;
+    for my $host (@$hosts) {
+        next unless ref($host) eq 'HASH' && defined $host->{name};
+        for my $initiator (@{ $host->{host_initiators} // [] }) {
+            next unless ref($initiator) eq 'HASH';
+            my $key = $class->_initiator_key($initiator->{port_name}) or next;
+            $owner{$key} = $host->{name};
+        }
+    }
+
+    my %found;
+    for my $mine (@$want) {
+        my $key = $class->_initiator_key($mine->{port_name}) or next;
+        $found{ $mine->{port_name} } = $owner{$key} if defined $owner{$key};
+    }
+
+    return \%found;
+}
+
 sub _array_ensure_host {
     my ($class, $scfg, $storeid, %opts) = @_;
 
@@ -584,14 +626,38 @@ sub _array_ensure_host {
 
     unless ($host) {
         my $id = eval { $api->host_create($name, $want, %opts) };
-        if ($@) {
-            my $err = $@;
-            die "Failed to create host '$name' on the array: this node's"
-              . " initiator is already registered to a different host. Remove"
-              . " the conflicting host in PowerStore Manager, or point this"
-              . " storage at the existing host by setting"
-              . " 'dell-cluster-name' to match it.\n  Array error: $err"
-                if $err =~ /already|conflict|in use/i;
+        if (my $err = $@) {
+            # Ask the array WHO has them rather than reading its refusal.
+            # PowerStore allows an initiator on exactly one host object, and
+            # the refusal names neither the initiator nor the host that holds
+            # it — on the first hardware run it quoted the host name back
+            # where the port name belonged, which sent the diagnosis in the
+            # wrong direction entirely (rule 30, lesson 69).
+            my $owners = eval { $class->_initiator_owners($scfg, $want, %opts) };
+
+            if ($owners && %$owners) {
+                my $detail = join("\n", map {
+                    "    $_ is registered to host '$owners->{$_}'"
+                } sort keys %$owners);
+
+                die "Cannot create host '$name' on the array: this node's"
+                  . " initiator(s) already belong to another host object, and"
+                  . " PowerStore allows each one on exactly one host.\n"
+                  . "$detail\n"
+                  . "  Either rename that host to '$name' in PowerStore"
+                  . " Manager — which keeps its initiators and any mappings —"
+                  . " or remove it and let this plugin create its own.\n"
+                  . "  The name matters beyond this node: volumes are mapped"
+                  . " to every node's host by looking for the '"
+                  . 'pve-' . $class->naming->sanitize($class->_cluster_name($scfg), 20) . '-'
+                  . "' prefix, so a host outside that convention is not"
+                  . " found when another node needs the volume, and live"
+                  . " migration to it fails.\n"
+                  . "  Set 'dell-cluster-name' if you would rather the"
+                  . " generated names carried your own cluster name.\n"
+                  . "  Array error: $err";
+            }
+
             die "Failed to create host '$name' on the array: $err\n";
         }
         return $name;
@@ -600,13 +666,17 @@ sub _array_ensure_host {
     # The host exists: make sure this node's initiators are on it. A node that
     # was reinstalled, or that gained an HBA port, otherwise silently sees
     # nothing.
+    # Compared by key, not by spelling: the array may write a WWPN with
+    # colons where this node writes it without, and a mismatch here re-adds an
+    # initiator the host already has — which the array refuses, taking the
+    # storage inactive (the shape of lesson 22 on PowerVault).
     my %present;
     for my $initiator (@{ $host->{host_initiators} // [] }) {
         my $port = $initiator->{port_name} // next;
-        $present{lc($port)} = 1;
+        $present{ $class->_initiator_key($port) } = 1;
     }
 
-    my @missing = grep { !$present{ lc($_->{port_name}) } } @$want;
+    my @missing = grep { !$present{ $class->_initiator_key($_->{port_name}) } } @$want;
     return $name unless @missing;
 
     eval { $api->host_add_initiators($host->{id}, \@missing, %opts) };

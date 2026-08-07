@@ -7,6 +7,28 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.97~beta1] - 2026-08-07
+
+### Fixed
+- **"The initiator is already registered" now says which host has it.**
+  PowerStore allows an initiator on exactly one host object, and its refusal
+  names neither the initiator nor the host that holds it. The plugin now asks
+  the array who owns each of this node's ports and says so, with the two ways
+  out: rename that host to the name the plugin uses — which keeps its
+  initiators and its mappings — or remove it.
+
+  The message also says why the name matters beyond the one node: volumes are
+  mapped to the other nodes' hosts by looking for the `pve-<cluster>-` prefix,
+  so a host outside that convention is not found when another node needs the
+  volume, and live migration to it fails.
+
+- **Initiators are compared by identity, not by spelling.** The same port is
+  written `21:00:f4:c7:aa:a0:a2:50` by PowerStore, `0x2100f4c7aaa0a250` by
+  sysfs and `2100f4c7aaa0a250` by an ME. The check for "is this node's port
+  already on the host" compared the strings, so a difference in spelling would
+  have re-added an initiator the host already had — which the array refuses,
+  taking the storage inactive.
+
 ## [0.7.96~beta1] - 2026-08-07
 
 ### Fixed

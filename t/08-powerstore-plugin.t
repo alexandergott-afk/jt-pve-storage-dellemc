@@ -318,4 +318,51 @@ SKIP: {
         if eval { require PVE::Storage::Custom::DellPowerFlexPlugin; 1 };
 }
 
+{
+    # An initiator that already belongs to another host object.
+    #
+    # PowerStore allows each initiator on exactly one host, and its refusal
+    # names neither the initiator nor the holder — on the first hardware run
+    # it quoted the HOST name back where the port name belonged. So the
+    # plugin asks the array who has them rather than reading the refusal.
+    my $P = 'PVE::Storage::Custom::DellPowerStorePlugin';
+
+    my $want = [ { port_name => '21:00:f4:c7:aa:a0:a2:50', port_type => 'FC' },
+                 { port_name => '21:00:f4:c7:aa:a0:a2:86', port_type => 'FC' } ];
+
+    {
+        package Test::OwnerApi;
+        sub new { bless {}, shift }
+        sub host_list {
+            return [
+                { id => 'h1', name => 'tpepve-01-fc', host_initiators => [
+                    # The array's spelling, which is not this node's.
+                    { port_name => '21:00:F4:C7:AA:A0:A2:50', port_type => 'FC' },
+                    { port_name => '2100f4c7aaa0a286',        port_type => 'FC' },
+                ] },
+                { id => 'h2', name => 'someone-else', host_initiators => [
+                    { port_name => '21:00:00:00:00:00:00:01', port_type => 'FC' },
+                ] },
+            ];
+        }
+    }
+
+    no warnings 'redefine', 'once';
+    my $api = Test::OwnerApi->new;
+    local *PVE::Storage::Custom::DellPowerStorePlugin::_api = sub { $api };
+
+    my $owners = $P->_initiator_owners({}, $want);
+
+    is_deeply($owners, {
+        '21:00:f4:c7:aa:a0:a2:50' => 'tpepve-01-fc',
+        '21:00:f4:c7:aa:a0:a2:86' => 'tpepve-01-fc',
+    }, 'both of this node\'s ports are found on the host that holds them,'
+     . ' whichever way the array spells them');
+
+    is($P->_initiator_key('0x2100F4C7AAA0A250'), '2100f4c7aaa0a250',
+        'a port name compares the same with 0x, with colons and without');
+    is($P->_initiator_key('21:00:f4:c7:aa:a0:a2:50'), '2100f4c7aaa0a250',
+        '... from either spelling');
+}
+
 done_testing();
