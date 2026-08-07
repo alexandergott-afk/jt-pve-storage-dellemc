@@ -579,4 +579,48 @@ my %BASE_DEFAULT_IS_RIGHT = (
     }
 }
 
+# ---------------------------------------------------------------------------
+# sparseinit is a claim about the array's provisioning
+#
+# PVE acts on it by NOT writing zeroes — drive-mirror is told the target is
+# zero-initialized, pbs-restore gets --skip-zero. That holds for a thin
+# volume, whose unmapped LBAs read as zeroes, and not for a thick one, whose
+# extents are whatever the array last had there. Answering yes for a thick
+# volume puts the array's previous contents inside a guest's disk where its
+# source had zeroes. Same claim 0.7.90 removed from the import path's
+# dd conv=sparse, reached through QEMU instead.
+# ---------------------------------------------------------------------------
+
+{
+    my %thick = (
+        'PVE::Storage::Custom::DellUnityPlugin'     => { 'unity-thin'  => 0 },
+        'PVE::Storage::Custom::DellPowerFlexPlugin' => { 'pflex-thick' => 1 },
+    );
+
+    for my $plugin (@PLUGINS) {
+        my $ask = sub {
+            my ($scfg) = @_;
+            return $plugin->volume_has_feature($scfg, 'sparseinit', 's1',
+                'vm-100-disk-0', undef, 0, {});
+        };
+
+        if (my $cfg = $thick{$plugin}) {
+            ok(!$ask->($cfg),
+                "$plugin refuses sparseinit when the storage is configured"
+              . " thick — those extents are whatever the array last had"
+              . " there, and PVE would skip writing over them");
+            ok($ask->({}),
+                "$plugin still offers it for the thin default, which is"
+              . " where the copy is worth skipping");
+        } else {
+            ok(defined $ask->({}),
+                "$plugin answers sparseinit one way or the other");
+        }
+
+        ok(!$plugin->volume_has_feature({}, 'sparseinit', 's1',
+                'vm-100-disk-0', 'a-snapshot', 0, {}),
+            "$plugin never claims it for a snapshot");
+    }
+}
+
 done_testing();

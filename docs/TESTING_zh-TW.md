@@ -335,12 +335,12 @@ host、加入 initiator、metrics/generate）：每一個線上鍵都與 Dell �
 ### PowerFlex（出自 REST 文件）
 
 **2026-08-06 已對 `python-powerflex`（gen1 與 gen2）逐鍵重新稽核** —— 在
-PowerStore 上乾淨收場的那一輪掃描,在這個系列找到了兩個證據最薄弱的呼叫,
-兩者原本都標 `NOT VERIFIED`,現在都改為讀自 Dell 自己的 gen2 客戶端:
+PowerStore 上乾淨收場的那一輪掃描，在這個系列找到了兩個證據最薄弱的呼叫，
+兩者原本都標 `NOT VERIFIED`，現在都改為讀自 Dell 自己的 gen2 客戶端：
 
 | 呼叫 | 原本 | 現在 |
 |---|---|---|
-| 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的陣列,在那裡仍未驗證 |
+| 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的陣列，在那裡仍未驗證 |
 | NVMe host 對應／解除 —— **預設協定** | 把 `hostId` 送給 `addMappedSdc` | 改用 **`addMappedHost`／`removeMappedHost`**,Dell 客戶端與 SDC 那對並列的動作 |
 
 只有 4.x 陣列能回答的一個問題：**第一次 NVMe 對應之後，GET 該磁碟區並回報
@@ -421,8 +421,8 @@ make test                    # 以上全部
 | 24 | LUN ID 攀升 | 反覆對應與解除對應 300 次 | ID 維持在低位且密集 | — |
 | 25 | Fibre Channel | FC fabric | 重跑第 1〜24 項 | — |
 | 26 | PVE 9.1 升級到 9.2 | — | 外掛仍正常，`get_identity` 正常回傳 | — |
-| 27 | 把磁碟移到其他類型的儲存 | VM 已停 | `qm move_disk` 移到 LVM 或 ZFS 儲存可完成，來源磁碟區已移除 | — |
-| 28 | `pvesm export`／`pvesm import` | — | 串流可來回轉換；同名再匯入一次會被拒絕，除非允許改名 | — |
+| 27 | 把磁碟移到其他類型的儲存 | VM 已停 | `qm move_disk` 移到 LVM 或 ZFS 儲存可完成，來源磁碟區已移除。這條路走的是 `qemu-img convert` 與 `path()`，不經過傳輸格式 | — |
+| 28 | `pvesm export`／`pvesm import` | — | 串流可來回轉換；同名再匯入一次會被拒絕，除非允許改名。這條路徑，以及叢集對叢集的移轉，才是傳輸格式的用途 | — |
 | 29 | `vzdump --mode snapshot` 與 `qmrestore` | — | 兩者都成功，而且結束後陣列上沒有殘留 `-tmp-` 或 `-vc-` 物件 | **ME4024 FC ✓** |
 | 30 | 客體作業系統從陣列 volume 開機 | — | 安裝程式讀得到分割表並啟動 | **ME4024 FC ✓** |
 

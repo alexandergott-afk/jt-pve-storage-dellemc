@@ -511,7 +511,21 @@ ok($P->volume_has_feature($scfg, 'snapshot', $storeid, 'vm-100-disk-0'), 'snapsh
 ok($P->volume_has_feature($scfg, 'clone', $storeid, 'vm-100-disk-0'), 'clone');
 ok($P->volume_has_feature($scfg, 'template', $storeid, 'vm-100-disk-0'), 'template');
 ok($P->volume_has_feature($scfg, 'copy', $storeid, 'vm-100-disk-0'), 'copy');
-ok($P->volume_has_feature($scfg, 'sparseinit', $storeid, 'vm-100-disk-0'), 'sparseinit');
+# sparseinit is a claim that a new volume reads as zeroes, and PVE acts on it
+# by not writing the zeroes at all. A family that cannot promise thin
+# provisioning must not make it: the default here is NO, and a family says yes
+# for itself.
+ok(!$P->volume_has_feature($scfg, 'sparseinit', $storeid, 'vm-100-disk-0'),
+    'sparseinit is refused by default — a thick volume\'s extents are'
+  . ' whatever the array last had there');
+{
+    no warnings 'redefine', 'once';
+    local *Test::Plugin::new_volumes_read_as_zeroes = sub { 1 };
+    ok($P->volume_has_feature($scfg, 'sparseinit', $storeid, 'vm-100-disk-0'),
+        '... and offered by a family whose volumes are thin');
+    ok(!$P->volume_has_feature($scfg, 'sparseinit', $storeid, 'vm-100-disk-0', 'snap1'),
+        '... but never for a snapshot');
+}
 ok($P->volume_has_feature($scfg, 'rename', $storeid, 'vm-100-disk-0'), 'rename');
 ok($P->volume_has_feature($scfg, 'clone', $storeid, 'base-100-disk-0'), 'clone of a base');
 ok(!$P->volume_has_feature($scfg, 'template', $storeid, 'vm-100-disk-0', 'snap1'),

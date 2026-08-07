@@ -98,6 +98,16 @@ sub capacity_scope {
     return defined $scfg->{'unity-pool'} ? 'pool' : 'array';
 }
 
+# 'unity-thin' defaults to on, and createLun is sent isThinEnabled 'true'
+# unless it is turned off. A thick LUN's extents are whatever the pool last
+# had there, so the answer follows the option rather than the default.
+sub new_volumes_read_as_zeroes {
+    my ($class, $scfg) = @_;
+    my $thin = $scfg->{'unity-thin'};
+    return 1 unless defined $thin;      # the schema default is 1
+    return $thin ? 1 : 0;
+}
+
 sub identity_suffix {
     my ($class, $scfg) = @_;
     return $scfg->{'unity-pool'} // '';

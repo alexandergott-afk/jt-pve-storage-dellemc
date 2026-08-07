@@ -2804,9 +2804,29 @@ sub volume_has_feature {
         clone      => { base => 1, current => 1, snap => 1 },
         template   => { current => 1 },
         copy       => { base => 1, current => 1, snap => 1 },
-        sparseinit => { base => 1, current => 1 },
+        # sparseinit is answered below rather than here: it is a claim about
+        # the ARRAY's provisioning, not about the volume's kind.
         rename     => { current => 1 },
     };
+
+    # 'sparseinit' tells PVE the target volume reads as zeroes where nothing
+    # has been written to it, and PVE acts on that by NOT writing the zeroes:
+    # drive-mirror is told 'zero-initialized', pbs-restore gets --skip-zero,
+    # and a clone of a running VM copies only the non-zero regions. On a thin
+    # volume that is correct — an unmapped LBA reads as zeroes. On a THICK one
+    # it is not: those extents hold whatever the array last had there, so the
+    # guest would find another volume's old contents where its source had
+    # zeroes.
+    #
+    # This is the same claim 0.7.90 removed from the import path's
+    # `dd conv=sparse`, reached through QEMU instead of through dd, and it was
+    # missed then because the two look nothing alike. RBD answers yes because
+    # an RBD image is always sparse; LVMPlugin does not answer at all, because
+    # an LV holds whatever was on the disk before it.
+    if ($feature eq 'sparseinit') {
+        return 0 if $snapname;
+        return $class->new_volumes_read_as_zeroes($scfg) ? 1 : 0;
+    }
 
     # Whether this is a base image comes from parse_volname, not from the
     # spelling of the volname. A linked clone is named
@@ -2824,6 +2844,15 @@ sub volume_has_feature {
     return 1 if $features->{$feature} && $features->{$feature}{$key};
     return 0;
 }
+
+# Does a volume this plugin has just created read as zeroes where nothing has
+# been written to it?
+#
+# Only a thin volume promises that. The default is NO, because being wrong the
+# safe way costs a full copy and being wrong the other way puts the array's
+# previous contents inside a guest's disk. A family overrides it where its own
+# provisioning answers the question.
+sub new_volumes_read_as_zeroes { return 0 }
 
 # LXC freezes a container's filesystem before a snapshot only when the storage
 # says it needs it. PVE::LXC::Config asks this, and nothing else does — a VM's

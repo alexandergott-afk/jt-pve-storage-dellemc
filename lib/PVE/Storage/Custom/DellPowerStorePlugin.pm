@@ -72,6 +72,10 @@ sub multipath_config_version { 1 }
 
 sub capacity_scope { 'array' }
 
+# PowerStore volumes are thin, always: the array has no thick provisioning to
+# ask for, so an unwritten region reads as zeroes.
+sub new_volumes_read_as_zeroes { return 1 }
+
 sub identity_suffix {
     my ($class, $scfg) = @_;
     return $scfg->{'pstore-appliance'} // '';

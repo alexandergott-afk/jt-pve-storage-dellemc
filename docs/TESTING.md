@@ -488,8 +488,8 @@ and the PowerStore OS version in the Result column.
 | 24 | LUN id growth | 300 attach/detach cycles | ids stay low and dense | — |
 | 25 | Fibre Channel | FC fabric | items 1–24 repeated | — |
 | 26 | PVE 9.1 to 9.2 upgrade | — | plugin still works, `get_identity` returns cleanly | — |
-| 27 | Move a disk to another storage type | VM stopped | `qm move_disk` to an LVM or ZFS storage completes and the source volume is gone | — |
-| 28 | `pvesm export` / `pvesm import` | — | the stream round-trips; a second import onto the same name is refused unless a rename is allowed | — |
+| 27 | Move a disk to another storage type | VM stopped | `qm move_disk` to an LVM or ZFS storage completes and the source volume is gone. This goes through `qemu-img convert` and `path()`, not through the transfer formats | — |
+| 28 | `pvesm export` / `pvesm import` | — | the stream round-trips; a second import onto the same name is refused unless a rename is allowed. This is the path the transfer formats are for, together with cluster-to-cluster migration | — |
 | 29 | `vzdump --mode snapshot` and `qmrestore` | — | both succeed, and no `-tmp-` or `-vc-` object is left on the array afterwards | **ME4024 FC ✓** |
 | 30 | A guest OS boots from an array volume | — | the installer reads the partition table and starts | **ME4024 FC ✓** |
 

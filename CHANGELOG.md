@@ -7,6 +7,41 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.7.95~beta1] - 2026-08-07
+
+### Fixed
+- **`sparseinit` promised something a thick volume does not do.** The feature
+  tells PVE that a new volume reads as zeroes where nothing has been written,
+  and PVE acts on it by not writing the zeroes at all: a clone of a running VM
+  is mirrored with `zero-initialized`, and `pbs-restore` is given
+  `--skip-zero`. That holds for a thin volume, whose unmapped blocks read as
+  zeroes, and not for a thick one, whose extents are whatever the array last
+  had there — so a clone or a restore onto a thick volume would leave the
+  array's previous contents inside the guest's disk, where its source had
+  zeroes.
+
+  It is answered per family now: PowerStore always (its volumes are thin),
+  Unity and PowerFlex according to `unity-thin` and `pflex-thick`, and
+  PowerVault not at all — whether an ME volume is thin depends on the pool it
+  lives in, and the plugin cannot know that without asking the array on a path
+  that runs per volume.
+
+  This is the same claim 0.7.90 removed from the import path's
+  `dd conv=sparse`, reached through QEMU instead of through dd.
+
+### Changed
+- Chinese text now uses full-width punctuation throughout. 219 half-width
+  commas and colons had accumulated in the zh-TW changelog, the documentation
+  site and the testing document; `t/11-imports.t` fails on them from now on,
+  in both directions — a Han character before the mark, and a Han character
+  after it, which is the case that hides behind a code span.
+
+- The 0.7.88 entry named `qm move_disk` among the operations it had fixed.
+  That was wrong and the entry now says so: a move between two storages on one
+  node goes through `qemu-img convert` and `path()`, and never asked for a
+  transfer format. What that release fixed is `pvesm export`, `pvesm import`
+  and cluster-to-cluster migration.
+
 ## [0.7.94~beta1] - 2026-08-07
 
 ### Fixed
@@ -199,11 +234,18 @@ release is a prerelease; 1.0.0 is the on-hardware test pass.
   whole of it: the transfer itself was left to
   `PVE::Storage::Plugin::volume_export`, which opens with
   `if ($scfg->{path} && ...)` and dies for a storage that has no path — which
-  this one has not, and cannot have. So `qm move_disk` to an LVM or ZFS
-  storage, `pvesm export`, `pvesm import` and remote migration all failed one
-  call after the plugin had offered them, with a message naming the format the
-  plugin itself had just advertised. All four families, since the override was
-  written. `LVMPlugin`, `RBDPlugin` and `ZFSPoolPlugin` all implement both
+  this one has not, and cannot have. So `pvesm export`, `pvesm import` and
+  remote migration all failed one call after the plugin had offered them, with
+  a message naming the format the plugin itself had just advertised. All four
+  families, since the override was written.
+
+  *Corrected in 0.7.95: this entry also named `qm move_disk` to another
+  storage, which was wrong. A move between two storages on the same node goes
+  through `PVE::QemuServer::clone_disk`, which copies with `qemu-img convert`
+  or drive-mirror through `path()`, and never asked for a transfer format. It
+  worked before this release and after it. What this release fixed is
+  everything that goes through `PVE::Storage::storage_migrate`:
+  `pvesm export`, `pvesm import`, and cluster-to-cluster migration.* `LVMPlugin`, `RBDPlugin` and `ZFSPoolPlugin` all implement both
   halves; only the formats half had been read.
 
   `volume_export` and `volume_import` are now implemented, for the SAN

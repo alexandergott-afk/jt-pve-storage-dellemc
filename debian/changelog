@@ -1,3 +1,23 @@
+jt-pve-storage-dellemc (0.7.95~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: volume_has_feature('sparseinit') promised something a thick volume
+    does not do. PVE acts on that feature by NOT writing zeroes - a clone of
+    a running VM is mirrored with zero-initialized, pbs-restore gets
+    --skip-zero - which is correct for a thin volume and wrong for a thick
+    one, whose extents are whatever the array last had there. Answered per
+    family now: PowerStore always, Unity and PowerFlex from unity-thin and
+    pflex-thick, PowerVault not at all (an ME volume's provisioning depends
+    on its pool). Same claim 0.7.90 removed from dd conv=sparse, reached
+    through QEMU instead.
+  * Chinese text now uses full-width punctuation throughout; 219 half-width
+    marks had accumulated, and t/11-imports.t fails on them from now on.
+  * The 0.7.88 entry wrongly named qm move_disk among the operations it
+    fixed; a same-node move goes through qemu-img convert and path(), never
+    through the transfer formats. The entry carries the correction.
+
+ -- Jason Cheng <jason@jason.tools>  Fri, 07 Aug 2026 09:30:00 +0800
+
 jt-pve-storage-dellemc (0.7.94~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

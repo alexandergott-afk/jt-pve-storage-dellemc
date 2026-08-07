@@ -80,6 +80,12 @@ sub capacity_scope {
     return defined $scfg->{'pvault-pool'} ? 'pool' : 'array';
 }
 
+# Left at the inherited NO on purpose. Whether an ME volume is thin depends on
+# the POOL it lives in — virtual pools are thin, linear pools are not — and
+# `create volume` takes no thin/thick argument, so the plugin cannot answer
+# from its own configuration. Asking the array would put a call on a path that
+# runs per volume in a loop (rule 18). A full copy on a virtual pool is the
+# cost of not guessing.
 sub identity_suffix {
     my ($class, $scfg) = @_;
     return $scfg->{'pvault-pool'} // '';

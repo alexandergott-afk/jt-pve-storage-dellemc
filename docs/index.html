@@ -150,7 +150,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.7.94~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.7.95~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -184,7 +184,7 @@
     <div class="alert alert--danger">
         <strong>
             <span class="lang-en">BETA SOFTWARE. One array has run this — a PowerVault ME4024 over Fibre Channel, which now also boots guests, grows disks, backs up and restores, runs containers and survives a reboot. PowerStore, PowerFlex, Unity, iSCSI and SAS remain unverified. Use at your own risk.</span>
-            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024，現在也已通過客體開機、磁碟擴充、備份與還原、容器,以及重開機。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
+            <span class="lang-zh">BETA 版軟體。只有一台陣列跑過它 —— 一台走 Fibre Channel 的 PowerVault ME4024，現在也已通過客體開機、磁碟擴充、備份與還原、容器，以及重開機。PowerStore、PowerFlex、Unity、iSCSI 與 SAS 仍未驗證。使用風險自負。</span>
         </strong>
         <ul>
             <li>
@@ -1100,11 +1100,20 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     </h2>
 
     <div class="changelog-entry">
+        <div class="changelog-version">v0.7.95~beta1</div>
+        <div class="changelog-date">2026-08-07</div>
+        <div class="changelog-summary">
+            <span class="lang-en">sparseinit told PVE a new volume reads as zeroes, and PVE acts on that by not writing the zeroes &mdash; true of a thin volume, not of a thick one, so a clone onto a thick volume could leave the array's previous contents inside the guest's disk. Answered per family now. Also: Chinese text uses full-width punctuation throughout, enforced by a test.</span>
+            <span class="lang-zh">sparseinit 告訴 PVE 新磁碟區讀出來是零，而 PVE 據此乾脆不寫那些零 &mdash; 這對精簡磁碟區成立，對厚配置不成立，於是複製到厚配置磁碟區時，客體可能讀到陣列先前的內容。現在改為各家族分別回答。另外：中文全面改用全形標點，並由測試強制。</span>
+        </div>
+    </div>
+
+    <div class="changelog-entry">
         <div class="changelog-version">v0.7.94~beta1</div>
         <div class="changelog-date">2026-08-07</div>
         <div class="changelog-summary">
             <span class="lang-en">The test suite wrote over this node's own tracking files &mdash; the lifecycle tests use storage ids a real installation would also use, and the orphan reaper reads exactly those files. Also: a removed storage left its outage state behind, so a storage created again later inherited it.</span>
-            <span class="lang-zh">測試套件會覆寫本節點自己的追蹤檔案 &mdash; 生命週期測試用的儲存 id 正是真實環境也會用的名字,而孤兒回收器讀的就是那些檔案。另修正:被移除的儲存會留下中斷狀態,之後同名的新儲存會繼承它。</span>
+            <span class="lang-zh">測試套件會覆寫本節點自己的追蹤檔案 &mdash; 生命週期測試用的儲存 id 正是真實環境也會用的名字，而孤兒回收器讀的就是那些檔案。另修正：被移除的儲存會留下中斷狀態，之後同名的新儲存會繼承它。</span>
         </div>
     </div>
 
@@ -1113,7 +1122,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-07</div>
         <div class="changelog-summary">
             <span class="lang-en">The recovery tool had been left behind by two changes: it looked for the array password where it no longer is, and it ignored dell-host-mode &mdash; against a shared-mode storage it would have registered a second host and moved this node's initiator off the one every volume is mapped to. Now tested by driving the real script.</span>
-            <span class="lang-zh">災難復原工具被兩項改動甩在後面:它到密碼已不在的地方去找,而且忽略了 dell-host-mode &mdash; 對 shared 模式的儲存,它會建立第二個 host,並把本節點的 initiator 從所有磁碟區對應的那一個上搬走。現在以驅動真正的腳本來測試。</span>
+            <span class="lang-zh">災難復原工具被兩項改動甩在後面：它到密碼已不在的地方去找，而且忽略了 dell-host-mode &mdash; 對 shared 模式的儲存，它會建立第二個 host，並把本節點的 initiator 從所有磁碟區對應的那一個上搬走。現在以驅動真正的腳本來測試。</span>
         </div>
     </div>
 
@@ -1122,7 +1131,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">IMPORTANT for dellpowerflex on 0.7.86&ndash;0.7.91: a storage whose password was still in storage.cfg died with "Can't locate object method" on every array call &mdash; the warning about the legacy location used a method PowerFlex does not inherit. The broken path was the upgrade-compatibility path itself. Also: three unthrottled warnings on PowerFlex's activation path.</span>
-            <span class="lang-zh">使用 dellpowerflex 且版本在 0.7.86&ndash;0.7.91 者請注意:密碼仍在 storage.cfg 的儲存,每一次陣列呼叫都會以「Can't locate object method」失敗 &mdash; 那則關於舊位置的警告用了 PowerFlex 並未繼承的方法。壞掉的正是升級相容路徑本身。另修正:PowerFlex 啟用路徑上三則未節流的警告。</span>
+            <span class="lang-zh">使用 dellpowerflex 且版本在 0.7.86&ndash;0.7.91 者請注意：密碼仍在 storage.cfg 的儲存，每一次陣列呼叫都會以「Can't locate object method」失敗 &mdash; 那則關於舊位置的警告用了 PowerFlex 並未繼承的方法。壞掉的正是升級相容路徑本身。另修正：PowerFlex 啟用路徑上三則未節流的警告。</span>
         </div>
     </div>
 
@@ -1131,7 +1140,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">Two storages on one array shared an API client &mdash; and with it the storeid named in every message and the password read per storage. A rotated password on only one of them meant repeated failed logins with a stale credential. Also: get_identity called the same array two different things once dell-portal became a list.</span>
-            <span class="lang-zh">同一台陣列上的兩個儲存共用了一個 API client &mdash; 連同每則訊息指名的 storeid 與逐儲存讀取的密碼。密碼只在其中一個輪換過,就會用過期憑證反覆登入。另修正:dell-portal 成為清單後,get_identity 會把同一台陣列說成兩台。</span>
+            <span class="lang-zh">同一台陣列上的兩個儲存共用了一個 API client &mdash; 連同每則訊息指名的 storeid 與逐儲存讀取的密碼。密碼只在其中一個輪換過，就會用過期憑證反覆登入。另修正：dell-portal 成為清單後，get_identity 會把同一台陣列說成兩台。</span>
         </div>
     </div>
 
@@ -1140,7 +1149,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">The ME4024 has run the six lifecycle items beyond the first-run test &mdash; guest boot, disk growth, backup and restore, container, reboot &mdash; and all six passed. Fixed: the import skipped runs of zeroes, which is only correct on a thin volume, and thin is an operator's choice here.</span>
-            <span class="lang-zh">ME4024 跑完首次執行測試之外的六項生命週期項目 &mdash; 客體開機、磁碟擴充、備份與還原、容器、重開機 &mdash; 六項全過。並修正:匯入會跳過連續的零,而那只有在精簡磁碟區上才正確,精簡在這裡是操作者的選擇。</span>
+            <span class="lang-zh">ME4024 跑完首次執行測試之外的六項生命週期項目 &mdash; 客體開機、磁碟擴充、備份與還原、容器、重開機 &mdash; 六項全過。並修正：匯入會跳過連續的零，而那只有在精簡磁碟區上才正確，精簡在這裡是操作者的選擇。</span>
         </div>
     </div>
 
@@ -1149,7 +1158,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">Starting a VM stat'ed its disk without a time limit &mdash; PVE's base qemu_blockdev_options reaches the device through an unbounded stat, which on a dead multipath device hangs the worker unkillably. Overridden in all four families, plus a test that asks what LVM and RBD both found necessary.</span>
-            <span class="lang-zh">啟動 VM 時對磁碟做了一次沒有上限的 stat &mdash; PVE 基底的 qemu_blockdev_options 透過無界限的 stat 取得裝置,而在失效的 multipath 裝置上那會讓 worker 卡死且殺不掉。四個家族都已覆寫,並新增一個測試,問 LVM 與 RBD 都認為必要的是什麼。</span>
+            <span class="lang-zh">啟動 VM 時對磁碟做了一次沒有上限的 stat &mdash; PVE 基底的 qemu_blockdev_options 透過無界限的 stat 取得裝置，而在失效的 multipath 裝置上那會讓 worker 卡死且殺不掉。四個家族都已覆寫，並新增一個測試，問 LVM 與 RBD 都認為必要的是什麼。</span>
         </div>
     </div>
 
@@ -1158,7 +1167,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">Moving a disk to another storage type, pvesm export/import and remote migration were advertised and then refused one call later: only the format was declared, not the transfer. Both are implemented now, and the device an import writes to must be confirmed by the kernel.</span>
-            <span class="lang-zh">把磁碟移到其他類型的儲存、pvesm export/import 與跨叢集移轉,先被宣告可用、下一個呼叫就被拒絕:當初只宣告了格式,沒有實作傳輸。兩者現已實作,而且匯入要寫入的裝置必須經核心確認。</span>
+            <span class="lang-zh">把磁碟移到其他類型的儲存、pvesm export/import 與跨叢集移轉，先被宣告可用、下一個呼叫就被拒絕：當初只宣告了格式，沒有實作傳輸。兩者現已實作，而且匯入要寫入的裝置必須經核心確認。</span>
         </div>
     </div>
 
@@ -1167,7 +1176,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <div class="changelog-date">2026-08-06</div>
         <div class="changelog-summary">
             <span class="lang-en">SECURITY: PowerVault's login puts sha256("user_password") in the URL, so a failed login wrote a crackable hash into the journal in full. Every message now passes a shape-based redactor &mdash; credentials cut to a correlatable prefix, WWIDs and volume names untouched.</span>
-            <span class="lang-zh">安全性:PowerVault 的登入把 sha256(「帳號_密碼」) 放在 URL 裡,因此登入失敗會把一個可破解的雜湊完整寫進 journal。現在每則訊息都會經過依形狀判斷的遮蔽 —— 憑證截成可對照的前綴,WWID 與磁碟區名稱完好保留。</span>
+            <span class="lang-zh">安全性：PowerVault 的登入把 sha256(「帳號_密碼」) 放在 URL 裡，因此登入失敗會把一個可破解的雜湊完整寫進 journal。現在每則訊息都會經過依形狀判斷的遮蔽 —— 憑證截成可對照的前綴，WWID 與磁碟區名稱完好保留。</span>
         </div>
     </div>
 

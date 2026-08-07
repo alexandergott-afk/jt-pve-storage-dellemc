@@ -469,4 +469,58 @@ for my $file (sort @files) {
               . join("\n  ", @dead));
 }
 
+# ---------------------------------------------------------------------------
+# Chinese text uses full-width punctuation
+#
+# CLAUDE.md has said so from the start, and it is the rule most easily lost
+# when writing quickly: a half-width comma between two Chinese characters
+# reads as wrong to a Taiwanese reader in the way a missing space between
+# English words reads to an English one. 219 of them accumulated across the
+# zh-TW changelog, the docs site and the testing document before somebody
+# pointed at a screenshot.
+#
+# Anything inside backticks is left alone: a code span, a path or a command
+# keeps the punctuation the machine needs. Both directions are checked — a
+# Chinese character before the mark, and a Chinese character after it, which
+# is the case that hides behind a code span (`--host-mode`,並且).
+# ---------------------------------------------------------------------------
+
+{
+    my @docs = grep { -f $_ } (
+        glob('*_zh-TW.md'), glob('docs/*_zh-TW.md'), 'docs/index.html',
+    );
+
+    ok(scalar(@docs) > 3, 'the Chinese documents were found')
+        or diag('nothing was scanned, so this test is not testing anything');
+
+    for my $file (@docs) {
+        # DECODED, not bytes. \p{Han} against a UTF-8 byte string matches
+        # nothing at all, so the first version of this test passed on every
+        # file including one with a half-width comma appended on purpose —
+        # lesson 48's bytes-versus-characters, in the test rather than the
+        # client.
+        my $src = do {
+            open my $fh, '<:encoding(UTF-8)', $file or die "$file: $!";
+            local $/;
+            <$fh>;
+        };
+
+        my @bad;
+        my $lineno = 0;
+        for my $line (split /\n/, $src, -1) {
+            $lineno++;
+            for my $seg (split /(`[^`]*`)/, $line) {
+                next if $seg =~ /\A`.*`\z/s;
+                next unless $seg =~ /\p{Han}[,;:!?]|[,;:!?](?=\p{Han})/;
+                my ($excerpt) = $seg =~ /(.{0,12}(?:\p{Han}[,;:!?]|[,;:!?]\p{Han}).{0,12})/;
+                push @bad, "line $lineno: $excerpt";
+            }
+        }
+
+        is(scalar(@bad), 0, "$file uses full-width punctuation in Chinese text")
+            or diag("  " . join("\n  ", @bad[0 .. ($#bad > 9 ? 9 : $#bad)])
+                  . ($#bad > 9 ? "\n  ... and " . ($#bad - 9) . " more" : ''));
+    }
+}
+
 done_testing();

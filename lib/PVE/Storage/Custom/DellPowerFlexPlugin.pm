@@ -1542,9 +1542,23 @@ sub volume_has_feature {
         clone      => { base => 1, current => 1, snap => 1 },
         template   => { current => 1 },
         copy       => { base => 1, current => 1, snap => 1 },
-        sparseinit => { base => 1, current => 1 },
+        # sparseinit is answered below: it is a claim about the array's
+        # provisioning, not about the volume's kind.
         rename     => { current => 1 },
     };
+
+    # 'sparseinit' tells PVE the volume reads as zeroes where nothing has been
+    # written, and PVE acts on it by not writing the zeroes at all — a clone
+    # of a running VM is mirrored with 'zero-initialized', pbs-restore gets
+    # --skip-zero. True of a ThinProvisioned volume; not true of a
+    # ThickProvisioned one, whose blocks are whatever the pool last had there.
+    # 'pflex-thick' is an operator's choice, so the answer follows it.
+    # Same claim as the import path's dd (0.7.90), reached through QEMU; this
+    # family inherits none of BlockBase's, so it is spelled out (lesson 40a).
+    if ($feature eq 'sparseinit') {
+        return 0 if $snapname;
+        return $scfg->{'pflex-thick'} ? 0 : 1;
+    }
 
     # From parse_volname, not from the spelling: a linked clone is named
     # 'base-100-disk-0/vm-101-disk-0', which starts with 'base-' while being
