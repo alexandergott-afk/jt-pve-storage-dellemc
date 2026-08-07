@@ -508,4 +508,50 @@ is_deeply(volumes_on_array(), [], 'which then deletes cleanly');
     like($@ // '', qr/could not be determined/, 'and says so plainly');
 }
 
+# ---------------------------------------------------------------------------
+# What the web interface does to a disk
+#
+# The buttons in the GUI are not extra code paths of their own — each one
+# lands on a storage method — but the SEQUENCE is different from the one a
+# test usually walks, and that is where a plugin gets caught. Detach leaves
+# the volume on the array with nothing pointing at it; the disk then has to
+# keep showing up as an unused disk of that VM, which is list_images and
+# nothing else. Reassign Owner is a rename, and the volid it returns is what
+# PVE writes into the target VM's configuration.
+# ---------------------------------------------------------------------------
+
+{
+    $A->reset_array();
+
+    my $volname = $A->alloc_image($store, $scfg, 700, 'raw', undef, 1024);
+    is($volname, 'vm-700-disk-0', 'Add Hard Disk allocates');
+
+    # Detach: PVE moves the disk to unusedN in the VM configuration and calls
+    # no storage method at all. The volume must survive it, and must still be
+    # listed as belonging to VM 700 — that listing is the only thing that
+    # makes it appear as 'Unused Disk 0' rather than vanishing from the GUI.
+    my $listed = $A->list_images($store, $scfg, 700);
+    my ($row) = grep { $_->{volid} && $_->{volid} =~ /vm-700-disk-0/ } @$listed;
+    ok($row, 'a detached disk is still listed for its VM');
+    is($row->{vmid}, 700, '... under the vmid the GUI groups it by');
+
+    # Reassign Owner: a rename, and PVE writes the returned volid into the
+    # other VM's configuration.
+    my $new = $A->rename_volume($scfg, $store, 'vm-700-disk-0', 701, undef);
+    is($new, "$store:vm-701-disk-0",
+        'Reassign Owner returns the volid PVE will write into the target VM');
+
+    my $after = $A->list_images($store, $scfg, 701);
+    ok(scalar(grep { $_->{vmid} == 701 } @$after),
+        '... and the volume is listed under the new owner');
+
+    is_deeply($A->list_images($store, $scfg, 700), [],
+        '... and no longer under the old one');
+
+    # Remove, from the GUI's unused-disk row.
+    $A->free_image($store, $scfg, 'vm-701-disk-0', 0, 'raw');
+    is_deeply($A->list_images($store, $scfg, 701), [],
+        'Remove takes it off the array');
+}
+
 done_testing();
