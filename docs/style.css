@@ -717,3 +717,13 @@ mark.search-hl {
     border-radius: 2px;
     box-shadow: 0 0 0 1px rgba(245,158,11,0.3);
 }
+
+/* A short qualification under a table cell: why a row is not a plain yes,
+   what the operator has to know before relying on it. Kept small and quiet
+   so the answer column stays readable at a glance. */
+.note {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-muted, #8b93a1);
+}

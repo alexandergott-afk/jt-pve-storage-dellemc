@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.4~beta1] - 2026-08-08
+
+### Changed
+- **The documentation site now leads with what an operator needs to decide
+  whether to trust it**, following the shape of the related synology project's
+  page:
+
+  - **Which Proxmox VE operations work** — a table of the operations
+    themselves, for virtual machines and for containers, with a column saying
+    where each row has actually been driven. Most rows say "Code": implemented,
+    covered by tests, and no array has run it. That is the honest state of a
+    beta plugin and it belongs above the feature list, not below it.
+  - **Why this plugin has to be verified on hardware** — Dell publishes
+    documentation for all four families and it is not enough; every
+    array-facing fact here was cross-checked against Dell's own client code,
+    and the first run on each of two real arrays still found defects that no
+    amount of reading would have.
+  - **How to help this project** — what it needs is not code. It is time on
+    other people's arrays, and the three questions only an array can answer.
+
+- The related-projects list now includes `jt-pve-storage-synology`.
+
+- `make release-check` compares the number of unit tests the site claims
+  against the number the run reported. That number had said 2,756 for eleven
+  releases while the suite grew past 3,000 — a figure in prose goes stale
+  silently, which is the one kind of documentation error nobody notices.
+
 ## [0.8.3~beta1] - 2026-08-08
 
 ### Fixed

@@ -1,3 +1,17 @@
+jt-pve-storage-dellemc (0.8.4~beta1-1) unstable; urgency=low
+
+  * BETA RELEASE. Not for production use.
+  * Documentation site: added "Which Proxmox VE operations work" (VM and
+    container, with a column saying where each row has actually been driven),
+    "Why this plugin has to be verified on hardware", and "How to help this
+    project". Shape follows the related synology project's page. The
+    related-projects list now includes jt-pve-storage-synology.
+  * make release-check compares the number of unit tests the site claims
+    against the number the run reported; it had said 2,756 for eleven
+    releases while the suite grew past 3,000.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 08 Aug 2026 11:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.3~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

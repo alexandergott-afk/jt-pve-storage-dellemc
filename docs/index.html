@@ -77,7 +77,10 @@
             <span class="lang-en">Features</span>
             <span class="lang-zh">功能特性</span>
         </a>
-        <a href="#requirements" class="sidebar__link">
+        <a href="#operations"><span class="lang-en">PVE operations</span><span class="lang-zh">支援的操作</span></a>
+            <a href="#why-hardware"><span class="lang-en">Why hardware</span><span class="lang-zh">為何需實機</span></a>
+            <a href="#how-to-help"><span class="lang-en">How to help</span><span class="lang-zh">如何協助</span></a>
+            <a href="#requirements" class="sidebar__link">
             <span class="lang-en">Requirements</span>
             <span class="lang-zh">系統需求</span>
         </a>
@@ -155,7 +158,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.3~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.4~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -377,6 +380,169 @@
 </section>
 
 <!-- ---- Requirements ---- -->
+<section class="doc-section" id="operations">
+    <h2 class="section-title">
+        <span class="lang-en">Which Proxmox VE operations work</span>
+        <span class="lang-zh">支援的 Proxmox VE 操作</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">The right-hand column says where each row has actually been driven. &ldquo;Code&rdquo; means it is implemented and covered by tests, and no array has run it &mdash; which is most of this table, and the reason this is beta software.</span>
+        <span class="lang-zh">最右欄寫的是每一列實際跑過的地方。「僅程式」表示已實作、有測試涵蓋，但沒有任何陣列跑過 &mdash; 本表大多數列都是如此，這也是本軟體仍為 beta 的原因。</span>
+    </p>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th><span class="lang-en">Operation</span><span class="lang-zh">操作</span></th>
+                <th><span class="lang-en">VM</span><span class="lang-zh">虛擬機</span></th>
+                <th><span class="lang-en">Container</span><span class="lang-zh">容器</span></th>
+                <th><span class="lang-en">Driven on</span><span class="lang-zh">實際跑過</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="lang-en">Create and remove a disk</span><span class="lang-zh">建立、移除磁碟</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Boot a guest from an array volume</span><span class="lang-zh">客體從陣列磁碟區開機</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Grow a disk</span><span class="lang-zh">擴充磁碟</span>
+                    <div class="note"><span class="lang-en">The array grows the volume, then this node&rsquo;s paths and multipath map are refreshed until they report the new size. Other nodes catch up when they next activate the volume.</span><span class="lang-zh">先由陣列擴充磁碟區，接著重新整理本節點的路徑與 multipath map，直到它們回報新的大小。其他節點會在下次啟用該磁碟區時跟上。</span></div>
+                </td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC (VM stopped)</span><span class="lang-zh">ME4024，FC（VM 已停）</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Shrink a disk</span><span class="lang-zh">縮小磁碟</span></td>
+                <td><span class="lang-en">refused</span><span class="lang-zh">拒絕</span></td>
+                <td><span class="lang-en">refused</span><span class="lang-zh">拒絕</span></td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Snapshot, list, delete</span><span class="lang-zh">快照建立、列出、刪除</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Rollback</span><span class="lang-zh">快照倒回</span>
+                    <div class="note"><span class="lang-en">Refused while a newer snapshot exists, because the array would discard it. A container&rsquo;s filesystem is frozen first; a backup snapshot is taken and kept until the rollback succeeds.</span><span class="lang-zh">有更新的快照存在時會拒絕，因為陣列會把它丟掉。容器的檔案系統會先凍結；倒回前會先取一份備份快照，直到倒回成功才移除。</span></div>
+                </td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC (container)</span><span class="lang-zh">ME4024，FC（容器）</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Template and linked clone</span><span class="lang-zh">範本與連結複製</span>
+                    <div class="note"><span class="lang-en">A linked clone is a thin clone on the array. Deleting a template while a clone still reads from it is refused by the array, and reported as such.</span><span class="lang-zh">連結複製在陣列上是一個精簡複製。複製還在讀取時刪除範本，陣列會拒絕，外掛也照實回報。</span></div>
+                </td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Clone from a snapshot</span><span class="lang-zh">從快照複製</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Backup and restore (<code>vzdump</code> snapshot mode)</span><span class="lang-zh">備份與還原（<code>vzdump</code> snapshot 模式）</span>
+                    <div class="note"><span class="lang-en">The backup reads through a temporary clone of the snapshot, which is removed afterwards.</span><span class="lang-zh">備份是透過該快照的一個臨時複製去讀取，結束後移除。</span></div>
+                </td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Live migration</span><span class="lang-zh">線上遷移</span>
+                    <div class="note"><span class="lang-en">The volume stays mapped: unmapping on migration is what breaks it. The target maps the volume itself if it does not already have it.</span><span class="lang-zh">磁碟區保持對應狀態：遷移時解除對應正是會弄壞它的做法。目標節點若尚未擁有該對應，會自行建立。</span></div>
+                </td>
+                <td>&#10003;</td>
+                <td><span class="lang-en">offline</span><span class="lang-zh">離線</span></td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Move a disk to another storage</span><span class="lang-zh">把磁碟移到其他儲存</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en"><code>pvesm export</code> / <code>import</code>, cluster-to-cluster migration</span><span class="lang-zh"><code>pvesm export</code>／<code>import</code>、叢集對叢集移轉</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">EFI disk, TPM state, cloud-init</span><span class="lang-zh">EFI 磁碟、TPM 狀態、cloud-init</span></td>
+                <td>&#10003;</td><td>&mdash;</td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Node reboot, storage returns on its own</span><span class="lang-zh">節點重開機後儲存自動回來</span></td>
+                <td>&#10003;</td><td>&#10003;</td>
+                <td><span class="lang-en">ME4024, FC</span><span class="lang-zh">ME4024，FC</span></td>
+            </tr>
+            <tr>
+                <td><span class="lang-en">Rename a snapshot</span><span class="lang-zh">重新命名快照</span>
+                    <div class="note"><span class="lang-en">Refused with a message that says why: a snapshot name is part of the array object&rsquo;s name here.</span><span class="lang-zh">會拒絕並說明原因：在這裡，快照名稱是陣列物件名稱的一部分。</span></div>
+                </td>
+                <td><span class="lang-en">refused</span><span class="lang-zh">拒絕</span></td>
+                <td><span class="lang-en">refused</span><span class="lang-zh">拒絕</span></td>
+                <td><span class="lang-en">Code</span><span class="lang-zh">僅程式</span></td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+</section>
+
+<section class="doc-section" id="why-hardware">
+    <h2 class="section-title">
+        <span class="lang-en">Why this plugin has to be verified on hardware</span>
+        <span class="lang-zh">為什麼這個外掛需要實機驗證</span>
+    </h2>
+    <p>
+        <span class="lang-en">Dell publishes documentation for all four families, and it is not enough. The documentation site refuses the pages that carry the collection-query syntax; a printed column heading is not a property name; and two firmware generations of the same array document the same command with its arguments in a different order. So every array-facing fact here was cross-checked against Dell&rsquo;s own client code &mdash; <code>python-powerstore</code>, <code>python-powerflex</code>, <code>gounity</code>, the ansible collections &mdash; and where those disagreed with the prose, the code won.</span>
+        <span class="lang-zh">Dell 四個系列都有公開文件，而那並不足夠。文件網站會拒絕提供帶有集合查詢語法的頁面；指令印出的欄位標題不等於屬性名稱；同一台陣列的兩個韌體世代，還會把同一個指令的參數順序記載成不同的樣子。所以這裡每一項面向陣列的認知，都與 Dell 自己的客戶端程式碼交叉比對過 &mdash; <code>python-powerstore</code>、<code>python-powerflex</code>、<code>gounity</code>、ansible collections &mdash; 兩者不一致時，以程式碼為準。</span>
+    </p>
+    <p>
+        <span class="lang-en">It still is not enough. The first run on a real ME4024 found three defects in a row, each hidden by the one before it, and none of them reachable by reading. The first run on a real PowerStore found four more, starting with a WWPN written without colons. That is what this table is for: a row that says &ldquo;Code&rdquo; means nobody has been able to be wrong about it yet.</span>
+        <span class="lang-zh">而這樣仍然不夠。在真正的 ME4024 上第一次執行，一口氣找出三個缺陷，每一個都被前一個遮住，而且沒有一個是用讀的能找到的。在真正的 PowerStore 上第一次執行，又找出四個，第一個是沒有冒號的 WWPN。上面那張表就是為此存在的：標示「僅程式」的那一列，代表還沒有人有機會在它上面犯錯。</span>
+    </p>
+    <p>
+        <span class="lang-en">Where nothing could be established, this plugin refuses the operation rather than guessing at it. A refusal that names what it could not establish is recoverable; a guess that deletes the wrong volume is not.</span>
+        <span class="lang-zh">凡是無法確立的地方，這個外掛會拒絕該操作，而不是用猜的。一個說得出「什麼無法確立」的拒絕是可以挽回的；一個刪錯磁碟區的猜測不是。</span>
+    </p>
+</section>
+
+<section class="doc-section" id="how-to-help">
+    <h2 class="section-title">
+        <span class="lang-en">How to help this project</span>
+        <span class="lang-zh">如何協助這個專案</span>
+    </h2>
+    <p>
+        <span class="lang-en">What this project needs is not code. It is time on other people&rsquo;s arrays: one PowerVault ME4024 over Fibre Channel has run it, and one PowerStore is running it now. PowerFlex and Unity XT have never been connected to anything.</span>
+        <span class="lang-zh">這個專案缺的不是程式，是在別人陣列上的時間：目前有一台走 Fibre Channel 的 PowerVault ME4024 跑過，另有一台 PowerStore 正在跑。PowerFlex 與 Unity XT 從來沒有連上過任何東西。</span>
+    </p>
+    <ul>
+        <li>
+            <span class="lang-en"><strong>Run it against a non-production array.</strong> <code>docs/FIRST_RUN.md</code> is nine steps and stops before anything is created if the array does not answer as expected.</span>
+            <span class="lang-zh"><strong>拿一台非正式環境的陣列跑跑看。</strong><code>docs/FIRST_RUN.md</code> 有九個步驟，而且只要陣列的回應不如預期，它會在建立任何東西之前停下來。</span>
+        </li>
+        <li>
+            <span class="lang-en"><strong>Report what broke.</strong> The useful details are the model and firmware, the protocol, what you were doing, and the error exactly as it appeared &mdash; including the array&rsquo;s own message, which is usually the part that names the real cause.</span>
+            <span class="lang-zh"><strong>回報壞在哪裡。</strong>有用的細節是機型與韌體、使用的協定、當時在做什麼，以及錯誤訊息原本的樣子 &mdash; 包含陣列自己那一段，通常真正的原因就寫在那裡。</span>
+        </li>
+        <li>
+            <span class="lang-en"><strong>Three things only an array can answer</strong>, and they take minutes: <code>sg_inq /dev/sdX</code> on a mapped volume, whether the WWID this plugin reports matches <code>multipath -ll</code>, and whether a <code>qm rollback</code> leaves the expected snapshot on the array.</span>
+            <span class="lang-zh"><strong>有三件事只有陣列答得出來</strong>，而且幾分鐘就好：對已對應的磁碟區跑 <code>sg_inq /dev/sdX</code>、外掛回報的 WWID 是否與 <code>multipath -ll</code> 一致，以及 <code>qm rollback</code> 之後陣列上是否留下預期的快照。</span>
+        </li>
+    </ul>
+    <p>
+        <span class="lang-en">Issues and reports: <a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/issues" target="_blank" rel="noopener">github.com/jasoncheng7115/jt-pve-storage-dellemc/issues</a></span>
+        <span class="lang-zh">問題回報：<a href="https://github.com/jasoncheng7115/jt-pve-storage-dellemc/issues" target="_blank" rel="noopener">github.com/jasoncheng7115/jt-pve-storage-dellemc/issues</a></span>
+    </p>
+</section>
+
 <section class="doc-section" id="requirements">
     <h2 class="section-title">
         <span class="lang-en">Requirements</span>
@@ -959,8 +1125,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">2,756 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">2,756 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
+        <span class="lang-en">3,072 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">3,072 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
     </p>
 
     <h3>
@@ -1120,6 +1286,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.4~beta1</div>
+        <div class="changelog-date">2026-08-08</div>
+        <div class="changelog-summary">
+            <span class="lang-en">This site now leads with which Proxmox VE operations work and where each has actually been driven, why the plugin has to be verified on hardware, and how to help. The test count in the text is checked against the run, because a number in prose goes stale silently.</span>
+            <span class="lang-zh">本站改為先講：哪些 Proxmox VE 操作可用、每一項實際在哪裡跑過、為什麼這個外掛需要實機驗證，以及如何協助。文中的測試數量會與實際執行結果比對，因為寫在文句裡的數字會安靜地過期。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.3~beta1</div>
@@ -2094,6 +2269,7 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     <ul>
         <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">jt-pve-storage-purestorage</a></li>
         <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">jt-pve-storage-netapp</a></li>
+        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" target="_blank" rel="noopener">jt-pve-storage-synology</a></li>
     </ul>
     <p>
         <span class="lang-en">In the absence of hardware, this plugin was written against Dell's published documentation: the PowerStore REST guide, the PowerVault ME5 CLI Reference Guide, and the PowerFlex REST and SDC material.</span>

@@ -1,10 +1,11 @@
 PACKAGE = jt-pve-storage-dellemc
+SHELL := /bin/bash
 
 # Versioning: the patch number increments per release and runs to .99 before
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.8.3~beta1
+VERSION = 0.8.4~beta1
 
 DESTDIR =
 PREFIX   = /usr
@@ -119,9 +120,30 @@ unit:
 	@mkdir -p $(PVE_DELLEMC_STATE_DIR) $(PVE_DELLEMC_RUN_DIR)
 	@if [ -n "$(strip $(UNIT_TESTS))" ]; then \
 		echo "Running unit tests..."; \
-		prove -Ilib $(UNIT_TESTS); \
+		prove -Ilib $(UNIT_TESTS) 2>&1 | tee $(TEST_STATE_DIR)/prove.out; \
+		test $${PIPESTATUS[0]:-0} -eq 0 || exit 1; \
+		sed -n 's/.*Tests=\([0-9]*\).*/\1/p' $(TEST_STATE_DIR)/prove.out \
+			| tail -1 > $(TEST_STATE_DIR)/count; \
 	else \
 		echo "No unit tests yet (t/*.t)."; \
+	fi
+
+# The documentation site names the number of unit tests, and a number in
+# prose goes stale silently: it said 2,756 for eleven releases while the suite
+# had grown past 3,000. Compared against what the run just reported.
+check-doc-test-count:
+	@count=$$(cat $(TEST_STATE_DIR)/count 2>/dev/null); \
+	if [ -z "$$count" ]; then \
+		echo "  SKIP: no test count recorded (run 'make unit' first)"; \
+		exit 0; \
+	fi; \
+	pretty=$$(printf "%'d" "$$count" 2>/dev/null || echo "$$count"); \
+	if grep -q "$$pretty unit tests" docs/index.html; then \
+		echo "  OK: the docs site says $$pretty unit tests, and so does the run"; \
+	else \
+		claimed=$$(sed -n 's/.*>\([0-9,]*\) unit tests.*/\1/p' docs/index.html | head -1); \
+		echo "  ERROR: the docs site says '$$claimed' unit tests; the run reported $$pretty"; \
+		exit 1; \
 	fi
 
 # The same suite as it runs on a machine with no Proxmox VE — which is what
@@ -162,7 +184,10 @@ nopve-stub:
 # every release was a syntax failure, not a test failure.
 unit-nopve: nopve-stub
 	@echo "Running checks as they run without Proxmox VE (as in CI)..."
-	@rm -rf $(TEST_STATE_DIR)
+	@# Only the state directories, never the whole tree: `make unit` records
+	@# the suite's test count here and this run's count is a different, smaller
+	@# number (the PVE-only tests skip without PVE).
+	@rm -rf $(PVE_DELLEMC_STATE_DIR) $(PVE_DELLEMC_RUN_DIR)
 	@mkdir -p $(PVE_DELLEMC_STATE_DIR) $(PVE_DELLEMC_RUN_DIR)
 	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" $(MAKE) --no-print-directory syntax
 	@PERL5OPT="-I$(NOPVE_STUB) -Mnopve" prove -Ilib $(UNIT_TESTS)
@@ -193,7 +218,7 @@ check-multipath-flush:
 # Everything that must pass before a release, including the checks that catch
 # a half-finished version bump. See docs/RELEASE_TESTING.md; this target is
 # stage 1 of that plan.
-release-check: check-multipath-flush syntax unit unit-nopve
+release-check: check-multipath-flush syntax unit unit-nopve check-doc-test-count
 	@echo "Checking version consistency..."
 	@deb_version=$$(dpkg-parsechangelog --show-field Version 2>/dev/null \
 		| sed 's/-[0-9]*$$//'); \
