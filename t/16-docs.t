@@ -310,4 +310,61 @@ SKIP: {
     }
 }
 
+# ---------------------------------------------------------------------------
+# The documentation site's navigation
+#
+# A link added without the class the others carry renders as bare inline text
+# in the middle of the sidebar — which is what shipped in 0.8.4, and what a
+# screenshot caught rather than any check here. Anchors and sections are
+# matched both ways: a link to a section that does not exist scrolls nowhere,
+# and a section no link reaches is one nobody finds.
+# ---------------------------------------------------------------------------
+
+{
+    my $file = 'docs/index.html';
+  SKIP: {
+        skip "$file not found", 4 unless -f $file;
+
+        my $html = do {
+            open my $fh, '<:encoding(UTF-8)', $file or die "$file: $!";
+            local $/;
+            <$fh>;
+        };
+
+        my @links = $html =~ /<a href="#([^"]+)"([^>]*)>/g;
+        my (@targets, @unstyled);
+        while (@links) {
+            my ($target, $attrs) = splice(@links, 0, 2);
+            next unless $attrs =~ /sidebar__link/ || $html =~ /id="sidebar"/;
+            push @targets, $target if $attrs =~ /sidebar__link/;
+            push @unstyled, $target
+                if $attrs !~ /sidebar__link/ && $html =~ /\Q<a href="#$target"$attrs>\E/
+                && index($html, "<a href=\"#$target\"$attrs>") < index($html, 'main-content');
+        }
+
+        is_deeply(\@unstyled, [],
+            'every sidebar link carries sidebar__link — one without it renders'
+          . ' as bare inline text between the styled ones')
+            or diag("  @unstyled");
+
+        my %section = map { $_ => 1 }
+            ($html =~ /<section class="doc-section" id="([^"]+)"/g),
+            ($html =~ /\bid="(hero|disclaimer)"/g);
+
+        my @dangling = grep { !$section{$_} } @targets;
+        is_deeply(\@dangling, [],
+            'every sidebar link points at a section that exists')
+            or diag("  @dangling");
+
+        my %linked = map { $_ => 1 } @targets;
+        my @unreachable = grep { !$linked{$_} && !/^(hero|disclaimer)$/ }
+                          sort keys %section;
+        is_deeply(\@unreachable, [],
+            'every section is reachable from the sidebar')
+            or diag("  @unreachable");
+
+        cmp_ok(scalar(@targets), '>', 10, 'the sidebar was actually parsed');
+    }
+}
+
 done_testing();

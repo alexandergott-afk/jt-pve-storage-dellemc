@@ -7,6 +7,19 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.5~beta1] - 2026-08-08
+
+### Fixed
+- **The three navigation entries added in 0.8.4 rendered as bare inline text.**
+  They were missing the class every other sidebar link carries, so instead of
+  three items they appeared as one run of unstyled words in the middle of the
+  menu. Caught from a screenshot, which is not a check.
+
+  `t/16-docs.t` now reads the site's navigation: every sidebar link must carry
+  the class, must point at a section that exists, and every section must be
+  reachable from the sidebar. A link that scrolls nowhere and a section nobody
+  can find are the same defect from opposite ends.
+
 ## [0.8.4~beta1] - 2026-08-08
 
 ### Changed

@@ -1,3 +1,15 @@
+jt-pve-storage-dellemc (0.8.5~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: the three navigation entries added in 0.8.4 were missing the class
+    every other sidebar link carries, so they rendered as one run of unstyled
+    inline text in the middle of the menu.
+  * t/16-docs.t now checks the site's navigation: every sidebar link carries
+    the class, every link points at a section that exists, and every section
+    is reachable from the sidebar.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 08 Aug 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.4~beta1-1) unstable; urgency=low
 
   * BETA RELEASE. Not for production use.
