@@ -1153,13 +1153,13 @@ sub path {
     # die here takes out more than this one volume.
     unless ($id) {
         my $placeholder = "/dev/disk/by-id/emc-vol-unknown-$array_name";
-        return wantarray ? ($placeholder, $parsed->{vmid}, 'raw') : $placeholder;
+        return wantarray ? ($placeholder, $parsed->{vmid}, 'images') : $placeholder;
     }
 
     my $device = $class->_device_lookup($scfg, $id)->()
         // "/dev/disk/by-id/emc-vol-unknown-$id";
 
-    return wantarray ? ($device, $parsed->{vmid}, 'raw') : $device;
+    return wantarray ? ($device, $parsed->{vmid}, 'images') : $device;
 }
 
 # QEMU's blockdev options for this volume. Same reasoning as BlockBase's, and
@@ -1662,7 +1662,7 @@ sub volume_export {
 
     PVE::Storage::Plugin::write_common_header($fh, $size);
     PVE::Tools::run_command(
-        ['dd', "if=$device", 'bs=64k', 'status=progress'],
+        ['/bin/dd', "if=$device", 'bs=64k', 'status=progress'],
         output => '>&' . fileno($fh),
     );
 
@@ -1727,7 +1727,7 @@ sub volume_import {
         # a thick one does not — and 'pflex-thick' is an operator's choice.
         # See the same comment in BlockBase.
         PVE::Tools::run_command(
-            ['dd', "of=$device", 'bs=64k'],
+            ['/bin/dd', "of=$device", 'bs=64k'],
             input => '<&' . fileno($fh),
         );
     };

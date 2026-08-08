@@ -461,4 +461,37 @@ is(is_device_in_use(undef), 0, 'and so is undef');
         'and nothing holding it is a confirmed no');
 }
 
+{
+    # Reaping a child that will not die on its own.
+    #
+    # sysfs_read_with_timeout ended with waitpid($pid, 0) on the SUCCESS path,
+    # with the alarm already cleared. The child has closed its end, so it is
+    # about to exit and this returns at once — unless the child has been
+    # STOPPED rather than killed (a debugger attached, a cgroup freezer), in
+    # which case it is not dead and never will be, and pvestatd blocks in
+    # there forever. Rule 8 covered the path that kills a child; nobody had
+    # looked at the one where everything went well.
+    my $reap = PVE::Storage::Custom::DellEMC::Common::Multipath->can('_reap_bounded');
+    ok($reap, 'the bounded reaper exists');
+
+    my $pid = fork();
+    if (!defined $pid) {
+        fail('fork failed');
+    } elsif ($pid == 0) {
+        POSIX::pause() while 1;
+        POSIX::_exit(0);
+    } else {
+        kill('STOP', $pid);
+
+        my $start = time();
+        my $ok = $reap->($pid, wait => 1);
+        my $took = time() - $start;
+
+        ok($ok, 'a stopped child is reaped rather than waited on forever');
+        cmp_ok($took, '<', 5,
+            "... and within the bound (took ${took}s): an unbounded waitpid"
+          . ' here is a pvestatd that never returns');
+    }
+}
+
 done_testing();

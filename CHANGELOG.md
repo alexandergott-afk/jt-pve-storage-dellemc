@@ -7,6 +7,43 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.3~beta1] - 2026-08-08
+
+### Fixed
+- **A `waitpid` with no bound, on the path where nothing went wrong.**
+  `sysfs_read_with_timeout` ended by waiting for its child with the alarm
+  already cleared. The child has closed its end — that is why the read
+  returned — so it normally exits at once; one that has been STOPPED rather
+  than killed (a debugger attached, a cgroup freezer) is not dead and never
+  will be, and pvestatd waits there forever. The rule about reaping with
+  `WNOHANG` covered the path that kills a child; nobody had looked at the one
+  where everything went well.
+
+- **A resized volume whose multipath map never grew.** `multipathd resize
+  map` resizes from udev's view of the paths, and when that view is still the
+  old capacity it resizes the map to the size it already had and reports
+  success. The map stayed small and QEMU's `block_resize` failed with *Cannot
+  grow device files* on a volume that had in fact grown. The resize is
+  re-issued now until the map reports the new size, and says so plainly if it
+  never does.
+
+- **Every other node kept the old size after a resize.** Only the node running
+  the guest resizes — PVE calls `volume_resize` there and nowhere else — so
+  every other node with the volume mapped kept the old capacity in its
+  multipath map, and a migration handed the guest a device SMALLER than its
+  configuration claimed. `activate_volume` compares the array's size against
+  the local map, which it already has both of, and refreshes when the array's
+  is larger. Never the other way round.
+
+### Changed
+- `path()` returns `images` as its third value, which is the vtype PVE reads
+  there; it was returning `raw`, which is the format. Nothing consumed it —
+  every caller either returns early for a shared storage or only tests for
+  `backup` — but "harmless" was a property of PVE's current code rather than
+  of ours.
+- The `dd` used by volume export and import is called by absolute path, like
+  every other command here.
+
 ## [0.8.2~beta1] - 2026-08-07
 
 ### Fixed

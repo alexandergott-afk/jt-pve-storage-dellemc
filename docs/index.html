@@ -155,7 +155,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.2~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.3~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1120,6 +1120,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.3~beta1</div>
+        <div class="changelog-date">2026-08-08</div>
+        <div class="changelog-summary">
+            <span class="lang-en">From reading the synology plugin's changelog defect by defect: an unbounded waitpid on the path where nothing went wrong, a multipath map that never reached the new size after a resize, and every other node keeping the old size &mdash; which hands a migrated guest a device smaller than its configuration claims.</span>
+            <span class="lang-zh">逐條讀 synology 外掛的變更紀錄而來：一個在「什麼都沒出錯」路徑上沒有界限的 waitpid、擴充後始終沒達到新大小的 multipath map，以及其他節點仍停在舊大小 &mdash; 那會把一個比設定更小的裝置交給遷移過去的客體。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.2~beta1</div>

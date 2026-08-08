@@ -1,3 +1,26 @@
+jt-pve-storage-dellemc (0.8.3~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: sysfs_read_with_timeout ended with an unbounded waitpid on the
+    success path, with the alarm already cleared. A child that has been
+    stopped rather than killed is not dead and never will be, and pvestatd
+    waits there forever. Bounded, then killed, then reaped with WNOHANG.
+  * Fixed: multipathd resize map resizes from udev's view of the paths, which
+    can still be the old capacity - it then resizes the map to the size it
+    already had and reports success, and QEMU's block_resize fails with
+    "Cannot grow device files". The resize is re-issued until the map reports
+    the new size.
+  * Fixed: only the node running the guest resizes, so every other node kept
+    the old capacity and a migration handed the guest a device smaller than
+    its configuration claimed. activate_volume compares the array's size
+    against the local map and refreshes when the array's is larger.
+  * Changed: path() returns 'images' as its third value (the vtype PVE reads
+    there) rather than 'raw' (the format). dd is called by absolute path.
+  * These came from reading the jt-pve-storage-synology changelog defect by
+    defect and trying each against this codebase.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 08 Aug 2026 09:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.2~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

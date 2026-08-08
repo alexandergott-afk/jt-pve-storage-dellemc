@@ -327,8 +327,43 @@ sub sysfs_read_with_timeout {
         return undef;
     }
 
-    waitpid($pid, 0);
+    # Bounded, even here. The child has closed its end — that is why the read
+    # returned — so it is about to exit and this normally returns at once. A
+    # child that has been STOPPED rather than killed (a debugger attached, a
+    # cgroup freezer) is not dead and never will be on its own, and
+    # waitpid(..., 0) then blocks forever inside pvestatd, which is the exact
+    # hang this module exists to prevent. Rule 8 covered the path that kills a
+    # child; nobody had looked at the one where everything went well.
+    _reap_bounded($pid);
+
     return length($content) ? $content : undef;
+}
+
+# Wait briefly for a child that should already be finished, then make sure of
+# it. Returns 1 if it was reaped.
+sub _reap_bounded {
+    my ($pid, %opts) = @_;
+
+    my $deadline = time() + ($opts{wait} // 5);
+
+    while (1) {
+        return 1 if waitpid($pid, POSIX::WNOHANG()) == $pid;
+        last if time() >= $deadline;
+        select(undef, undef, undef, 0.05);
+    }
+
+    kill('KILL', $pid);
+
+    # SIGKILL reaches a stopped process too, but the transition to zombie is
+    # not instant; a single WNOHANG can race it.
+    for (1 .. 20) {
+        return 1 if waitpid($pid, POSIX::WNOHANG()) == $pid;
+        select(undef, undef, undef, 0.05);
+    }
+
+    warn "child pid $pid did not exit after being killed; leaving it\n";
+
+    return 0;
 }
 
 # ---------------------------------------------------------------------------
@@ -633,6 +668,18 @@ sub multipath_reload_throttled {
 # the volume and the SCSI paths were rescanned. Without this the map keeps
 # reporting the old size and QEMU's block_resize fails with "Cannot grow
 # device files" even though everything below it already grew.
+# Tell multipathd the map grew, and CHECK that it did.
+#
+# One `multipathd resize map` is not enough: it resizes from udev's view of
+# the paths, and that view can still be the old capacity when the command
+# runs, in which case multipathd cheerfully resizes the map to the size it
+# already had and reports success. The map then stays small, and QEMU's
+# block_resize fails with "Cannot grow device files" on a volume that did in
+# fact grow — the array is right, the guest is right, and the device in
+# between is wrong.
+#
+# With expect => <bytes> this re-issues the resize until the map reports at
+# least that size, or the deadline passes. Without it, one attempt, as before.
 sub multipath_resize_map {
     my ($device, %opts) = @_;
 
@@ -641,12 +688,37 @@ sub multipath_resize_map {
     my $name = _untaint_device_name(basename($device));
     return 0 unless $name;
 
-    eval {
-        _run_cmd([MULTIPATHD, 'resize', 'map', $name],
-            allow_nonzero => 1, ignore_errors => 1, timeout => $opts{timeout} // 15);
-    };
+    my $expect   = $opts{expect};
+    my $deadline = time() + ($opts{wait} // 20);
 
-    return $@ ? 0 : 1;
+    while (1) {
+        my $ok = eval {
+            _run_cmd([MULTIPATHD, 'resize', 'map', $name],
+                allow_nonzero => 1, ignore_errors => 1,
+                timeout => $opts{timeout} // 15);
+            1;
+        };
+
+        return 0 unless $ok;
+        return 1 unless defined $expect && $expect > 0;
+
+        my $have = device_size_bytes($device);
+        return 1 if defined $have && $have >= $expect;
+
+        # The paths are what multipathd resizes from, so give udev the time
+        # it needs rather than asking again immediately.
+        last if time() >= $deadline;
+        select(undef, undef, undef, 1);
+    }
+
+    my $have = device_size_bytes($device);
+    warn "the multipath map for '$name' still reports "
+       . (defined $have ? $have : 'an unreadable size')
+       . " bytes rather than $expect after the resize. The array has the new"
+       . " size; the guest will not see it until the map catches up. Rescan"
+       . " the paths, or restart the guest.\n";
+
+    return 0;
 }
 
 # Flush ONE map, named by device path, map name or WWID.

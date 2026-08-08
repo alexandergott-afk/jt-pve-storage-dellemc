@@ -2013,7 +2013,9 @@ sub volume_resize {
         if ($device && is_block_device($device)) {
             my $slaves = eval { get_multipath_slaves($device) } // [];
             eval { rescan_scsi_device($_) } for @$slaves;
-            eval { multipath_resize_map($device) };
+            # expect: the map has to actually reach the new size, not just be
+            # told about it. See multipath_resize_map.
+            eval { multipath_resize_map($device, expect => $size) };
             udev_refresh();
         }
     }
@@ -2130,6 +2132,8 @@ sub activate_volume {
         my $existing = eval { get_device_by_wwid($wwid) };
         if ($existing && is_block_device($existing)) {
             eval { $WWID_STATE->track_wwid($storeid, $wwid) };
+            $class->_reconcile_device_size($scfg, $storeid, $volname,
+                $existing, $vol);
             return 1;
         }
     }
@@ -2203,6 +2207,38 @@ sub _device_diagnostics {
     return $out;
 }
 
+# A map smaller than the volume the array reports.
+#
+# Only the node running the guest resizes: PVE calls volume_resize there and
+# nowhere else. Every other node that has this volume mapped keeps the old
+# capacity in its multipath map until something makes it re-read, and a
+# migration to such a node hands the guest a device SMALLER than its
+# configuration says it is — which the guest discovers by writing past the
+# end. This is the first thing every node does with a volume, so it is where
+# the two are compared.
+#
+# Only ever grows the local view, never shrinks it, and only acts when the
+# array's number is larger — an unreadable size does nothing.
+sub _reconcile_device_size {
+    my ($class, $scfg, $storeid, $volname, $device, $vol) = @_;
+
+    my $want = $vol->{size} or return;
+    my $have = device_size_bytes($device);
+    return unless defined $have && $have > 0;
+    return if $have >= $want;
+
+    warn "Storage '$storeid': the device for '$volname' is $have bytes but"
+       . " the array reports $want. Another node resized it; refreshing this"
+       . " node's view.\n";
+
+    my $slaves = eval { get_multipath_slaves($device) } // [];
+    eval { rescan_scsi_device($_) } for @$slaves;
+    eval { multipath_resize_map($device, expect => $want) };
+    eval { udev_refresh() };
+
+    return;
+}
+
 sub deactivate_volume {
     my ($class, $storeid, $scfg, $volname, $snapname, $cache) = @_;
     local $CURRENT_STOREID = $storeid;
@@ -2255,7 +2291,7 @@ sub path {
         # path() is called in contexts where the array may be unreachable and
         # a die would take out more than this one volume. Hand back the
         # canonical path; whoever opens it gets a clear ENOENT instead.
-        return wantarray ? ("/dev/mapper/unknown-$target", $parsed->{vmid}, 'raw')
+        return wantarray ? ("/dev/mapper/unknown-$target", $parsed->{vmid}, 'images')
                          : "/dev/mapper/unknown-$target";
     }
 
@@ -2269,7 +2305,7 @@ sub path {
 
     $device //= "/dev/mapper/$wwid";
 
-    return wantarray ? ($device, $parsed->{vmid}, 'raw') : $device;
+    return wantarray ? ($device, $parsed->{vmid}, 'images') : $device;
 }
 
 sub filesystem_path {
@@ -3120,7 +3156,7 @@ sub volume_export {
 
     PVE::Storage::Plugin::write_common_header($fh, $size);
     PVE::Tools::run_command(
-        ['dd', "if=$device", 'bs=64k', 'status=progress'],
+        ['/bin/dd', "if=$device", 'bs=64k', 'status=progress'],
         output => '>&' . fileno($fh),
     );
 
@@ -3194,7 +3230,7 @@ sub volume_import {
         # tenant's old data readable inside the imported disk. LVMPlugin
         # writes every byte too.
         PVE::Tools::run_command(
-            ['dd', "of=$device", 'bs=64k'],
+            ['/bin/dd', "of=$device", 'bs=64k'],
             input => '<&' . fileno($fh),
         );
     };

@@ -1670,4 +1670,62 @@ SKIP: {
         '... and the mapping is made to the object the node actually is');
 }
 
+{
+    # A map smaller than the volume the array reports.
+    #
+    # Only the node running the guest resizes; every other node keeps the old
+    # capacity in its multipath map until something makes it re-read. A
+    # migration to such a node hands the guest a device SMALLER than its
+    # configuration says, which the guest finds out by writing past the end.
+    Test::Plugin->reset_state();
+
+    my @rescanned;
+    my @resized;
+    my $local_size = 4 * 1024 ** 3;
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+    my $BB = 'PVE::Storage::Custom::DellEMC::Common::BlockBase';
+    local *{"${BB}::device_size_bytes"}    = sub { $local_size };
+    local *{"${BB}::get_multipath_slaves"} = sub { ['/dev/sdb', '/dev/sdc'] };
+    local *{"${BB}::rescan_scsi_device"}   = sub { push @rescanned, $_[0]; 1 };
+    local *{"${BB}::multipath_resize_map"} = sub {
+        my ($dev, %o) = @_; push @resized, $o{expect}; return 1;
+    };
+    local *{"${BB}::udev_refresh"} = sub { 1 };
+
+    my @w;
+    {
+        local $SIG{__WARN__} = sub { push @w, $_[0] };
+        $BB->can('_reconcile_device_size')->('Test::Plugin', {}, 't1',
+            'vm-100-disk-0', '/dev/mapper/x', { size => 8 * 1024 ** 3 });
+    }
+
+    is_deeply(\@rescanned, ['/dev/sdb', '/dev/sdc'],
+        'every path under the map is rescanned when the array says the volume'
+      . ' is bigger than this node thinks');
+    is_deeply(\@resized, [8 * 1024 ** 3],
+        '... and the map is resized to the size the array reports, with the'
+      . ' expectation checked rather than assumed');
+    like(join('', @w), qr/Another node resized it/,
+        '... and the operator is told why');
+
+    # The ordinary case does nothing at all: this runs on every activation.
+    @rescanned = (); @resized = ();
+    $local_size = 8 * 1024 ** 3;
+    $BB->can('_reconcile_device_size')->('Test::Plugin', {}, 't1',
+        'vm-100-disk-0', '/dev/mapper/x', { size => 8 * 1024 ** 3 });
+    is_deeply([@rescanned, @resized], [],
+        'a map that already matches costs nothing — this is on the VM start'
+      . ' path');
+
+    # And it never shrinks the local view.
+    $local_size = 8 * 1024 ** 3;
+    $BB->can('_reconcile_device_size')->('Test::Plugin', {}, 't1',
+        'vm-100-disk-0', '/dev/mapper/x', { size => 4 * 1024 ** 3 });
+    is_deeply([@rescanned, @resized], [],
+        'a map LARGER than the array reports is left alone: shrinking a'
+      . ' device under a guest is not a repair');
+}
+
 done_testing();
