@@ -7,6 +7,21 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.7~beta1] - 2026-08-09
+
+### Changed
+- **Chinese now says 儲存伺服器 for an array, never 陣列.** The same term the
+  related synology project uses, and the one that does not read as a
+  programming array on a page that also talks about JSON listings. 463
+  occurrences across every Chinese document, checked first for the
+  programming sense — there was none. The English keeps *array*: that is what
+  Dell calls a PowerStore.
+
+  `t/11-imports.t` keeps it that way. Its first version could not: it matched
+  a literal Chinese term against text read through an encoding layer, so the
+  pattern was bytes and the content was characters, and 152 assertions passed
+  against a file with the forbidden term appended on purpose.
+
 ## [0.8.6~beta1] - 2026-08-09
 
 ### Fixed

@@ -35,7 +35,7 @@ journalctl -t pvestatd -n 50 | grep dellpowerstore
 
 1. **帳號密碼。** journal 中會看到 `HTTP 401`。請確認 `dell-username` 與 `dell-password`，以及該帳號在 PowerStore Manager 中沒有被鎖定。
 2. **管理網路。** 出現的是逾時而不是 401。請從「該台節點」確認連線是否可達。
-3. **陣列回應慢。** 健康路徑只給 `dell-status-timeout` 秒（預設 5 秒）且只嘗試一次。負載很重的陣列可能讓儲存在某一次輪詢變成 `inactive`，下一次就恢復；若持續發生再調高逾時。
+3. **儲存伺服器回應慢。** 健康路徑只給 `dell-status-timeout` 秒（預設 5 秒）且只嘗試一次。負載很重的儲存伺服器可能讓儲存在某一次輪詢變成 `inactive`，下一次就恢復；若持續發生再調高逾時。
 4. **沒有可用路徑。** iSCSI 情況下，若沒有任何 portal 可達，`activate_storage` 會直接失敗，訊息中會列出它嘗試過哪些。
 
 如果**其他**儲存也在同一時間變成 `inactive`，請懷疑是這個儲存太慢：PVE 是依序輪詢儲存的，一個慢的會拖累其他。`dell-status-timeout` 存在的目的就是限制這件事。
@@ -44,7 +44,7 @@ journalctl -t pvestatd -n 50 | grep dellpowerstore
 
 ## 過一段時間之後，新磁碟就掃不到了
 
-症狀是：陣列上有建立 volume、對應也存在，但主機端始終沒有出現裝置；舊的 volume 仍然正常。
+症狀是：儲存伺服器上有建立 volume、對應也存在，但主機端始終沒有出現裝置；舊的 volume 仍然正常。
 
 PowerStore 對 UI 與 REST／PSTCLI **各自維護一組自動 LUN ID 序列**。REST 那一組從 200 開始，而且只會往上加，ID 不會重用。PVE 叢集會不斷地掛載與卸載，於是那個計數器一路往上爬，直到超過主機 SCSI 層會掃描的範圍，之後的每一顆新磁碟都看不到。
 
@@ -57,7 +57,7 @@ PowerStore 對 UI 與 REST／PSTCLI **各自維護一組自動 LUN ID 序列**�
 
 若發現有本外掛啟用之前留下的高 ID，請把那些 volume 卸載後重新掛載，讓它們取得較低的 ID。
 
-Dell 自己的知識庫文章（[KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/)）替這道天花板標出了實際數字：ESXi 預設掃描 LUN ID 0～1023，而 **Linux 搭配 Emulex FC 驅動只掃描 0～255**。這正是本外掛止於 255、而不是止於陣列所允許上限的原因 —— 主機不會掃描的 LUN ID，對 PVE 而言就等於那個 volume 不存在，而且任何一端都不會回報錯誤。
+Dell 自己的知識庫文章（[KB 000199943](https://www.dell.com/support/kbdoc/en-us/000199943/)）替這道天花板標出了實際數字：ESXi 預設掃描 LUN ID 0～1023，而 **Linux 搭配 Emulex FC 驅動只掃描 0～255**。這正是本外掛止於 255、而不是止於儲存伺服器所允許上限的原因 —— 主機不會掃描的 LUN ID，對 PVE 而言就等於那個 volume 不存在，而且任何一端都不會回報錯誤。
 
 同一篇文章也給了「ID 已經爬高、又不想重新掛載」時的解法：建立一個 OS 類型為 **Windows** 的 host 物件，PowerStore 會把它限制在 LUN ID 0～254，於是又會開始重複使用低位 ID。
 
@@ -92,7 +92,7 @@ global_filter = [ "r|/dev/mapper/36.*|", "r|/dev/dm-.*|", "a|.*|" ]
 
 ## 所有路徑都失效的殘留 multipath 裝置
 
-從其他節點刪掉的 volume，會在本節點留下一個指向已不存在儲存的 map。外掛的 orphan 清理機制會自動移除，但必須同時滿足：該 WWID 已追蹤超過寬限期（10 分鐘）**且**連續三次輪詢都沒在陣列上出現，而且裝置處於閒置狀態。這些防護存在的理由是：清掉一個實際仍在使用的裝置，等於毀掉一台執行中 VM 的磁碟。
+從其他節點刪掉的 volume，會在本節點留下一個指向已不存在儲存的 map。外掛的 orphan 清理機制會自動移除，但必須同時滿足：該 WWID 已追蹤超過寬限期（10 分鐘）**且**連續三次輪詢都沒在儲存伺服器上出現，而且裝置處於閒置狀態。這些防護存在的理由是：清掉一個實際仍在使用的裝置，等於毀掉一台執行中 VM 的磁碟。
 
 外掛不認得的裝置只會被回報，不會被移除：
 
@@ -117,14 +117,14 @@ dmsetup remove --force --retry <wwid>
 
 ### 手動移除儲存之後殘留的 sd 路徑
 
-把 map flush 掉並不是全部。一顆 LUN 每條路徑都會在本節點形成一個 `/dev/sd*`，而在陣列不再提供它之後，這些裝置仍會留在 kernel 裡 —— 沒有任何機制會自動移除 sd 裝置。它們平時是安靜的，直到 multipathd 被 reload：此時它會試著為每一個殘留裝置建立 map，journal 就會出現：
+把 map flush 掉並不是全部。一顆 LUN 每條路徑都會在本節點形成一個 `/dev/sd*`，而在儲存伺服器不再提供它之後，這些裝置仍會留在 kernel 裡 —— 沒有任何機制會自動移除 sd 裝置。它們平時是安靜的，直到 multipathd 被 reload：此時它會試著為每一個殘留裝置建立 map，journal 就會出現：
 
 ```
 device-mapper: table: multipath: error getting device (-EBUSY)
 multipathd: dm_addmap: libdm task=0 error: Device or resource busy
 ```
 
-判斷特徵是：某個 WWID 已經沒有 `/dev/mapper` 項目、`dmsetup ls` 也查不到，但 `/dev/disk/by-id/scsi-*` 底下還在。外掛只會清理自己刪掉的 volume；在陣列端手動移除的 LUN、或整台儲存下架，都不在這個範圍內。請在**每一台節點**上逐條移除：
+判斷特徵是：某個 WWID 已經沒有 `/dev/mapper` 項目、`dmsetup ls` 也查不到，但 `/dev/disk/by-id/scsi-*` 底下還在。外掛只會清理自己刪掉的 volume；在儲存伺服器端手動移除的 LUN、或整台儲存下架，都不在這個範圍內。請在**每一台節點**上逐條移除：
 
 ```bash
 # 先確認沒有任何東西在使用它。
@@ -196,7 +196,7 @@ pve-dell-config-get -l ps1 100
 pve-dell-config-get ps1 100 before-upgrade > /etc/pve/qemu-server/100.conf
 ```
 
-當 `/etc/pve` 本身已經不存在，或 pvedaemon 起不來時，這個工具可以直接跟陣列溝通：
+當 `/etc/pve` 本身已經不存在，或 pvedaemon 起不來時，這個工具可以直接跟儲存伺服器溝通：
 
 ```bash
 pve-dell-config-get -r --portal 10.0.0.5 --username pveadmin \
@@ -209,25 +209,25 @@ pve-dell-config-get -r --portal 10.0.0.5 --username pveadmin \
 
 ## 完整複製（Full Clone）很慢
 
-這是預期行為，也無法從外掛這端解決。PVE 對完整複製的實作是 `alloc_image` 加上 `qemu-img` 逐區塊複製，完全不會呼叫外掛的 `clone_image`。想要陣列端的即時精簡複製，請使用**連結複製（Linked Clone）**。
+這是預期行為，也無法從外掛這端解決。PVE 對完整複製的實作是 `alloc_image` 加上 `qemu-img` 逐區塊複製，完全不會呼叫外掛的 `clone_image`。想要儲存伺服器端的即時精簡複製，請使用**連結複製（Linked Clone）**。
 
 ---
 
 ## 刪除範本失敗
 
-範本的標記快照是所有由它衍生的連結複製的來源。只要那些複製還存在，陣列就會拒絕刪除，外掛會把相依物件列出來。請先刪掉那些複製。
+範本的標記快照是所有由它衍生的連結複製的來源。只要那些複製還存在，儲存伺服器就會拒絕刪除，外掛會把相依物件列出來。請先刪掉那些複製。
 
 ---
 
 ## 加入 PowerStore 時出現 `the format of the port name ... is incorrect`
 
 0.7.96 已修正：FC 的 WWPN 以無冒號的形式送出，而 PowerStore 要的是
-`21:00:f4:c7:aa:a0:a2:50`。陣列在「port name」的位置回填的是 host 名稱，所以那則訊息
+`21:00:f4:c7:aa:a0:a2:50`。儲存伺服器在「port name」的位置回填的是 host 名稱，所以那則訊息
 指向了錯的東西。請升級。
 
 ## `this node's initiators already belong to another host object`
 
-PowerStore 規定一個 initiator 只能屬於一個 host 物件，而陣列上通常早就有一個屬於這台
+PowerStore 規定一個 initiator 只能屬於一個 host 物件，而儲存伺服器上通常早就有一個屬於這台
 節點的 —— 多半是當初做 fabric 分區時建立的。自 0.7.98 起，外掛會直接使用那個物件而
 不是另建一個，所以看到這則訊息，代表遇到了它不會替您決定的兩種情況之一：
 

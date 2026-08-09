@@ -4,15 +4,15 @@ English: [TESTING.md](TESTING.md)
 
 ## 已經在實機上觀察到的部分
 
-已經有一台陣列跑過這個外掛：**PowerVault ME4024，系統名稱 MIL-ME4024，韌體
-`GT280R011-01`，走 Fibre Channel**。本節所有內容都是從那台陣列上讀出來的，而
+已經有一台儲存伺服器跑過這個外掛：**PowerVault ME4024，系統名稱 MIL-ME4024，韌體
+`GT280R011-01`，走 Fibre Channel**。本節所有內容都是從那台儲存伺服器上讀出來的，而
 不是從文件推出來的；原始回應逐字保留在 `t/fixtures/powervault/`，讓測試套件
-是拿真實陣列送出的東西在驗。
+是拿真實儲存伺服器送出的東西在驗。
 
 | 觀察到的事實 | 造成的結果 | 修正版本 |
 |---|---|---|
 | `GET /show/system` 回的是 `text/*`，且內含非 ASCII 位元組 | `pvesm add` 直接失敗，訊息是 `Wide character in subroutine entry`。`decoded_content` 回傳的是字元，而 `decode_json` 要的是位元組 | 0.7.62 |
-| `GET /show/host-groups` 最上層只有 `host-group`；host 巢狀在 `host`（單數）底下，initiator 再巢狀在 `initiator` 底下 | host 查詢完全落空，外掛每次輪詢都重建 host，陣列以 `-10389` 拒絕，儲存一直停在 inactive | 0.7.63 |
+| `GET /show/host-groups` 最上層只有 `host-group`；host 巢狀在 `host`（單數）底下，initiator 再巢狀在 `initiator` 底下 | host 查詢完全落空，外掛每次輪詢都重建 host，儲存伺服器以 `-10389` 拒絕，儲存一直停在 inactive | 0.7.63 |
 | `GET /show/pools` 的可用空間欄位是 `total-avail` / `total-avail-numeric`，沒有 `avail` | 每個儲存池都讀成 100% 已用，而 PVE 不會配置到已滿的儲存池裡。儲存池 B 實測 98.56% 已用，那是真實數字 | 0.7.63 |
 | `-10389` 是「The specified host name is already in use」的回傳碼 | 現在把它當成「host 確實存在」的證據，只讀代碼、絕不讀訊息文字 | 0.7.63 |
 | `map`／`unmap` 收的是識別碼而不是名稱：`<名稱>` 是 **initiator**、`<名稱>.*` 是 host、`<名稱>.*.*` 是 host group | 送出的是裸的 host 名稱，被當成 initiator 去查，以 `-10386` 拒絕。任何磁碟區都無法對應 | 0.7.65 |
@@ -21,28 +21,28 @@ English: [TESTING.md](TESTING.md)
 | 即使 `map` 指定的是 host，只要該 host 是某個群組的唯一成員，對應仍可能被記錄在**群組層級** | 群組層級的資料列會替群組內每一個 host 佔住那個 LUN | 0.7.65 |
 | WWID 換算規則：`3` + `6`(NAA) + OUI `00c0ff` + `000` + 磁碟區序號第 7–12 碼 + 序號後 16 碼。序號中的 `0000` 是右補零，WWID 對應位置卻是左補零，方向相反 | 外掛算出的 WWID 與 `multipath -ll`、`/dev/mapper` 在四顆磁碟區上完全吻合 | 原本就正確 |
 | `unmap volume initiator <host>.* <volume>` | 原始碼中標註為 NOT VERIFIED | 已驗證 |
-| host 物件要的 WWPN 寫法：純十六進位、以逗號分隔（`100000109b643bca,100000109b643c04`） | 陣列接受 | 已驗證 |
+| host 物件要的 WWPN 寫法：純十六進位、以逗號分隔（`100000109b643bca,100000109b643c04`） | 儲存伺服器接受 | 已驗證 |
 | 路徑中經過百分號編碼的 `*`，在 CLI 看到之前就會被解碼 | 這就是 URL 跳脫不需要為 `.*` 後綴開例外的原因 | 已驗證 |
 
-### 在該陣列上跑過的煙霧測試
+### 在該儲存伺服器上跑過的煙霧測試
 
-上述三個缺陷修好之後，`docs/FIRST_RUN` 的每一項都在那台陣列上通過：`pvesm
+上述三個缺陷修好之後，`docs/FIRST_RUN` 的每一項都在那台儲存伺服器上通過：`pvesm
 status`（3.2 秒，容量與 GUI 一致）、連續數顆 `pvesm alloc`（LUN 4／5／6 依序
 遞增）、對應與 dm-multipath（兩條路徑，prio 50／10）、透過 `/dev/mapper` 的
 `dd` 讀寫（寫 175 MB/s、讀 344 MB/s，並以雜湊驗證）、`qm snapshot`、
-`qm rollback`、`qm delsnapshot`、`qm template`、秒級完成的連結複製、陣列正確
+`qm rollback`、`qm delsnapshot`、`qm template`、秒級完成的連結複製、儲存伺服器正確
 拒絕刪除仍有存活複製的範本（`-3442`），以及解除對應、刪除與本機裝置清理。
 
 **這是本專案史上第一次端到端完整執行。** 它不代表另外兩個系列已經驗證，也不
-代表 iSCSI 或 SAS 已經驗證 —— 那台陣列走的是 Fibre Channel。
+代表 iSCSI 或 SAS 已經驗證 —— 那台儲存伺服器走的是 Fibre Channel。
 
-以下仍未從該陣列上抓到，因此仍屬推測：
+以下仍未從該儲存伺服器上抓到，因此仍屬推測：
 
 | 未解的問題 | 為什麼重要 | 目前如何因應 |
 |---|---|---|
 | **不屬於任何 host group** 的 host 在 JSON 中長什麼樣。CLI 會把 ungrouped host 印在另一個區塊，但對應的鍵名不明 | 單節點安裝時，host 不在任何 group 裡才是常態 | 鍵名清單已經不是決定因素。ME 回應裡的每個物件都會在 `object-name` 說出自己的型別，只要那一列寫著 `"object-name": "host"`，不論它掛在哪個鍵底下都會被收進來 |
-| 位於 host group **內**的 host，究竟能不能被單獨對應。在該陣列上，一個身為群組唯一成員的 host，其對應一律被記錄在群組層級 | 若部署方式是把 host 放進群組，可能需要「群組層級」的比對，而不只是 host 層級 | 群組層級的資料列會被計為佔用該 LUN，因此不會有同一個號碼被發兩次。這種部署其餘部分是否可用，尚未測試 |
-| `qm destroy` 中途失敗時應該怎麼處理 —— 陣列正確拒絕刪除仍有存活複製的範本，但 PVE 此時已經移除虛擬機設定檔，於是磁碟區失去了所有指向它的參照 | 會留下需要手動 `pvesm free` 的孤兒 | 孤兒回收機制會回報它；不會在無人看管的情況下刪除 |
+| 位於 host group **內**的 host，究竟能不能被單獨對應。在該儲存伺服器上，一個身為群組唯一成員的 host，其對應一律被記錄在群組層級 | 若部署方式是把 host 放進群組，可能需要「群組層級」的比對，而不只是 host 層級 | 群組層級的資料列會被計為佔用該 LUN，因此不會有同一個號碼被發兩次。這種部署其餘部分是否可用，尚未測試 |
+| `qm destroy` 中途失敗時應該怎麼處理 —— 儲存伺服器正確拒絕刪除仍有存活複製的範本，但 PVE 此時已經移除虛擬機設定檔，於是磁碟區失去了所有指向它的參照 | 會留下需要手動 `pvesm free` 的孤兒 | 孤兒回收機制會回報它；不會在無人看管的情況下刪除 |
 
 ## 實機驗證狀態
 
@@ -70,23 +70,23 @@ status`（3.2 秒，容量與 GUI 一致）、連續數顆 `pvesm alloc`（LUN 4
 
 ### 該去哪裡確認
 
-陣列本身就會提供自己的 API 參考。PowerStore 是 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，本外掛用到的每一個路徑都列在那裡，而且會直接產生對應的 `curl` 指令；請在信任任何端點之前先逐一比對。Dell 已公開的文件中，對於有文件的物件型別顯示的是相同的結構 —— `POST /volume_group/{id}/clone`、`POST /file_system/{id}/snapshot` —— 與這裡使用的 `/volume/{id}/clone`、`/volume/{id}/snapshot` 一致，但「與同類物件的寫法一致」並不等於已驗證。
+儲存伺服器本身就會提供自己的 API 參考。PowerStore 是 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，本外掛用到的每一個路徑都列在那裡，而且會直接產生對應的 `curl` 指令；請在信任任何端點之前先逐一比對。Dell 已公開的文件中，對於有文件的物件型別顯示的是相同的結構 —— `POST /volume_group/{id}/clone`、`POST /file_system/{id}/snapshot` —— 與這裡使用的 `/volume/{id}/clone`、`/volume/{id}/snapshot` 一致，但「與同類物件的寫法一致」並不等於已驗證。
 
 PowerVault 的參考則是 ME4／ME5 Series CLI Reference Guide，而且可以先透過 SSH 逐條試跑指令，再交給外掛以 HTTPS 送出。
 
 ### 最該優先驗證的四項
 
-只要把本外掛指向任何一台陣列，請先做這四件事。每一項都很便宜，而每一項一旦錯了都是無聲的失敗。
+只要把本外掛指向任何一台儲存伺服器，請先做這四件事。每一項都很便宜，而每一項一旦錯了都是無聲的失敗。
 
 ```bash
-# 1. 端點與欄位名稱：陣列自己就有文件
+# 1. 端點與欄位名稱：儲存伺服器自己就有文件
 #    https://<mgmt-ip>/swaggerui
 
 # 2. SCSI vendor 與 product 字串，它們決定外掛「會去碰哪些裝置」
 sg_inq /dev/sdX | head -5
 multipathd show config | grep -A3 -i dell
 
-# 3. WWN 轉 WWID。陣列回報的是 naa.68ccf098...，兩者必須對得起來。
+# 3. WWN 轉 WWID。儲存伺服器回報的是 naa.68ccf098...，兩者必須對得起來。
 /lib/udev/scsi_id -g -u /dev/sdX
 
 # 4. LUN ID 長期下來是否維持在低位
@@ -108,10 +108,10 @@ ME4 與 ME5 系列不是 REST 物件模型，而是把 CLI 透過 HTTPS 開放�
 | 標頭 `sessionKey` 與 `dataType: json` | 同上 |
 | session 閒置 30 分鐘逾時 | 同上 |
 | 指令 URL 形式 `https://<ip>/api/<verb>/<object>/<args>` | 同上 |
-| 回應帶有 `status` 陣列，含 `response-type`、`response`、`return-code` | Using JSON API output |
+| 回應帶有 `status` 儲存伺服器，含 `response-type`、`response`、`return-code` | Using JSON API output |
 | `create volume [pool] [volume-group] size <n>[B\|GiB\|…] <name>` | create volume |
 | Volume 名稱上限 32 bytes，不可含 `" , . < \` | create volume |
-| 容量對齊 4 MiB，且由陣列**向下**取整 | create volume、expand volume |
+| 容量對齊 4 MiB，且由儲存伺服器**向下**取整 | create volume、expand volume |
 | `expand volume size <amount> <volume>` —— 這個數值是**增量** | expand volume |
 | 不支援縮小 | expand volume |
 | `map volume [access rw] initiator <hosts> [lun <n>] <volumes>`；指定 initiator 時必須給 LUN | map volume |
@@ -145,7 +145,7 @@ ME5：map volume [access ...] initiator <initiators> [lun <LUN>] <volumes>
 ME4：map volume <volumes> [access ...] initiator <initiators> [lun <LUN>]
 ```
 
-外掛會先送 ME5 的形式，若陣列拒絕就退回 ME4 的形式，因此兩者都能運作；在
+外掛會先送 ME5 的形式，若儲存伺服器拒絕就退回 ME4 的形式，因此兩者都能運作；在
 ME4 上，journal 會記錄它最後採用了哪一種順序。**第一次上實機時請檢查那一
 行** —— 那是確認對應路徑行為符合文件最省力的方式。
 
@@ -165,10 +165,10 @@ ME4 上，journal 會記錄它最後採用了哪一種順序。**第一次上實
 | SCSI vendor 與 product 字串（`DellEMC` / `ME[45]…`） | `DellPowerVaultPlugin` |
 | WWN 轉 WWID | `wwn_to_wwid` |
 
-在陣列上用一個指令就能確認語法：
+在儲存伺服器上用一個指令就能確認語法：
 
 ```bash
-# 透過 SSH 連到陣列自己的 CLI
+# 透過 SSH 連到儲存伺服器自己的 CLI
 help delete volumes
 help unmap volume
 help create host
@@ -179,14 +179,14 @@ help create host
 
 在第一次上實機之前找到的缺陷中，最嚴重的兩個都是「欄位名稱根本不存在」：PowerVault 的儲存池容量讀的是 `avail-size`，而 pools basetype 記載的是 `total-avail`，於是每個儲存池看起來都是滿的；而對應狀態的檢查，是拿 host 名稱去比對一份根本沒有 host 名稱欄位的清單。這兩者除了「行為說不通」之外都不會有任何徵兆。
 
-因此以下列出 API 客戶端讀取的每一個欄位。第一次上機時，請拿它跟陣列實際回傳的內容比對 —— PowerStore 用 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，PowerVault 用 SSH 直接下指令，PowerFlex 直接打 API。
+因此以下列出 API 客戶端讀取的每一個欄位。第一次上機時，請拿它跟儲存伺服器實際回傳的內容比對 —— PowerStore 用 `https://<mgmt-ip>/swaggerui` 的 Swagger UI，PowerVault 用 SSH 直接下指令，PowerFlex 直接打 API。
 
 ### PowerVault ME（出自 ME4／ME5 CLI Reference）
 
 | 欄位 | 用途 | 狀態 |
 |---|---|---|
 | `total-size-numeric` | 儲存池容量，單位為 512 位元組區塊 | 文件記載為 **Total Size** |
-| `total-avail-numeric` | 儲存池可用空間 | pools basetype 記載的是 `total-avail`；**Avail** 是 `show pools` 印出來的欄位標題。已在 ME4024 上確認：該陣列沒有標題那個拼法的欄位，於是每個儲存池都讀成 100% 已用 |
+| `total-avail-numeric` | 儲存池可用空間 | pools basetype 記載的是 `total-avail`；**Avail** 是 `show pools` 印出來的欄位標題。已在 ME4024 上確認：該儲存伺服器沒有標題那個拼法的欄位，於是每個儲存池都讀成 100% 已用 |
 | `avail-numeric`、`avail-size-numeric`、`available-size-numeric` | 在 `total-avail` 之後才嘗試 | 舊拼法，都不是文件記載的那一個 |
 | `size-numeric`（volume） | volume 大小 | volumes basetype 記載 `size` 就是該 volume 的容量 |
 | `allocated-size-numeric` | volume 已使用空間 | volumes basetype 記載為 `allocated-size` |
@@ -197,7 +197,7 @@ help create host
 | `identifier` | 一列對應屬於哪個 initiator（WWPN 或 IQN） | `volume-view-mappings`，已記載 |
 | `lun`、`access`、`ports` | 對應的 LUN、存取模式與連接埠 | `volume-view-mappings`，已記載 |
 | `access-numeric` | 用來分辨真實對應與 default mapping 的佔位列 | 已在 ME4024 上確認：`3` 為 read-write、`1` 為 read-only，**佔位列是 `0`**。即使沒有設定 default mapping，每顆磁碟區都會帶一列這種佔位列，其 `identifier` 是顯示字串 `all other initiators`、`nickname` 為空。CLI 的表格輸出不會顯示它，只有 JSON 有 |
-| `volume-view`、`volume-group-view` | `show maps` 回應的最上層，每顆磁碟區一筆 | 已在 ME4024 上確認：對應資料列巢狀在其底下的 `volume-view-mappings`，最上層沒有任何對應陣列。巢狀列的 `object-name` 自稱 `host-view`，所以這份清單是依鍵名走訪，而不是依資料列自稱的型別 |
+| `volume-view`、`volume-group-view` | `show maps` 回應的最上層，每顆磁碟區一筆 | 已在 ME4024 上確認：對應資料列巢狀在其底下的 `volume-view-mappings`，最上層沒有任何對應儲存伺服器。巢狀列的 `object-name` 自稱 `host-view`，所以這份清單是依鍵名走訪，而不是依資料列自稱的型別 |
 | `volume-name`、`volume-serial` | 巢狀的對應資料列屬於哪顆磁碟區 | 已在 ME4024 上確認。資料列本身只以 `durable-id` 指向父物件，因此identity 由外層的 view 帶下來 —— 並用來檢查 `show maps <volume>` 是否真的照要求過濾了 |
 | `media` | `iSCSI`、`FC(P)`、`FC(L)`、`SAS` | 文件記載為 **Media** |
 | `target-id` | iSCSI 連接埠的 IQN | 文件記載為 **Target ID** |
@@ -207,7 +207,7 @@ help create host
 | `name-numeric`、`status-numeric` | 主要欄位不存在時嘗試的替代拼法 | — |
 | `port-type`、`primary-ip-address` | Media 與 IP Address 的舊拼法 | — |
 | `host-id`、`host`、`name` | 對應資料列可能用來表示「屬於誰」的其他拼法 | — |
-| `host`（巢狀）、`hosts`、`host-view` | `show host-groups` 回應中放置 host 資料列的鍵 | 回應是一棵樹：host group 在最上層，host **巢狀**在其中，initiator 再巢狀一層。已在 ME4024 上確認：只讀最上層的 `hosts` 陣列會什麼都找不到，外掛因此看不見自己剛建立的 host |
+| `host`（巢狀）、`hosts`、`host-view` | `show host-groups` 回應中放置 host 資料列的鍵 | 回應是一棵樹：host group 在最上層，host **巢狀**在其中，initiator 再巢狀一層。已在 ME4024 上確認：只讀最上層的 `hosts` 儲存伺服器會什麼都找不到，外掛因此看不見自己剛建立的 host |
 | `name`、`host-name` | host 自己的名稱 | host basetype 記載為 `name`；`host-name` 是 host-view 的拼法 |
 | `durable-id` | 在樹中重複走到同一列時用來辨識是同一個 host | 文件記載 |
 | `return-code` | 指令是否被拒絕，以及原因 | 各指令頁面均有記載；`-10389` 是「host 名稱已被使用」。判斷只讀這個代碼，絕不讀訊息文字 |
@@ -218,7 +218,7 @@ help create host
 
 以下每一個 URI、請求內容與欄位名稱，都是從 `github.com/dell/gounity` 讀出來的
 —— 那是 Dell 的 CSI driver 實際用來打 Unity 的客戶端 —— 而不是文件敘述。兩者
-不一致時，以程式碼為準。**沒有任何一項在 Unity 陣列上執行過。**
+不一致時，以程式碼為準。**沒有任何一項在 Unity 儲存伺服器上執行過。**
 
 | 欄位 | 讀來做什麼 | 狀態 |
 |---|---|---|
@@ -246,13 +246,13 @@ help create host
 | SCSI 的 vendor 與 product 字串。`DGC` / `VRAID` 是承襲自 CLARiiON 的寫法 | **已從「前置條件」降級為「第一項確認」。** 裝置探索以 WWID 為準、完全不看 vendor，而 multipath-tools 自己的內建表就帶著 `vendor "^DGC"`，所以即使本外掛的字串是錯的，map 仍會建立、裝置仍找得到。字串錯的代價是調校用的 drop-in 不生效（改用核心的 DGC 預設）以及 vendor 過濾的殘留路徑清掃 —— 是降級，不是故障。第一次接觸時仍請以 `sg_inq /dev/sdX` 確認並回報結果 |
 | WWN 轉 WWID 的換算 | 這一項錯了，裝置探索會完全無法運作 |
 | `POST /instances/snap/<id>/action/restore` | 唯一**不在** Dell 客戶端裡的破壞性呼叫，因為 CSI driver 從來不需要倒回 |
-| 陣列對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |
+| 儲存伺服器對 LUN 大小是無條件進位還是捨去 | 本外掛會先向上對齊到 8 KiB，因此無論哪一種都不會出問題 |
 | Unisphere 接受的最小 LUN 容量 | 假設為 1 GiB，比查到的任何參考值都再向上取；極小的磁碟區（EFI disk 與 TPM state，各 4 MiB）會被向上補到這個值 —— 取太大只是浪費空間，取太小則會讓 `qm create` 整個失敗 |
-| 一個 base resource 支援多少個精簡複製、一個 LUN family 能帶多少快照 | Dell 白皮書顯示兩者都有上限；連結複製數超過上限的範本會被陣列拒絕。用戶端不做強制 —— 陣列的拒絕才是權威 |
-| 快照 restore 的 `copyName` 是否真的為自動備份快照命名 | Dell 白皮書記載每次 restore 都會產生一個備份快照；若 `copyName` 被忽略，備份會拿到陣列自取的名稱，快照清理認不得它，磁碟區從此刪不掉。**第一次 `qm rollback` 之後，請檢查有沒有名為 `<磁碟區>.pve-snap-rollback*` 的快照** |
+| 一個 base resource 支援多少個精簡複製、一個 LUN family 能帶多少快照 | Dell 白皮書顯示兩者都有上限；連結複製數超過上限的範本會被儲存伺服器拒絕。用戶端不做強制 —— 儲存伺服器的拒絕才是權威 |
+| 快照 restore 的 `copyName` 是否真的為自動備份快照命名 | Dell 白皮書記載每次 restore 都會產生一個備份快照；若 `copyName` 被忽略，備份會拿到儲存伺服器自取的名稱，快照清理認不得它，磁碟區從此刪不掉。**第一次 `qm rollback` 之後，請檢查有沒有名為 `<磁碟區>.pve-snap-rollback*` 的快照** |
 | HLU 能不能指定 | 沒有任何東西依賴它；Unity 自行配發 |
-| 陣列跑的是哪種 failover 模式（ALUA／PNR）。multipath 設定跟隨核心的 DGC 條目 —— `prio emc`、checker `emc_clariion` —— 兩種模式都能判，但 `multipath -ll` 裡的兩個優先權群組才是證明 | 第一顆 LUN 對應之後，`multipath -ll` 必須顯示兩個不同優先權的路徑群組、I/O 落在擁有 SP 的那組；若 Unisphere 裡看到 LUN 在兩個 SP 之間不斷 *trespass*，表示設定沒有生效 |
-| iSCSI portal 查詢：`iscsiPortal` 型別、`ipAddress` 與 `iscsiNode` 欄位、以及 node 名稱是否就是目標 IQN | 客戶的陣列走 FC，所以這條路徑會是最晚遇到實機的；在那之前，iSCSI 的 Unity 儲存會在 portal 探索階段以可讀的錯誤失敗，而不是錯誤地登入 |
+| 儲存伺服器跑的是哪種 failover 模式（ALUA／PNR）。multipath 設定跟隨核心的 DGC 條目 —— `prio emc`、checker `emc_clariion` —— 兩種模式都能判，但 `multipath -ll` 裡的兩個優先權群組才是證明 | 第一顆 LUN 對應之後，`multipath -ll` 必須顯示兩個不同優先權的路徑群組、I/O 落在擁有 SP 的那組；若 Unisphere 裡看到 LUN 在兩個 SP 之間不斷 *trespass*，表示設定沒有生效 |
+| iSCSI portal 查詢：`iscsiPortal` 型別、`ipAddress` 與 `iscsiNode` 欄位、以及 node 名稱是否就是目標 IQN | 客戶的儲存伺服器走 FC，所以這條路徑會是最晚遇到實機的；在那之前，iSCSI 的 Unity 儲存會在 portal 探索階段以可讀的錯誤失敗，而不是錯誤地登入 |
 
 ### 沒有 Unity 也能測 Unity
 
@@ -275,7 +275,7 @@ WWID 是否對得上一顆裝置、對應是否真的送達主機。它能做的
 驗證傳輸層、認證、回應結構與請求內容 —— 而在有硬體之前，這裡沒有其他東西做得到。
 
 它已經證明了自己的價值：這個模擬器對 `createLun` 回的是 204 且沒有內容，而那讓
-`volume_create` 靜靜回傳了 `undef`。某些韌體的真實陣列可能也是如此，或以非同步
+`volume_create` 靜靜回傳了 `undef`。某些韌體的真實儲存伺服器可能也是如此，或以非同步
 job 回應。現在每一個建立動作都會退回「用剛才那個名稱查一次」，而如果連那樣都無法
 回答，就會大聲失敗。
 
@@ -314,9 +314,9 @@ host、加入 initiator、metrics/generate）：每一個線上鍵都與 Dell �
 | 部分結果 | 集合超過 limit 時回應 `206 Partial Content`，並帶 `Content-Range: 0-99/1000` —— 斜線之後的數字是總筆數 |
 | offset 超過結尾 | `416 Range Not Satisfiable`。分頁過程中若集合在兩頁之間變短，是有可能正常遇到的，因此它會結束分頁而不是失敗 |
 
-如果陣列對萬用字元的解讀不同，過濾就會一筆都對不上：陣列上明明還在的 volume，會整批從 PVE 消失。因此以名稱前置字串列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
+如果儲存伺服器對萬用字元的解讀不同，過濾就會一筆都對不上：儲存伺服器上明明還在的 volume，會整批從 PVE 消失。因此以名稱前置字串列舉時若回傳空集合，會再查一次不帶過濾條件的版本、改在本地比對，並印出一行指出原因的警告。看到那行警告請回報。
 
-以下是仍未確定的**回應**欄位名稱 —— 也就是陣列實際放進每一列的內容，這部分在 3.x 與 4.x 之間有差異。其中數項現在已由 Dell `ansible-powerstore` collection 裡的範例回應佐證，逐列註明；其餘仍屬推測。
+以下是仍未確定的**回應**欄位名稱 —— 也就是儲存伺服器實際放進每一列的內容，這部分在 3.x 與 4.x 之間有差異。其中數項現在已由 Dell `ansible-powerstore` collection 裡的範例回應佐證，逐列註明；其餘仍屬推測。
 
 | 欄位 | 用途 | 狀態 |
 |---|---|---|
@@ -330,7 +330,7 @@ host、加入 initiator、metrics/generate）：每一個線上鍵都與 Dell �
 | `host_id`、`host_group_id`、`logical_unit_number`、`volume_id` | 對應資料列 | 與 attach／detach 請求內容所用的名稱相同，Dell 的 SDK 已確認 |
 | `address`、`target_iqn` | iSCSI portal | **未驗證** |
 | `purposes` | 哪些位址對外提供 iSCSI target —— 是一個清單，但單一字串也一併接受 | **未驗證** |
-| `messages[].message_l10n`、`messages[].code` | 陣列自己的錯誤文字 | **未驗證** |
+| `messages[].message_l10n`、`messages[].code` | 儲存伺服器自己的錯誤文字 | **未驗證** |
 
 ### PowerFlex（出自 REST 文件）
 
@@ -340,10 +340,10 @@ PowerStore 上乾淨收場的那一輪掃描，在這個系列找到了兩個證
 
 | 呼叫 | 原本 | 現在 |
 |---|---|---|
-| 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的陣列，在那裡仍未驗證 |
+| 快照倒回 | 對每一代都送 `overwriteVolumeContent` | 4.x 改送 **`restore`** 動作（`{srcVolumeId}`）；3.x 寫法只保留給以 3.x 方式登入的儲存伺服器，在那裡仍未驗證 |
 | NVMe host 對應／解除 —— **預設協定** | 把 `hostId` 送給 `addMappedSdc` | 改用 **`addMappedHost`／`removeMappedHost`**,Dell 客戶端與 SDC 那對並列的動作 |
 
-只有 4.x 陣列能回答的一個問題：**第一次 NVMe 對應之後，GET 該磁碟區並回報
+只有 4.x 儲存伺服器能回答的一個問題：**第一次 NVMe 對應之後，GET 該磁碟區並回報
 host 對應出現在哪個欄位** —— Dell 的公開程式碼從不讀回它，所以 `mappedHostInfo`
 是本外掛已登記的猜測，與 `mappedSdcInfo` 並讀、欄位不存在時零成本。若真正的
 欄位另有其名，症狀會是磁碟區在每次 activation 都被重新對應一次。
@@ -366,7 +366,7 @@ host 對應出現在哪個欄位** —— Dell 的公開程式碼從不讀回它
 | `protectionDomainId`、`protectionDomainName` | 解析有歧義的儲存池名稱 | 兩者都出現在 `ansible-powerflex` 的 volume 物件上 |
 | `capacityAvailableForVolumeAllocationInKb` | 儲存池容量，備援欄位 | **未驗證** |
 | `access_token`、`refresh_token` | 4.x 的登入回應 | **未驗證** |
-| `errorCode`、`message` | 陣列自己的錯誤文字 | **未驗證** |
+| `errorCode`、`message` | 儲存伺服器自己的錯誤文字 | **未驗證** |
 | `volumeIdList` | 快照請求建立出來的 id | **未驗證** |
 | `ipList`（每一筆帶 `ip` 與 `role`） | host 可以連線的 SDT 位址 | Dell 的 `ansible-powerflex` sdt 模組兩者都有列出，role 為 `StorageOnly`／`HostOnly`／`StorageAndHost` |
 | `nvmePort` | host 連線用的連接埠，Dell 範例中為 4420 | 同一來源。**不是 `storagePort`** —— 那是 12200，走的是 SDS 與 SDT 之間的流量 |
@@ -385,13 +385,13 @@ make check-multipath-flush   # 出現全系統 multipath flush 即失敗
 make test                    # 以上全部
 ```
 
-目前有 867 個單元測試，不需要陣列或實體裝置即可執行，涵蓋命名與歸屬檢查、REST 重試策略、orphan 清理防護、對照 fixture 的請求格式，以及外掛的 PVE schema。需要 `PVE::Storage::Plugin` 的測試在沒有 Proxmox VE 的機器上會自行跳過。
+目前有 867 個單元測試，不需要儲存伺服器或實體裝置即可執行，涵蓋命名與歸屬檢查、REST 重試策略、orphan 清理防護、對照 fixture 的請求格式，以及外掛的 PVE schema。需要 `PVE::Storage::Plugin` 的測試在沒有 Proxmox VE 的機器上會自行跳過。
 
 單元測試無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現。那是下面這份矩陣的工作。
 
 ## 人工測試矩陣
 
-請在至少三台節點的叢集搭配實體陣列上執行，並把結果與 PowerStore OS 版本填入結果欄。
+請在至少三台節點的叢集搭配實體儲存伺服器上執行，並把結果與 PowerStore OS 版本填入結果欄。
 
 | # | 測試項 | 前置條件 | 通過標準 | 結果 |
 |---|---|---|---|---|
@@ -399,13 +399,13 @@ make test                    # 以上全部
 | 2 | 叢集全節點安裝 | 3 節點 | 每台節點的 `pvesm status` 結果一致 | — |
 | 3 | `pvesm add` 參數驗證 | — | 缺少必填選項會被擋下 | — |
 | 4 | 容量回報 | — | 與 PowerStore Manager 誤差在 1% 以內 | — |
-| 5 | 陣列離線 | 拔掉管理網路 | 儲存在約 5 秒內轉為 `inactive`，其他儲存不受影響 | — |
-| 6 | 建立 VM 磁碟 | — | 陣列上出現 volume，節點上出現 multipath 裝置 | **ME4024 FC ✓** |
+| 5 | 儲存伺服器離線 | 拔掉管理網路 | 儲存在約 5 秒內轉為 `inactive`，其他儲存不受影響 | — |
+| 6 | 建立 VM 磁碟 | — | 儲存伺服器上出現 volume，節點上出現 multipath 裝置 | **ME4024 FC ✓** |
 | 7 | 線上擴充 | VM 執行中 | 重新掃描後客體看得到新容量 | **ME4024 FC ✓（VM 已停）** |
 | 8 | 縮小 | — | 被擋下，並同時列出兩個容量 | — |
 | 9 | 刪除磁碟 | VM 已停止 | volume 消失，且沒有殘留裝置或 map | **ME4024 FC ✓** |
 | 10 | 刪除使用中的磁碟 | VM 執行中 | 被擋下並說明原因 | — |
-| 11 | 快照建立／列出／刪除 | — | 與陣列上的快照一致 | **ME4024 FC ✓** |
+| 11 | 快照建立／列出／刪除 | — | 與儲存伺服器上的快照一致 | **ME4024 FC ✓** |
 | 12 | 快照還原 | VM 已停止 | 資料正確還原，無殘留快取 | **ME4024 FC ✓（容器）** |
 | 13 | 含記憶體的快照（vmstate） | VM 執行中 | state 卷建立成功，VM 能正確恢復 | — |
 | 14 | 設定備份與 `pve-dell-config-get` | PowerStore | 設定可以讀回來；在 PowerVault ME 上不會產生設定卷 | — |
@@ -423,17 +423,17 @@ make test                    # 以上全部
 | 26 | PVE 9.1 升級到 9.2 | — | 外掛仍正常，`get_identity` 正常回傳 | — |
 | 27 | 把磁碟移到其他類型的儲存 | VM 已停 | `qm move_disk` 移到 LVM 或 ZFS 儲存可完成，來源磁碟區已移除。這條路走的是 `qemu-img convert` 與 `path()`，不經過傳輸格式 | — |
 | 28 | `pvesm export`／`pvesm import` | — | 串流可來回轉換；同名再匯入一次會被拒絕，除非允許改名。這條路徑，以及叢集對叢集的移轉，才是傳輸格式的用途 | — |
-| 29 | `vzdump --mode snapshot` 與 `qmrestore` | — | 兩者都成功，而且結束後陣列上沒有殘留 `-tmp-` 或 `-vc-` 物件 | **ME4024 FC ✓** |
-| 30 | 客體作業系統從陣列 volume 開機 | — | 安裝程式讀得到分割表並啟動 | **ME4024 FC ✓** |
-| 31 | 本節點在陣列上已有 host 物件 | PowerStore，fabric 分區時建立的 host | 外掛直接使用它而不另建；`/var/lib/pve-storage-dellemc/<storeid>-host` 會寫出它的名稱；陣列上沒有任何東西被改名或移除 | — |
+| 29 | `vzdump --mode snapshot` 與 `qmrestore` | — | 兩者都成功，而且結束後儲存伺服器上沒有殘留 `-tmp-` 或 `-vc-` 物件 | **ME4024 FC ✓** |
+| 30 | 客體作業系統從儲存伺服器 volume 開機 | — | 安裝程式讀得到分割表並啟動 | **ME4024 FC ✓** |
+| 31 | 本節點在儲存伺服器上已有 host 物件 | PowerStore，fabric 分區時建立的 host | 外掛直接使用它而不另建；`/var/lib/pve-storage-dellemc/<storeid>-host` 會寫出它的名稱；儲存伺服器上沒有任何東西被改名或移除 | — |
 | 32 | 那個 host 同時持有別台的埠 | PowerStore | 被拒絕，並指名是哪一個外來的埠 | — |
 
 
 ### 這台 ME4024 實際跑過什麼、以及是什麼時候跑的
 
 標記 **ME4024 FC ✓** 的項目，是由使用韌體 `GT280R011-01`、走 Fibre Channel 的
-ME4024 客戶，在 **0.7.66~beta1** 上確認的。這幾項合起來，涵蓋了沒有陣列就最難
-推論的幾條路徑：客體作業系統從陣列 volume 開機、`expand volume` 那個「要增加
+ME4024 客戶，在 **0.7.66~beta1** 上確認的。這幾項合起來，涵蓋了沒有儲存伺服器就最難
+推論的幾條路徑：客體作業系統從儲存伺服器 volume 開機、`expand volume` 那個「要增加
 多少」的換算與其後的 resize、會建立臨時複製去讀再刪掉的 `vzdump --mode
 snapshot`、需要 fsfreeze 的容器快照，以及節點重開機。
 
@@ -442,7 +442,7 @@ snapshot`、需要 fsfreeze 的容器快照，以及節點重開機。
 `qemu_blockdev_options`，也就是 PVE 啟動 VM 時用來掛上磁碟的那個方法。升級之後
 再開機一次，值得那兩分鐘。
 
-這台陣列上仍未跑過的：iSCSI、SAS、節點間的線上遷移、路徑失效，以及 0.7.88 新增
+這台儲存伺服器上仍未跑過的：iSCSI、SAS、節點間的線上遷移、路徑失效，以及 0.7.88 新增
 的兩條傳輸路徑。
 
 ## 1.0.0 的長時間測試門檻

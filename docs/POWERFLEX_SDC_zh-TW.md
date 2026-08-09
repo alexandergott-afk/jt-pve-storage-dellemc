@@ -50,7 +50,7 @@ Dell 自己也說明，E-Lab 的矩陣不一定涵蓋各發行版釋出的每一
 
 ## 本外掛在兩種路徑下的做法
 
-**一顆 VM 磁碟 = 一個 PowerFlex volume**，全部透過 REST API 建立。中間沒有 LVM 層、沒有「切一顆大 volume 再在本地分割」、主機上也沒有 volume group：陣列自身的快照、複製與精簡配置都以「一顆 VM 磁碟」為自然單位運作，而 SDC（或 NVMe initiator）只負責把那個 volume 呈現成區塊裝置。
+**一顆 VM 磁碟 = 一個 PowerFlex volume**，全部透過 REST API 建立。中間沒有 LVM 層、沒有「切一顆大 volume 再在本地分割」、主機上也沒有 volume group：儲存伺服器自身的快照、複製與精簡配置都以「一顆 VM 磁碟」為自然單位運作，而 SDC（或 NVMe initiator）只負責把那個 volume 呈現成區塊裝置。
 
 之所以要特別說明，是因為 Dell 的 Proxmox VE KB 裡有一個 LVM 步驟。那是給「要在 scini 裝置上疊 LVM」的人用的，本外掛並不這麼做。在我們的情境下，真正需要注意的 LVM 設定剛好相反，而且和 SAN 系列遇到的是同一個問題：主機端的 LVM 掃描器可能會自動啟用位於**客體磁碟內部**的 volume group，導致該 volume 無法刪除。詳見 [TROUBLESHOOTING_zh-TW.md](TROUBLESHOOTING_zh-TW.md) 的 LVM 段落。
 
@@ -104,14 +104,14 @@ ls /bin/emc/scaleio/scini_sync/driver_cache/
 apt install nvme-cli
 modprobe nvme_tcp
 
-# 本節點的 NQN。陣列必須先知道它，才會對應任何 volume。
+# 本節點的 NQN。儲存伺服器必須先知道它，才會對應任何 volume。
 cat /etc/nvme/hostnqn
 
 nvme list-subsys        # 與 SDT 之間的連線
 nvme list               # 目前掛載的 namespace
 ```
 
-外掛會在 `activate_storage` 時連線到陣列公布的各個 SDT，若本節點的 NQN 尚未註冊則自動註冊為 host，並在對應 volume 之後等待 namespace 出現。
+外掛會在 `activate_storage` 時連線到儲存伺服器公布的各個 SDT，若本節點的 NQN 尚未註冊則自動註冊為 host，並在對應 volume 之後等待 namespace 出現。
 
 ## NVMe/TCP 的多路徑
 
@@ -125,7 +125,7 @@ cat /sys/module/nvme_core/parameters/multipath     # 必須是 Y
 
 若顯示 N，請在 kernel 命令列加上 `nvme_core.multipath=Y` 並重開機。外掛在啟用時若偵測到它被停用會提出警告。
 
-**2. 要連到每一個 SDT。** 只有一條連線不叫多路徑。外掛會在 `activate_storage` 時連線到陣列公布的每一個 target，若只連上部分會提出警告。
+**2. 要連到每一個 SDT。** 只有一條連線不叫多路徑。外掛會在 `activate_storage` 時連線到儲存伺服器公布的每一個 target，若只連上部分會提出警告。
 
 ```bash
 nvme list-subsys        # 一個 subsystem、多條路徑，並顯示 ANA 狀態

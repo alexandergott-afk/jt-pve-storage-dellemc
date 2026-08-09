@@ -1,3 +1,13 @@
+jt-pve-storage-dellemc (0.8.7~beta1-1) unstable; urgency=low
+
+  * BETA RELEASE. Not for production use.
+  * Chinese documents now say 儲存伺服器 for an array, never 陣列 - 463
+    occurrences, checked first for the programming sense. English keeps
+    "array". t/11-imports.t enforces it, with use utf8 so the literal and the
+    file content are both characters.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 09 Aug 2026 11:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.6~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

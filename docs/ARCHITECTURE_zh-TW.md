@@ -18,10 +18,10 @@ PowerScale 與 Unity XT 未排入。PowerScale 是 NAS，而 Proxmox VE 內建�
 為什麼不做成單一 plugin 加 `--dell-type` 參數：
 
 - **`plugindata()` 是 class method。** PVE 會在解析任何 `storage.cfg` 參數**之前**呼叫它，取得支援的 content type 與磁碟格式。PowerStore 是 block 儲存、只能放 `raw`；像 PowerScale 這類 NAS 則可以放 `qcow2`、`subvol`、ISO 與備份。沒有任何一組回傳值能同時描述兩者；PowerFlex 也一樣，它的 volume 是透過 kernel module 呈現，而不是經由 SAN 登入。
-- **schema 無法表達「在某條件下才必填」。** PVE 的 JSON schema 只有 `optional`，沒有別的。單一 type 會被迫宣告所有系列參數的聯集，錯誤的組合只會在執行期、在陣列上、在操作進行到一半時才失敗。
+- **schema 無法表達「在某條件下才必填」。** PVE 的 JSON schema 只有 `optional`，沒有別的。單一 type 會被迫宣告所有系列參數的聯集，錯誤的組合只會在執行期、在儲存伺服器上、在操作進行到一半時才失敗。
 - **type 字串一旦公開就不能再改。** 日後修改會讓所有既有的 `storage.cfg` 失效。
 
-type 一律在 `pvesm add` 時明確指定，絕不向陣列探測。`storage.cfg` 會被 pvestatd、pvedaemon、pveproxy、`qm`、`pct` 反覆解析，其中也包含陣列不可達的時候；一旦解析結果取決於一次 REST 呼叫，整台節點的儲存清單都會跟著失效。
+type 一律在 `pvesm add` 時明確指定，絕不向儲存伺服器探測。`storage.cfg` 會被 pvestatd、pvedaemon、pveproxy、`qm`、`pct` 反覆解析，其中也包含儲存伺服器不可達的時候；一旦解析結果取決於一次 REST 呼叫，整台節點的儲存清單都會跟著失效。
 
 在 `activate_storage` **之後**做探測則沒有問題，因為那裡的失敗可以優雅降級：韌體版本、是否支援 NVMe-TCP、授權功能、appliance 型號。
 
@@ -31,7 +31,7 @@ type 一律在 `pvesm add` 時明確指定，絕不向陣列探測。`storage.cf
 DellPowerStorePlugin.pm          系列專屬：type、schema，以及以 REST 呼叫
         |                        實作的 _array_* 方法
         v
-DellEMC::Common::BlockBase       所有與陣列無關的邏輯：
+DellEMC::Common::BlockBase       所有與儲存伺服器無關的邏輯：
                                  啟用、配置、裝置探索與拆除、快照、範本、
                                  複製、multipath drop-in、orphan 清理
         |
@@ -39,7 +39,7 @@ DellEMC::Common::BlockBase       所有與陣列無關的邏輯：
         +-- Common::ISCSI        initiator、portal 預檢、session rescan
         +-- Common::FC           HBA 探索、WWN 正規化
         +-- Common::Multipath    SCSI 裝置生命週期、dm-multipath map
-        +-- Common::Naming       PVE 名稱與陣列物件名稱的對應
+        +-- Common::Naming       PVE 名稱與儲存伺服器物件名稱的對應
         +-- Common::Schema       共用的 dell-* 選項，只宣告一次
         +-- Common::WwidState    WWID 追蹤、orphan 寬限期
         +-- Common::Health       status 失敗計數、容量告警
@@ -75,7 +75,7 @@ _array_is_mapped        _array_mapped_hosts
 _array_get_portals      iSCSI portal，格式為 [{ portal, iqn }]
 ```
 
-可選擇覆寫：`naming`、`family_properties`、`family_options`、`identity_suffix`、`capacity_scope`、`multipath_config_version`、`_vendor_re`、`_array_list_base_snapshots`、`_array_clone_parents`（如何從陣列自身的中繼資料判斷連結複製的母體），以及 `supports_config_backup`（volume 上限太少、無法為每個快照再多花一個 volume 的系列回傳 0，該功能就完全不提供）。
+可選擇覆寫：`naming`、`family_properties`、`family_options`、`identity_suffix`、`capacity_scope`、`multipath_config_version`、`_vendor_re`、`_array_list_base_snapshots`、`_array_clone_parents`（如何從儲存伺服器自身的中繼資料判斷連結複製的母體），以及 `supports_config_backup`（volume 上限太少、無法為每個快照再多花一個 volume 的系列回傳 0，該功能就完全不提供）。
 
 ## Property 宣告
 
@@ -105,4 +105,4 @@ ME5 與 PowerMax 會繼承 `BlockBase` —— 它們正是這個基底當初設�
 
 1. **不可中斷睡眠。** 讀取沒有回應的裝置會讓行程進入 D state，任何訊號都無法清除。本專案的每一次 sysfs 存取都在有逾時限制的子行程中進行，每一個外部指令都有 alarm 保護。
 2. **影響範圍。** 全系統的 `multipath -F` 絕不使用 —— 它會清掉節點上所有未使用的 map；LIP 也不使用，它會干擾某個 HBA port 後面的所有 LUN。具破壞性的操作都有 vendor 過濾，而且一次只處理一個物件。
-3. **依序輪詢。** PVE 是一個接一個輪詢儲存的，因此一台慢的陣列會餓死它的鄰居。健康路徑採用短逾時且只嘗試一次，昂貴的週期性工作則加上頻率限制並丟到獨立的背景流程執行。
+3. **依序輪詢。** PVE 是一個接一個輪詢儲存的，因此一台慢的儲存伺服器會餓死它的鄰居。健康路徑採用短逾時且只嘗試一次，昂貴的週期性工作則加上頻率限制並丟到獨立的背景流程執行。

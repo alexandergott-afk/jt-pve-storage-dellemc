@@ -2,7 +2,7 @@
 
 English: [QUICKSTART.md](QUICKSTART.md)
 
-> **請先讀這段。** 截至 0.5.0，本外掛的任何部分都尚未在實體 PowerStore 上執行過。請使用非正式環境的叢集與陣列，並在開始之前先看過 [TESTING_zh-TW.md](TESTING_zh-TW.md)。
+> **請先讀這段。** 截至 0.5.0，本外掛的任何部分都尚未在實體 PowerStore 上執行過。請使用非正式環境的叢集與儲存伺服器，並在開始之前先看過 [TESTING_zh-TW.md](TESTING_zh-TW.md)。
 
 ## 1. 前置需求
 
@@ -10,9 +10,9 @@ English: [QUICKSTART.md](QUICKSTART.md)
 
 - Proxmox VE 9.1 以上
 - 已安裝 `open-iscsi`、`multipath-tools`、`sg3-utils`、`psmisc`
-- 可連到陣列的管理位址；使用 iSCSI 時還要能連到 target portal，使用 FC 則要完成 fabric 分區
+- 可連到儲存伺服器的管理位址；使用 iSCSI 時還要能連到 target portal，使用 FC 則要完成 fabric 分區
 
-陣列端：
+儲存伺服器端：
 
 - PowerStore OS 3.0 以上
 - 一組至少具備 Storage Operator 角色的 REST API 帳號
@@ -72,7 +72,7 @@ pvesm add dellpowerstore ps1 \
 pvesm status
 ```
 
-該儲存應顯示為 `active` 並帶有陣列容量。陣列上此時應該已為每台節點建立一個 host 物件，名稱為 `pve-{cluster}-{node}`。
+該儲存應顯示為 `active` 並帶有儲存伺服器容量。儲存伺服器上此時應該已為每台節點建立一個 host 物件，名稱為 `pve-{cluster}-{node}`。
 
 若顯示 `inactive`，原因會在 journal 中：
 
@@ -93,7 +93,7 @@ qm set 999 --scsi0 ps1:8            # 8 GB
 # 節點端：應出現一個具有多條路徑的 multipath 裝置
 multipath -ll | grep -A5 DellEMC
 
-# 陣列端：應出現名為 pve-ps1-999-disk0 的 volume
+# 儲存伺服器端：應出現名為 pve-ps1-999-disk0 的 volume
 ```
 
 `pvesm list ps1` 應會列出 `ps1:vm-999-disk-0`。
@@ -114,7 +114,7 @@ qm delsnapshot 999 before-change
 qm destroy 999
 ```
 
-確認陣列上的 volume 已消失，且節點端沒有殘留裝置：
+確認儲存伺服器上的 volume 已消失，且節點端沒有殘留裝置：
 
 ```bash
 multipath -ll | grep -c DellEMC

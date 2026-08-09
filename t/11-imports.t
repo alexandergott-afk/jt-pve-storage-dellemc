@@ -17,6 +17,13 @@
 use strict;
 use warnings;
 
+# The terminology guard below matches a literal Chinese term against file
+# content read through an encoding layer. Without this the literal is bytes,
+# the content is characters, and the match never fires — 152 assertions passed
+# against a file with the forbidden term appended on purpose. Lesson 48, in a
+# test, for the third time in one week.
+use utf8;
+
 use Test::More;
 use File::Find;
 
@@ -526,6 +533,48 @@ for my $file (sort @files) {
         is(scalar(@bad), 0, "$file uses full-width punctuation in Chinese text")
             or diag("  " . join("\n  ", @bad[0 .. ($#bad > 9 ? 9 : $#bad)])
                   . ($#bad > 9 ? "\n  ... and " . ($#bad - 9) . " more" : ''));
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Terminology the project has decided on
+#
+# 'array' is 儲存伺服器 in Chinese, never 陣列 — the term the related synology
+# project uses, and the one that does not read as a programming array on a
+# page that also talks about JSON listings. 463 occurrences were swept in
+# 0.8.7; a decided term is only decided if something keeps it.
+# ---------------------------------------------------------------------------
+
+{
+    my %forbidden = (
+        '陣列' => 'array is 儲存伺服器 in this project, never 陣列',
+    );
+
+    my @docs = grep { -f $_ } (
+        glob('*_zh-TW.md'), glob('docs/*_zh-TW.md'), 'docs/index.html',
+    );
+
+    for my $file (@docs) {
+        my $src = do {
+            open my $fh, '<:encoding(UTF-8)', $file or die "$file: $!";
+            local $/;
+            <$fh>;
+        };
+
+        # Mentioning a term is not using it. A changelog entry has to be
+        # able to say which word was replaced, so a code span exempts it —
+        # the same use/mention line the punctuation check draws.
+        $src =~ s/`[^`]*`//g;
+        $src =~ s{<code>.*?</code>}{}gs;
+
+        my @bad;
+        for my $term (sort keys %forbidden) {
+            my $n = () = $src =~ /\Q$term\E/g;
+            push @bad, "$term x$n: $forbidden{$term}" if $n;
+        }
+
+        is_deeply(\@bad, [], "$file uses the terms this project decided on")
+            or diag("  " . join("\n  ", @bad));
     }
 }
 
