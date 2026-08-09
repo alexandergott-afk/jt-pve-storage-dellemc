@@ -7,6 +7,42 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.8~beta1] - 2026-08-09
+
+### Fixed
+- **A long outage buried the journal.** PVE logs whatever `activate_storage`
+  dies with, on every poll — about every ten seconds, per node, for as long as
+  the outage lasts. Measured against an unroutable address: 297 characters,
+  six times a minute, beside the single throttled OUTAGE line carrying the
+  same facts.
+
+  The first failures still carry the array's own answer, because that is the
+  diagnosis. Once the outage is on record the line is one sentence naming the
+  storage and the address, and pointing at the OUTAGE record for the rest.
+
+### Verified
+- **The host-side layer, against real SAN devices.** This node carries four
+  NetApp LUNs over iSCSI with live multipath maps — the first time anything
+  but a customer's ME4024 has exercised this code against real devices.
+  Everything read-only: those maps belong to another storage.
+
+  The property that matters most is the vendor gate, and it holds:
+  `list_vendor_multipath_devices` returns nothing here, and neither family's
+  vendor pattern matches `NETAPP,LUN C-Mode`. That is what keeps the orphan
+  reaper off another vendor's storage, and it had never been checked against a
+  foreign device.
+
+  Every device helper answered correctly and within its bound: the size exact
+  to the byte, the paths matching `multipath -ll`, the WWID confirmed by the
+  kernel and a wrong one refused, all under 0.15s. `probe_portal` against an
+  unroutable address returned at exactly its timeout, and `get_fc_targets` on
+  a node with no HBA returned empty without erroring.
+
+  The configuration refusals fire as written — protocol per family, prefix
+  collision, the password at `/etc/pve/priv/storage/<id>.pw` in mode 0600 with
+  nothing in `storage.cfg`, both removed on `pvesm remove` — and an
+  unreachable storage goes inactive while every other storage stays active.
+
 ## [0.8.7~beta1] - 2026-08-09
 
 ### Changed

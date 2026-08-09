@@ -1728,4 +1728,52 @@ SKIP: {
       . ' device under a guest is not a repair');
 }
 
+{
+    # What a long outage costs the journal.
+    #
+    # PVE logs whatever activate_storage dies with, on every poll — about
+    # every ten seconds, per node. Measured against an unroutable address on
+    # this node: 297 characters, six times in a minute, beside one throttled
+    # OUTAGE line carrying the same facts. The first failures keep the array's
+    # own answer because that is the diagnosis; once the outage is on record,
+    # the line is short.
+    Test::Plugin->reset_state();
+
+    my $scfg = { 'dell-portal' => '192.0.2.1', 'dell-protocol' => 'iscsi' };
+
+    no warnings 'redefine', 'once';
+    no strict 'refs';
+    my $HL = 'PVE::Storage::Custom::DellEMC::Common::Health';
+    my $down = 0;
+    local *{"${HL}::is_down"} = sub { $down };
+    local *{"${HL}::record_status_failure"} = sub { 1 };
+    # As long as the real thing: measured at 297 characters on this node,
+    # which is what makes six of them a minute worth avoiding.
+    local *Test::Plugin::_array_ping = sub {
+        die "[dellpowerstore:t1] GET /cluster?select=id%2Cname%2Cstate"
+          . "%2Csystem_time failed: GET /login_session failed: HTTP 500:"
+          . " Can't connect to 192.0.2.1:443 (Connection timed out)"
+          . " Connection timed out\n";
+    };
+    local *Test::Plugin::_check_protocol = sub { 1 };
+    local *Test::Plugin::_check_prefix_collision = sub { 1 };
+
+    eval { Test::Plugin->activate_storage('t1', $scfg, {}) };
+    my $first = $@;
+    like($first, qr/login_session failed/,
+        'the first failure carries the array\'s own answer, which is the'
+      . ' diagnosis');
+
+    $down = 1;
+    eval { Test::Plugin->activate_storage('t1', $scfg, {}) };
+    my $later = $@;
+    unlike($later, qr/login_session failed/,
+        '... and once the outage is on record the line is short, because PVE'
+      . ' logs this one every ten seconds for as long as it lasts');
+    like($later, qr/unreachable at 192\.0\.2\.1/,
+        '... while still naming the storage and the address');
+    cmp_ok(length($later), '<', length($first),
+        '... and is shorter than the first');
+}
+
 done_testing();

@@ -895,7 +895,24 @@ sub activate_storage {
         # status() if this dies — which is precisely what an unreachable array
         # does. Recording only in status() would mean recording nothing at all
         # for the outages that matter most.
+        my $already_down = eval { $HEALTH->is_down($storeid) } ? 1 : 0;
         eval { $HEALTH->record_status_failure($storeid, $err) };
+
+        # PVE logs whatever this dies with, on every poll — about every ten
+        # seconds, per node, for as long as the outage lasts. The first
+        # failures carry the array's own answer, because that is the
+        # diagnosis; once the outage is on record the message is one line, so
+        # a long outage does not bury everything else in the journal. Measured
+        # on this node: 297 characters, six times in a minute, against one
+        # throttled OUTAGE line carrying the same facts.
+        #
+        # Rule 35 applies to a warn on this path. A die is PVE's to log, so
+        # the only lever is how much it is handed.
+        die "Storage '$storeid' is unreachable at "
+          . ($scfg->{'dell-portal'} // '?')
+          . "; see the OUTAGE record in this log for the array's answer.\n"
+            if $already_down;
+
         die "Cannot reach the array at " . ($scfg->{'dell-portal'} // '?')
           . " for storage '$storeid': $err";
     }

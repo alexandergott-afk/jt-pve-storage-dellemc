@@ -167,7 +167,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.7~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.8~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1134,8 +1134,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">3,108 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">3,108 個單元測試不需要儲存伺服器或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有儲存伺服器能回答，而目前只有一台回答過。</span>
+        <span class="lang-en">3,112 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">3,112 個單元測試不需要儲存伺服器或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有儲存伺服器能回答，而目前只有一台回答過。</span>
     </p>
 
     <h3>
@@ -1295,6 +1295,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.8~beta1</div>
+        <div class="changelog-date">2026-08-09</div>
+        <div class="changelog-summary">
+            <span class="lang-en">The host-side layer was exercised against real SAN devices for the first time outside a customer's array &mdash; the vendor gate holds, every device helper answers correctly and within its bound. Fixed: a long outage repeated a 297-character message every ten seconds in the journal.</span>
+            <span class="lang-zh">主機端那一層第一次在客戶儲存伺服器以外的地方面對真實 SAN 裝置 &mdash; 廠商閘門成立，每個裝置輔助函式的回答都正確且在界限內。並修正：長時間中斷時，journal 每十秒重複一段 297 字元的訊息。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.7~beta1</div>

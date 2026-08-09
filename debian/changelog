@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.8.8~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: PVE logs whatever activate_storage dies with, on every poll -
+    measured at 297 characters six times a minute against an unroutable
+    address. The first failures keep the array's own answer; once the outage
+    is on record the line is one sentence pointing at the OUTAGE record.
+  * Verified: the host-side layer against real SAN devices (four NetApp LUNs
+    over iSCSI on this node, read-only). The vendor gate returns nothing for
+    them and neither family's pattern matches NETAPP - the property that
+    keeps the orphan reaper off another vendor's storage, never before
+    checked against a foreign device. Device helpers exact and bounded;
+    config refusals, credential handling and unreachable-storage behaviour
+    all as written.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 09 Aug 2026 16:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.7~beta1-1) unstable; urgency=low
 
   * BETA RELEASE. Not for production use.
