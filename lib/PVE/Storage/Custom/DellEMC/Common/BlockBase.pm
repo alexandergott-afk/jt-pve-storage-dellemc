@@ -605,6 +605,12 @@ sub _parse_volname {
     if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit\z/) {
         return { vmid => $1, format => 'raw', type => 'cloudinit', isBase => 0 };
     }
+    if ($volname =~ /^(?:vm|base)-(\d+)-efi-enroll\z/) {
+        return { vmid => $1, format => 'raw', type => 'efienroll', isBase => 0 };
+    }
+    if ($volname =~ /^(?:vm|base)-(\d+)-fleece-(\d+)\z/) {
+        return { vmid => $1, diskid => $2, format => 'raw', type => 'fleece', isBase => 0 };
+    }
     if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return { vmid => $1, snapname => $2, format => 'raw', type => 'state', isBase => 0 };
     }
@@ -1447,7 +1453,7 @@ sub alloc_image {
     my $size_bytes = $size * 1024;   # PVE passes KiB
     my ($array_name, $pve_volname);
 
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit|efi-enroll|fleece-\d+)\z/) {
         # PVE dictates these names and uses the device immediately after this
         # call returns.
         $array_name  = $class->_array_volname($storeid, $name);
@@ -1466,7 +1472,7 @@ sub alloc_image {
     # A state or cloud-init volume left behind by a failed attempt is
     # reclaimable: PVE dictates its name, which is derived from the snapshot,
     # so it cannot belong to anything else and cannot be moved out of the way.
-    my $dictated = ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) ? 1 : 0;
+    my $dictated = ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit|efi-enroll|fleece-\d+)\z/) ? 1 : 0;
 
     if ($dictated && eval { $class->_array_get_volume($scfg, $array_name) }) {
         warn "Reclaiming orphaned volume '$array_name' from a previous"
@@ -1534,7 +1540,7 @@ sub alloc_image {
 
     # PVE uses state and cloud-init volumes the moment this returns, so the
     # device has to be there before we hand the name back.
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit|efi-enroll|fleece-\d+)\z/) {
         my $wwid = eval { $class->_array_get_wwid($scfg, $array_name) };
         unless ($wwid) {
             eval { $class->_release_volume($scfg, $storeid, $array_name) };

@@ -167,7 +167,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.5~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.6~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1134,8 +1134,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">3,076 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">3,076 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
+        <span class="lang-en">3,096 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">3,096 個單元測試不需要陣列或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有陣列能回答，而目前只有一台回答過。</span>
     </p>
 
     <h3>
@@ -1295,6 +1295,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.6~beta1</div>
+        <div class="changelog-date">2026-08-09</div>
+        <div class="changelog-summary">
+            <span class="lang-en">Two of the four volume names PVE builds itself &mdash; efi-enroll and fleece-&lt;n&gt; &mdash; were not recognised, and allocation fell through to an ordinary disk name rather than refusing. Fleecing is the one that matters: it goes wrong during a backup. Also: the site lost its side padding on a narrow window.</span>
+            <span class="lang-zh">PVE 自己建構的四種磁碟區名稱中，有兩種不被認得 &mdash; efi-enroll 與 fleece-&lt;n&gt; &mdash; 而且不是拒絕，是落到「當成普通磁碟命名」。要緊的是 fleecing：它會在備份時出錯。另外：文件站在窄視窗下失去左右留白。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.5~beta1</div>

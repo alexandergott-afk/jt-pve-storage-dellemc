@@ -7,6 +7,35 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.6~beta1] - 2026-08-09
+
+### Fixed
+- **Two of the four volume names Proxmox VE builds itself were not
+  recognised.** Most names come back from `find_free_diskname`, so the plugin
+  chooses them; four do not, and PVE hands those to `alloc_image` already
+  named: `cloudinit`, `state-<snapshot>`, `efi-enroll` and `fleece-<n>`. The
+  first two were handled from the start. The other two were not, and the
+  failure was not a refusal — allocation fell through to "pick a free disk
+  id", so the volume would have been created under a name that says it is an
+  ordinary VM disk.
+
+  **Fleecing is the one that matters.** `vzdump --fleecing` allocates one
+  fleecing image per disk on the fleecing storage, so this goes wrong during a
+  backup rather than during a create, and what it leaves behind looks like a
+  disk nobody can account for. Both names now round-trip: the array object
+  carries the name PVE gave, `list_images` reports it back, and the ownership
+  gate recognises it.
+
+  Read out of PVE's own source rather than from a list: the related synology
+  project's list also carries `tpmstate<n>` and `efidisk<n>`, and PVE does not
+  construct those — they come through `find_free_diskname` like any other
+  disk.
+
+- **The documentation site lost its side padding on a narrow window.** Section
+  padding was `calc((100% - 920px) / 2)`, which goes negative below that width
+  and invalidates the whole shorthand, so text ran to both edges. Found in the
+  same reading, in the same place.
+
 ## [0.8.5~beta1] - 2026-08-08
 
 ### Fixed

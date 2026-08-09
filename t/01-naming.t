@@ -397,4 +397,47 @@ ok(!$N->is_valid_snapshot_name('.leading-dot'), 'snapshot must start alphanumeri
     }
 }
 
+# ---------------------------------------------------------------------------
+# Every volume name Proxmox VE constructs itself
+#
+# Most volume names come back from find_free_diskname, so the plugin chooses
+# them. Four do not: PVE builds them and hands them to alloc_image, and a
+# plugin that does not recognise one either refuses it or quietly allocates a
+# different name. Read out of PVE's own source rather than remembered:
+#
+#     vm-<vmid>-cloudinit        vm-<vmid>-efi-enroll
+#     vm-<vmid>-state-<snap>     vm-<vmid>-fleece-<n>
+#
+# efi-enroll and fleece-<n> were both refused until 0.8.6. Fleecing is the one
+# that bites: `vzdump --fleecing` allocates one per disk on the fleecing
+# storage, so pointing that at a Dell storage would have gone wrong on a
+# backup rather than on a create.
+# ---------------------------------------------------------------------------
+
+{
+    my $PS = 'PVE::Storage::Custom::DellEMC::PowerStore::Naming';
+
+    for my $case (
+        ['vm-100-cloudinit',      'cloudinit'],
+        ['vm-100-state-before',   'state'],
+        ['vm-100-efi-enroll',     'efienroll'],
+        ['vm-100-fleece-0',       'fleece'],
+        ['vm-100-fleece-3',       'fleece'],
+    ) {
+        my ($volname, $type) = @$case;
+
+        my $array = eval { $PS->pve_volname_to_array('ps1', $volname) };
+        ok($array, "'$volname' has an array name") or next;
+
+        my $decoded = $PS->decode_volume_name($array);
+        is($decoded && $decoded->{type}, $type, "... decoded as '$type'");
+
+        is($PS->array_to_pve_volname($array), $volname,
+            "... and back to the name PVE gave, so list_images reports it");
+
+        ok($PS->is_pve_managed_volume($array, 'ps1'),
+            "... and the ownership gate recognises it");
+    }
+}
+
 done_testing();

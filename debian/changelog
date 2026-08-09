@@ -1,3 +1,22 @@
+jt-pve-storage-dellemc (0.8.6~beta1-1) unstable; urgency=medium
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: two of the four volume names PVE constructs itself were not
+    recognised - vm-<vmid>-efi-enroll and vm-<vmid>-fleece-<n>. Allocation
+    did not refuse them; it fell through to picking a free disk id, so the
+    volume would have been created under a name that says it is an ordinary
+    VM disk. vzdump --fleecing allocates one per disk on the fleecing
+    storage, so this goes wrong during a backup rather than during a create.
+    Both now round-trip through the array name, list_images and the
+    ownership gate.
+  * Fixed: the documentation site's section padding was
+    calc((100% - 920px) / 2), which goes negative on a narrower window and
+    invalidates the shorthand, so text ran to both edges.
+  * Both found by reading the jt-pve-storage-synology changelog for versions
+    0.7.0 and above, which an earlier pass had truncated.
+
+ -- Jason Cheng <jason@jason.tools>  Sat, 09 Aug 2026 10:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.5~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

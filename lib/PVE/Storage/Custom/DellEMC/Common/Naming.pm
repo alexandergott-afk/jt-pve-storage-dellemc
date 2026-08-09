@@ -66,6 +66,12 @@ my $RE_CLOUDINIT = qr/^pve-($PFX)-(\d+)-cloudinit\z/;
 my $RE_EFIDISK   = qr/^pve-($PFX)-(\d+)-efidisk(\d+)\z/;
 my $RE_TPMSTATE  = qr/^pve-($PFX)-(\d+)-tpmstate(\d+)\z/;
 my $RE_STATE     = qr/^pve-($PFX)-(\d+)-state-(.+)\z/;
+# PVE dictates four volume names of its own construction, and these are the
+# two nobody had noticed: 'efi-enroll' for enrolling secure-boot keys, and
+# 'fleece-<n>' for a backup's fleecing image. Both reach alloc_image as a name
+# the plugin must keep, exactly as cloudinit and state do.
+my $RE_EFIENROLL = qr/^pve-($PFX)-(\d+)-efienroll\z/;
+my $RE_FLEECE    = qr/^pve-($PFX)-(\d+)-fleece(\d+)\z/;
 my $RE_VMCONF    = qr/^pve-($PFX)-(\d+)-vmconf-(.+)\z/;
 
 my $RE_SNAPSHOT  = qr/^(.+)\.pve-snap-(.+)\z/;
@@ -173,6 +179,25 @@ sub encode_tpmstate_name {
     die "vmid is required\n"   unless defined $vmid;
     die "diskid is required\n" unless defined $diskid;
     return $class->volume_prefix($storeid) . "${vmid}-tpmstate${diskid}";
+}
+
+# Written by PVE when it enrolls secure-boot keys into an EFI disk.
+sub encode_efi_enroll_name {
+    my ($class, $storeid, $vmid) = @_;
+
+    die "vmid is required\n" unless defined $vmid;
+    return $class->volume_prefix($storeid) . "${vmid}-efienroll";
+}
+
+# A backup's fleecing image: vzdump writes the guest's overwritten blocks here
+# so the backup reads a consistent point in time. Created and removed by the
+# backup, and named by PVE.
+sub encode_fleece_name {
+    my ($class, $storeid, $vmid, $diskid) = @_;
+
+    die "vmid is required\n"   unless defined $vmid;
+    die "diskid is required\n" unless defined $diskid;
+    return $class->volume_prefix($storeid) . "${vmid}-fleece${diskid}";
 }
 
 # RAM state volume written by `qm snapshot --vmstate`.
@@ -390,6 +415,14 @@ sub decode_volume_name {
         my $vmid = _valid_vmid($2) or return undef;
         return { storage => $1, vmid => $vmid, diskid => int($3), type => 'tpmstate' };
     }
+    if ($name =~ $RE_EFIENROLL) {
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, type => 'efienroll' };
+    }
+    if ($name =~ $RE_FLEECE) {
+        my $vmid = _valid_vmid($2) or return undef;
+        return { storage => $1, vmid => $vmid, diskid => int($3), type => 'fleece' };
+    }
     if ($name =~ $RE_STATE) {
         my $vmid = _valid_vmid($2) or return undef;
         return { storage => $1, vmid => $vmid, snapname => $3, type => 'state' };
@@ -505,6 +538,12 @@ sub pve_volname_to_array {
     if ($volname =~ /^(?:vm|base)-(\d+)-tpmstate(\d+)\z/) {
         return $class->encode_tpmstate_name($storeid, $1, $2);
     }
+    if ($volname =~ /^(?:vm|base)-(\d+)-efi-enroll\z/) {
+        return $class->encode_efi_enroll_name($storeid, $1);
+    }
+    if ($volname =~ /^(?:vm|base)-(\d+)-fleece-(\d+)\z/) {
+        return $class->encode_fleece_name($storeid, $1, $2);
+    }
     if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return $class->encode_state_name($storeid, $1, $2);
     }
@@ -528,6 +567,8 @@ sub array_to_pve_volname {
     return "vm-${vmid}-efidisk$d->{diskid}"   if $type eq 'efidisk';
     return "vm-${vmid}-tpmstate$d->{diskid}"  if $type eq 'tpmstate';
     return "vm-${vmid}-state-$d->{snapname}"  if $type eq 'state';
+    return "vm-${vmid}-efi-enroll"            if $type eq 'efienroll';
+    return "vm-${vmid}-fleece-$d->{diskid}"   if $type eq 'fleece';
 
     # vmconf volumes are plugin bookkeeping and have no PVE volume name.
     return undef;

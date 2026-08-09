@@ -302,6 +302,12 @@ sub _parse_volname {
     if ($volname =~ /^(?:vm|base)-(\d+)-cloudinit\z/) {
         return { vmid => $1, type => 'cloudinit', isBase => 0 };
     }
+    if ($volname =~ /^(?:vm|base)-(\d+)-efi-enroll\z/) {
+        return { vmid => $1, type => 'efienroll', isBase => 0 };
+    }
+    if ($volname =~ /^(?:vm|base)-(\d+)-fleece-(\d+)\z/) {
+        return { vmid => $1, diskid => $2, type => 'fleece', isBase => 0 };
+    }
     if ($volname =~ /^(?:vm|base)-(\d+)-state-(.+)\z/) {
         return { vmid => $1, snapname => $2, type => 'state', isBase => 0 };
     }
@@ -735,7 +741,7 @@ sub alloc_image {
     my $pool = $class->_storage_pool($scfg, storeid => $storeid);
 
     my ($array_name, $pve_volname);
-    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit)\z/) {
+    if ($name && $name =~ /^vm-\d+-(?:state-.+|cloudinit|efi-enroll|fleece-\d+)\z/) {
         $array_name  = $class->_array_name($storeid, $name);
         $pve_volname = $name;
     } else {
