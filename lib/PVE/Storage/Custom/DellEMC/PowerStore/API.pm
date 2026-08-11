@@ -140,9 +140,9 @@ sub _clear_session {
 sub _logout {
     my ($self) = @_;
 
-    return unless $self->session_valid;
-    eval { $self->post('/logout', {}) };
-    $self->_clear_session();
+    return unless $self->_session_to_release;
+
+    $self->_release_request('POST', '/logout', {});
 
     return;
 }

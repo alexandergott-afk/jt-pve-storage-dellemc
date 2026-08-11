@@ -11,6 +11,7 @@ use LWP::UserAgent;
 use HTTP::Request;
 use JSON;
 use URI;
+use Scalar::Util ();
 
 # Transport shared by every Dell EMC family client. A family module
 # subclasses this and supplies its own authentication:
@@ -245,6 +246,39 @@ sub _auth_headers {
 # arrays expire sessions on their own.
 sub _logout { return; }
 
+# The session this client should give back, or undef.
+#
+# Deliberately NOT session_valid: that also enforces this plugin's own TTL,
+# and a session past our TTL is exactly the one that needs releasing — the
+# array still holds it, and on an ME the array has no command to clear one.
+# What it does check is that the session is ours (a forked worker inherits
+# the object but not the right to end its parent's session) and that we are
+# not already inside a logout.
+sub _session_to_release {
+    my ($self) = @_;
+
+    return undef unless $self->{_session};
+    return undef if $self->{_logging_out};
+    return undef unless ($self->{_session_pid} // 0) == $$;
+
+    return $self->{_session};
+}
+
+# Send the request that ends a session.
+#
+# no_auth is not optional here: _request calls ensure_session, ensure_session
+# releases the session it is about to replace, and that is a loop. The session
+# key still travels — it lives in the headers, not in ensure_session.
+sub _release_request {
+    my ($self, $method, $endpoint, $body) = @_;
+
+    local $self->{_logging_out} = 1;
+    eval { $self->_request($method, $endpoint, $body, no_auth => 1) };
+    $self->_clear_session();
+
+    return;
+}
+
 # Base path prepended to every endpoint, e.g. '/api/rest'.
 sub base_path { '' }
 
@@ -325,6 +359,17 @@ sub session_valid {
     return 1;
 }
 
+# Every client that currently holds a session, so the END block below can
+# give them back.
+#
+# A management session on an ME occupies one of a small number of slots and
+# lives out its idle timeout — and the ME CLI has no command to clear one, so
+# a session this plugin abandons is a slot nobody can recover until the array
+# times it out. A pvedaemon worker is created for one task and exits; without
+# this, every task left a session behind. Weak references: this must never be
+# the reason a client stays alive.
+my %LIVE_SESSIONS;
+
 sub _mark_session {
     my ($self, $session) = @_;
 
@@ -332,11 +377,17 @@ sub _mark_session {
     $self->{_session_time} = time();
     $self->{_session_pid}  = $$;
 
+    my $addr = Scalar::Util::refaddr($self);
+    $LIVE_SESSIONS{$addr} = $self;
+    Scalar::Util::weaken($LIVE_SESSIONS{$addr});
+
     return $session;
 }
 
 sub _clear_session {
     my ($self) = @_;
+
+    delete $LIVE_SESSIONS{ Scalar::Util::refaddr($self) };
 
     $self->{_session}      = undef;
     $self->{_session_time} = 0;
@@ -387,9 +438,51 @@ sub ensure_session {
     my ($self) = @_;
 
     return 1 if $self->session_valid;
+
+    # Give back the one being replaced. session_valid says no for an expired
+    # session and for one inherited by a fork; only the first is ours to end,
+    # and only from the process that opened it.
+    if ($self->{_session} && ($self->{_session_pid} // 0) == $$) {
+        eval { $self->_logout() };
+    }
+
     $self->_login();
 
     return 1;
+}
+
+# Give the session back when this client goes away.
+#
+# Not during global destruction: the user agent and its sockets may already be
+# gone, and a request from there is at best refused and at worst a crash in a
+# daemon. The END block covers process exit, which is when it matters.
+sub DESTROY {
+    my ($self) = @_;
+
+    return if ${^GLOBAL_PHASE} eq 'DESTRUCT';
+    return unless $self->{_session};
+    return unless ($self->{_session_pid} // 0) == $$;
+
+    eval { $self->_logout() };
+
+    return;
+}
+
+# Process exit, while it is still possible to speak to the array.
+#
+# A pvedaemon worker runs one task and exits; a `pvesm` command is a process
+# per invocation. Each one that logged in and did not log out left a session
+# occupying a slot until the array timed it out, and on an ME there is no
+# command to clear one. This is where the short-lived processes give theirs
+# back — DESTROY cannot, because at that point Perl is already tearing the
+# world down.
+END {
+    for my $client (values %LIVE_SESSIONS) {
+        next unless defined $client;
+        next unless $client->{_session};
+        next unless ($client->{_session_pid} // 0) == $$;
+        eval { $client->_logout() };
+    }
 }
 
 # ---------------------------------------------------------------------------

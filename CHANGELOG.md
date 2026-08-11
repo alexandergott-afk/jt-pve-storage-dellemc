@@ -7,6 +7,34 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.9~beta1] - 2026-08-11
+
+### Fixed
+- **Management sessions were opened and never given back.** Reported from a
+  customer's PowerVault ME, where they accumulate on the array. An ME
+  management session occupies one of a small number of slots and lives out its
+  idle timeout, and the ME CLI has no command to clear one — `show sessions`
+  shows them, nothing removes them — so a session this plugin abandons is a
+  slot nobody can recover until the array times it out.
+
+  `_logout` was written for all four families at the start and nothing called
+  it. It is called from two places now:
+
+  - **When a process exits.** A pvedaemon worker runs one task and exits, and
+    a `pvesm` command is a process per invocation; each of them logged in and
+    left the session behind. `DESTROY` cannot do this — at global destruction
+    the user agent is already going away — so the release happens in an `END`
+    block, which can still speak to the array. Both are guarded on the process
+    id: a forked worker inherits the object and must not end its parent's
+    session.
+  - **When the TTL replaces a session.** Every `_logout` began with *return
+    unless the session is valid*, and a session past this plugin's own TTL is
+    not valid — so the one that most needed releasing was the one that never
+    was. That TTL is a local policy; the array's session is still there.
+
+  `GET /exit` is the ME's own command for it and is NOT 0.8.9~beta1IFIED against
+  hardware. `show sessions` on the array is how to see whether it works.
+
 ## [0.8.8~beta1] - 2026-08-09
 
 ### Fixed

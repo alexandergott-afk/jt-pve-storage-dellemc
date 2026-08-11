@@ -194,14 +194,12 @@ sub _auth_headers {
 sub _logout {
     my ($self) = @_;
 
-    return unless $self->session_valid;
+    my $session = $self->_session_to_release or return;
 
-    my $generation = $self->{_session}{generation} // 0;
-    eval {
-        $generation == 4 ? $self->post('/rest/auth/logout', {})
-                         : $self->get('/api/logout');
-    };
-    $self->_clear_session();
+    my $generation = $session->{generation} // 0;
+    $generation == 4
+        ? $self->_release_request('POST', '/rest/auth/logout', {})
+        : $self->_release_request('GET', '/api/logout', undef);
 
     return;
 }

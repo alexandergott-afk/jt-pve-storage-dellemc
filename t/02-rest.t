@@ -637,4 +637,124 @@ like($@, qr/password is required/, 'password is mandatory');
     unlike($msg, qr/f{20}/, 'the message builder redacts too');
 }
 
+# ---------------------------------------------------------------------------
+# A session is given back
+#
+# A management session on a PowerVault ME occupies one of a small number of
+# slots and lives out its idle timeout, and the ME CLI has no command to clear
+# one — so a session this plugin abandons is a slot nobody can recover. A
+# pvedaemon worker is created for one task and exits; a `pvesm` command is a
+# process per invocation. Every one of them logged in and left the session
+# behind, which is what a customer saw on a real ME.
+#
+# _logout existed from the start and had no caller anywhere in the tree.
+# ---------------------------------------------------------------------------
+
+{
+    my @logged_out;
+
+    {
+        package Test::SessionApi;
+        use parent -norequire, 'PVE::Storage::Custom::DellEMC::Common::REST';
+
+        sub _login {
+            my ($self) = @_;
+            $self->_mark_session({ key => 'k' . ++$main::LOGIN_COUNT });
+            return 1;
+        }
+        sub _logout {
+            my ($self) = @_;
+            return unless $self->{_session};
+            push @logged_out, $self->{_session}{key};
+            $self->_clear_session();
+            return;
+        }
+    }
+
+    our $LOGIN_COUNT = 0;
+
+    my $api = Test::SessionApi->new(portal => '10.0.0.1', username => 'u',
+        password => 'p', session_ttl => 1);
+
+    $api->ensure_session;
+    is($LOGIN_COUNT, 1, 'one login');
+    is_deeply(\@logged_out, [], 'and nothing given back yet');
+
+    # The session ages out and is replaced: the old one has to go back, or the
+    # array holds a slot for a session nobody will use again. This is the case
+    # every _logout got wrong — each opened with `return unless
+    # session_valid`, and a session past the TTL is not valid, so the one that
+    # most needed releasing was the one that never was.
+    sleep 2;
+    $api->ensure_session;
+    is($LOGIN_COUNT, 2, 'an expired session is replaced');
+    is_deeply(\@logged_out, ['k1'],
+        '... and the one it replaced was given back, not abandoned: this is'
+      . ' the session a long-lived pvestatd sheds every TTL, and an ME has no'
+      . ' command to clear one');
+
+    # The client goes away: so does its session.
+    undef $api;
+    is_deeply(\@logged_out, ['k1', 'k2'],
+        'a client that goes out of scope gives its session back — a worker'
+      . ' that ran one task and exited used to leave one behind');
+}
+
+{
+    # The logout request must not ask for a session.
+    #
+    # _request calls ensure_session; ensure_session releases the session it is
+    # about to replace; if the release goes through _request without no_auth,
+    # that is a loop. Every family's logout sends a real request, so this is
+    # checked against the transport rather than against each of them.
+    my @sent;
+
+    {
+        package Test::LoopApi;
+        use parent -norequire, 'PVE::Storage::Custom::DellEMC::Common::REST';
+
+        sub _login {
+            my ($self) = @_;
+            $self->_mark_session({ key => 'k' });
+            return 1;
+        }
+        sub _logout {
+            my ($self) = @_;
+            return unless $self->_session_to_release;
+            $self->_release_request('GET', '/exit', undef);
+            return;
+        }
+        sub _request {
+            my ($self, $method, $endpoint, $body, %opts) = @_;
+            push @sent, { endpoint => $endpoint, no_auth => $opts{no_auth} };
+            # What the real one does, and the loop this test exists for.
+            $self->ensure_session unless $opts{no_auth};
+            return {};
+        }
+    }
+
+    my $api = Test::LoopApi->new(portal => '10.0.0.1', username => 'u',
+        password => 'p', session_ttl => 1);
+
+    $api->ensure_session;
+    sleep 2;
+
+    my $ok = eval {
+        local $SIG{ALRM} = sub { die "recursion\n" };
+        alarm 5;
+        $api->ensure_session;
+        alarm 0;
+        1;
+    };
+    alarm 0;
+
+    ok($ok, 'replacing an expired session does not recurse')
+        or diag($@);
+
+    my ($logout) = grep { $_->{endpoint} eq '/exit' } @sent;
+    ok($logout, 'the logout was sent');
+    ok($logout && $logout->{no_auth},
+        '... with no_auth, which is what keeps it out of the loop');
+}
+
 done_testing();

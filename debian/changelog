@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.8.9~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: management sessions were opened and never given back, reported
+    from a customer's PowerVault ME where they accumulate. An ME session
+    occupies one of a small number of slots, lives out its idle timeout, and
+    the ME CLI has no command to clear one. _logout existed for all four
+    families and nothing called it. It is now called when a process exits (an
+    END block, because DESTROY runs too late) and when the TTL replaces a
+    session - the case every _logout got wrong, because it began with "return
+    unless the session is valid" and a session past our own TTL is not.
+    Both paths are guarded on the process id so a forked worker cannot end
+    its parent's session. GET /exit is NOT VERIFIED against hardware; `show
+    sessions` on the array is how to see it work.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 11 Aug 2026 09:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.8~beta1-1) unstable; urgency=medium
 
   * BETA RELEASE. Not for production use.

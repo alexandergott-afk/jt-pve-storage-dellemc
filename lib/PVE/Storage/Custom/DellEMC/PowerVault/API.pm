@@ -160,9 +160,13 @@ sub _auth_headers {
 sub _logout {
     my ($self) = @_;
 
-    return unless $self->session_valid;
-    eval { $self->_request('GET', '/exit', undef) };
-    $self->_clear_session();
+    return unless $self->_session_to_release;
+
+    # 'exit' is the CLI command that ends a session, and the ME's API is the
+    # command as the URL path. NOT VERIFIED against hardware: a customer's
+    # ME is where this gets its first answer, and `show sessions` on the
+    # array is how to see it.
+    $self->_release_request('GET', '/exit', undef);
 
     return;
 }
