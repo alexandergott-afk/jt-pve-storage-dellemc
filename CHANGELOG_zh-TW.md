@@ -5,6 +5,23 @@ English version: [CHANGELOG.md](CHANGELOG.md)
 
 版本規則：小版號逐次遞增，到 .99 才進位到次版號 —— 0.7.0、0.7.1、……、0.7.99，然後 0.8.0。所有 0.x 版本都屬於預先發行版；1.0.0 的門檻是實機測試通過。
 
+## [0.8.10~beta1] - 2026-08-12
+
+### 已修正
+- **0.8.9 加的連線歸還，在 PVE worker 裡根本跑不到。** 客戶在他們的 ME 上驗證後精確地
+  回報：`GET /api/exit` 可以，但 `END` 區塊沒有生效。
+  `PVE::RESTEnvironment::fork_worker` 是以 `POSIX::_exit` 結束子行程的，那會跳過 END
+  區塊、跳過全域解構，連緩衝的輸出都一起丟掉。在 worker 裡，行程結束時什麼都跑不了
+  —— 而 `qm create`、`qm destroy` 以及每一個會碰到磁碟區的工作，跑的正是 worker。
+
+  真正會執行的是 `DESTROY`，也就是物件被正常回收的時候；在 worker 裡，那個時刻就是
+  外掛方法返回的當下。唯一讓 client 活過那一刻的，就是那個行程層級的快取。所以現在
+  worker 不再拿到快取的 client：它為這次呼叫拿一個，呼叫返回時連線就歸還，遠早於
+  `_exit`。長命的行程（pvestatd）仍然共用一個 client，因為在那裡連線是被重複使用的，
+  不是被丟著不管。
+
+  `PVE::RESTEnvironment->is_worker` 是 PVE 自己用來區分這件事的旗標。
+
 ## [0.8.9~beta1] - 2026-08-11
 
 ### 已修正

@@ -161,6 +161,17 @@ sub _api {
 
     my $health = $opts{status} ? 1 : 0;
 
+    # A PVE worker runs one task and ends with POSIX::_exit, which skips END
+    # blocks and global destruction alike — so nothing at exit can give the
+    # session back, which is what a customer measured on 0.8.9. Keeping the
+    # client in a package hash is what holds it to that moment. Uncached, the
+    # client is freed when the method returns and DESTROY releases the
+    # session, which happens well before the _exit.
+    #
+    # PVE::RESTEnvironment->is_worker is PVE's own flag for this, set in the
+    # forked child; eval because the unit tests run without PVE.
+    my $worker = eval { PVE::RESTEnvironment->is_worker() } ? 1 : 0;
+
     # The storeid is part of the key, not only of the object.
     #
     # The client carries the storeid — every message it writes names it — and
@@ -182,7 +193,7 @@ sub _api {
         $health ? $class->_status_timeout($scfg) : '',
     );
 
-    if (my $cached = $API_CACHE{$key}) {
+    if (!$worker && (my $cached = $API_CACHE{$key})) {
         # A forked worker must not reuse the parent's session.
         if ((time() - $cached->{created}) < API_CACHE_TTL && $cached->{pid} == $$) {
             return $cached->{api};
@@ -205,7 +216,8 @@ sub _api {
 
     my $api = PVE::Storage::Custom::DellEMC::Unity::API->new(%args);
 
-    $API_CACHE{$key} = { api => $api, created => time(), pid => $$ };
+    $API_CACHE{$key} = { api => $api, created => time(), pid => $$ }
+        unless $worker;
 
     return $api;
 }

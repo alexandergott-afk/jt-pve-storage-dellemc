@@ -1,3 +1,18 @@
+jt-pve-storage-dellemc (0.8.10~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: the session release added in 0.8.9 could not run in a PVE worker.
+    Verified on the customer's ME: GET /api/exit works, the END block never
+    ran. PVE::RESTEnvironment::fork_worker ends the child with POSIX::_exit,
+    which skips END blocks, global destruction and buffered output alike -
+    and a worker is what runs qm create, qm destroy and every task that
+    touches a volume. DESTROY does run when the client is freed, which in a
+    worker is when the plugin method returns; the per-process client cache
+    was the only thing keeping it alive past that. A worker now gets an
+    uncached client. Long-lived processes still reuse one.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 12 Aug 2026 09:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.9~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

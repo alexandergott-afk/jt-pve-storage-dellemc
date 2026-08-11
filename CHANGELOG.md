@@ -7,6 +7,27 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.10~beta1] - 2026-08-12
+
+### Fixed
+- **The session release added in 0.8.9 could not run in a PVE worker.**
+  Verified on the customer's ME and reported precisely: `GET /api/exit`
+  works, and the `END` block never ran.
+  `PVE::RESTEnvironment::fork_worker` ends the child with `POSIX::_exit`,
+  which skips END blocks, global destruction, and even the flushing of
+  buffered output. Nothing at exit can run in a worker — and a worker is what
+  runs `qm create`, `qm destroy` and every other task that touches a volume.
+
+  What does run is `DESTROY`, when the client is freed normally, which in a
+  worker is the moment the plugin method returns. The only thing keeping the
+  client alive past that was the per-process client cache. So a worker is not
+  given a cached client any more: it gets one for the call, and the session
+  goes back when the call returns, well before the `_exit`. A long-lived
+  process — pvestatd — still reuses one client, because there the session is
+  reused rather than abandoned.
+
+  `PVE::RESTEnvironment->is_worker` is PVE's own flag for the difference.
+
 ## [0.8.9~beta1] - 2026-08-11
 
 ### Fixed

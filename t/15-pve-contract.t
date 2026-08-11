@@ -670,4 +670,50 @@ my %BASE_DEFAULT_IS_RIGHT = (
       . ' array has actually accepted');
 }
 
+# ---------------------------------------------------------------------------
+# A worker's client is not cached, because a worker cannot clean up
+#
+# PVE::RESTEnvironment::fork_worker ends the child with POSIX::_exit, which
+# skips END blocks and global destruction alike — measured on a customer's ME
+# at 0.8.9, where the END block added for exactly this never ran. So nothing
+# at exit can give the session back, and the only moment left is when the
+# client is freed. Keeping it in a package hash is what prevents that.
+# ---------------------------------------------------------------------------
+
+{
+    for my $plugin (@PLUGINS) {
+        my $scfg = {
+            'dell-portal'   => '10.0.0.1',
+            'dell-username' => 'u',
+            'dell-password' => 'p',
+            'pvault-pool'   => 'A',
+            'unity-pool'    => 'A',
+            'pflex-storage-pool' => 'A',
+        };
+
+        no warnings 'redefine', 'once';
+
+        my $is_worker = 0;
+        local *PVE::RESTEnvironment::is_worker = sub { $is_worker };
+
+        my $a = eval { $plugin->_api($scfg, storeid => 'w1') };
+        my $b = eval { $plugin->_api($scfg, storeid => 'w1') };
+
+      SKIP: {
+            skip "$plugin: no client could be built here", 2 unless $a && $b;
+
+            is($a, $b, "$plugin reuses one client in a long-lived process");
+
+            $is_worker = 1;
+            my $c = eval { $plugin->_api($scfg, storeid => 'w1') };
+            my $d = eval { $plugin->_api($scfg, storeid => 'w1') };
+
+            isnt($c, $d,
+                "$plugin gives a worker its own client each time — a cached"
+              . " one lives until POSIX::_exit, and its session is never"
+              . " given back");
+        }
+    }
+}
+
 done_testing();
