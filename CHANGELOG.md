@@ -7,6 +7,27 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.12~beta1] - 2026-08-12
+
+### Fixed
+- **A snapshot rollback flushed and invalidated whatever the lookup handed
+  it.** Every device here is resolved fresh from a WWID on each use — that
+  indirection is what lets a volid survive a reboot, a remap and a migration
+  — and the lookup has fallbacks: a stale mapper entry, a reused mapping
+  index, a link that has not caught up. Where the answer is only read, a wrong
+  device is a wrong number. A rollback writes to it: the flush before lands on
+  another volume, this one keeps its dirty pages, and they are written back on
+  top of the restored snapshot. That is rule 14's failure reached by a
+  different road, and it looks like the rollback half worked.
+
+  The rollback now refuses a device the kernel will not confirm, before it
+  flushes anything — the same confirmation the config-backup and transfer
+  paths have had.
+
+  `deactivate_storage` gets the opposite answer on purpose: it is a loop over
+  every volume, and one device that cannot be confirmed is reported and
+  skipped rather than taking the rest of the deactivation with it.
+
 ## [0.8.11~beta1] - 2026-08-12
 
 ### Changed

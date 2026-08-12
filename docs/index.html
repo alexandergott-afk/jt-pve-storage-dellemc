@@ -167,7 +167,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.11~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.12~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1134,8 +1134,8 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-zh">驗證狀態</span>
     </h2>
     <p class="section-subtitle">
-        <span class="lang-en">3,128 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
-        <span class="lang-zh">3,128 個單元測試不需要儲存伺服器或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有儲存伺服器能回答，而目前只有一台回答過。</span>
+        <span class="lang-en">3,130 unit tests run without an array or a device. What they cannot tell you is whether the endpoints exist, whether the field names are right, or whether a device ever appears &mdash; only an array can, and exactly one has.</span>
+        <span class="lang-zh">3,130 個單元測試不需要儲存伺服器或實體裝置即可執行。它們無法告訴你的是：端點是否存在、欄位名稱是否正確、裝置到底會不會出現 &mdash; 那隻有儲存伺服器能回答，而目前只有一台回答過。</span>
     </p>
 
     <h3>
@@ -1295,6 +1295,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">Changelog</span>
         <span class="lang-zh">變更紀錄</span>
     </h2>
+
+    <div class="changelog-entry">
+        <div class="changelog-version">v0.8.12~beta1</div>
+        <div class="changelog-date">2026-08-12</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A snapshot rollback flushed and invalidated whatever the device lookup handed it. Devices are resolved fresh on every use and the lookup has fallbacks; a rollback writes, so the wrong one means the flush lands elsewhere and this volume's dirty pages go back on top of the restored snapshot.</span>
+            <span class="lang-zh">快照倒回會對「查出來的那個裝置」做 flush 與 invalidate，而沒有先確認它是誰。裝置是每次現查的、查找有退路；倒回是要寫的，所以查錯就會讓 flush 落到別處，而這一顆的髒頁被寫回到剛還原好的快照上面。</span>
+        </div>
+    </div>
 
     <div class="changelog-entry">
         <div class="changelog-version">v0.8.11~beta1</div>

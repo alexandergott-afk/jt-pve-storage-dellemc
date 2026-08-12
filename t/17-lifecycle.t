@@ -501,11 +501,28 @@ is_deeply(volumes_on_array(), [], 'which then deletes cleanly');
     local *PVE::Storage::Custom::DellEMC::Common::BlockBase::is_device_in_use =
         sub { undef };
 
+    # The device this node resolved is the one the kernel agrees it is. Every
+    # device here is looked up fresh from a WWID and the lookup has fallbacks;
+    # a rollback acts on the cache of whatever it was handed, so a wrong
+    # answer means the flush and the invalidation happen to another volume and
+    # this one keeps serving pre-rollback pages.
+    my $confirms = 1;
+    local *PVE::Storage::Custom::DellEMC::Common::BlockBase::device_matches_wwid =
+        sub { $confirms };
+
     ok(!eval { $A->volume_snapshot_rollback($scfg, $store, 'vm-801-disk-0',
             'before'); 1 },
         'a rollback refuses when in-use cannot be established')
         or diag('this would overwrite a volume a guest may be writing to');
     like($@ // '', qr/could not be determined/, 'and says so plainly');
+
+    $confirms = 0;
+    ok(!eval { $A->volume_snapshot_rollback($scfg, $store, 'vm-801-disk-0',
+            'before'); 1 },
+        'and refuses a device the kernel will not confirm, before it flushes'
+      . ' anything');
+    like($@ // '', qr/does not confirm/,
+        '... naming what it could not establish');
 }
 
 # ---------------------------------------------------------------------------

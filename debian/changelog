@@ -1,3 +1,18 @@
+jt-pve-storage-dellemc (0.8.12~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: a snapshot rollback flushed and invalidated whatever the device
+    lookup handed it, without the kernel confirmation the config-backup and
+    transfer paths already require. Devices are resolved fresh from a WWID on
+    every use and the lookup has fallbacks; a rollback writes, so a wrong
+    device means the flush lands on another volume and this one keeps dirty
+    pages that are then written over the restored snapshot. Rollback now
+    refuses an unconfirmed device before flushing anything.
+  * deactivate_storage reports and skips an unconfirmable device instead of
+    dying, because it is a loop over every volume.
+
+ -- Jason Cheng <jason@jason.tools>  Tue, 12 Aug 2026 14:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.11~beta1-1) unstable; urgency=low
 
   * BETA RELEASE. Not for production use.

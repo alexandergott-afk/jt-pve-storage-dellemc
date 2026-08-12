@@ -1142,8 +1142,19 @@ sub deactivate_storage {
         # "could not tell" the same way. This unmaps the volume as well as
         # removing the local devices, so a wrong "free" takes the disk away
         # from a guest that is still writing to it.
+        # The in-use answer is only worth as much as the device it was asked
+        # about. A device the kernel will not confirm is one we cannot ask —
+        # and this is a loop over every volume, so it is skipped rather than
+        # dying and taking the rest of the deactivation with it.
         my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && is_block_device($device)) {
+        $device = undef unless $device && is_block_device($device);
+
+        if ($device && !device_matches_wwid($device, $wwid)) {
+            push @in_use, $vol->{name} . ' (device could not be confirmed)';
+            next;
+        }
+
+        if ($device) {
             my $in_use = is_device_in_use($device);
             if (!defined($in_use) || $in_use) {
                 push @in_use, $vol->{name}
@@ -2756,6 +2767,35 @@ sub volume_rollback_is_possible {
     return 1;
 }
 
+# The device for a WWID, or undef — refusing an answer the kernel does not
+# confirm.
+#
+# Every device here is resolved fresh on each use, from a WWID the storage
+# server just gave. That indirection is what makes a volid survive a reboot
+# and a migration, and it is also where a wrong answer is silent: the lookup
+# has fallbacks, a mapper entry can be stale, and a mapping index gets reused.
+# Where the answer is only READ (a size, a health) a wrong device is a wrong
+# number. Where it is written to, flushed or invalidated, a wrong device is
+# the operation quietly not happening to the volume it was meant for.
+#
+# Returns undef when there is no device at all — which is an ordinary state,
+# not an error — and dies when there is one the kernel will not vouch for.
+sub _confirmed_device {
+    my ($class, $wwid, $what) = @_;
+
+    return undef unless defined $wwid && length $wwid;
+
+    my $device = eval { get_device_by_wwid($wwid) };
+    return undef unless $device && is_block_device($device);
+
+    return $device if device_matches_wwid($device, $wwid);
+
+    die "Refusing to $what through '$device': the kernel does not confirm it"
+      . " is the device for WWID $wwid. It was resolved by a lookup that has"
+      . " fallbacks, and acting on the wrong device here is not something"
+      . " that reports itself.\n";
+}
+
 sub volume_snapshot_rollback {
     my ($class, $scfg, $storeid, $volname, $snap) = @_;
     local $CURRENT_STOREID = $storeid;
@@ -2791,8 +2831,8 @@ sub volume_snapshot_rollback {
           . " docs/TESTING.md on the WWN field name.");
     }
 
-    my $device = $wwid ? eval { get_device_by_wwid($wwid) } : undef;
-    if ($device && is_block_device($device)) {
+    my $device = $class->_confirmed_device($wwid, 'roll back');
+    if ($device) {
         my $in_use = is_device_in_use($device);
 
         die "Cannot roll back volume '$volname': whether device $device is in"
@@ -2814,8 +2854,9 @@ sub volume_snapshot_rollback {
     die "Failed to roll back volume '$volname' to snapshot '$snap': $@" if $@;
 
     if ($wwid) {
-        my $device = eval { get_device_by_wwid($wwid) };
-        if ($device && is_block_device($device)) {
+        my $device = $class->_confirmed_device($wwid,
+            'invalidate the cache of');
+        if ($device) {
             # The snapshot may have a different size than the current volume,
             # and the kernel does not pick that up from a host scan.
             my $slaves = eval { get_multipath_slaves($device) } // [];
