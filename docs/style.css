@@ -22,6 +22,12 @@
 
     --border: #e2e8f0;
     --border-light: #f1f5f9;
+    /* Table rules are their own tone. --border-light is right for a
+       divider under a heading, where the eye already knows the boundary;
+       inside a table it is what the reader follows across four columns to
+       find the cell that belongs to a family, and at #f1f5f9 it was not
+       there to follow. */
+    --table-line: #d5dde7;
 
     --code-bg: #1a1f2e;
     --code-text: #d4d4d8;
@@ -423,7 +429,7 @@ th {
 }
 td {
     padding: 9px 14px;
-    border-bottom: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--table-line);
     vertical-align: top; color: var(--text-secondary);
 }
 
@@ -432,9 +438,7 @@ td {
    draws the outer edge, and a border there would double it. A cell spanning
    the whole width has no column to be separated from. */
 th:not(:last-child),
-td:not(:last-child) { border-right: 1px solid var(--border-light); }
-
-th:not(:last-child) { border-right-color: var(--border); }
+td:not(:last-child) { border-right: 1px solid var(--table-line); }
 
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--indigo-subtle); }

@@ -7,6 +7,16 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.11~beta1] - 2026-08-12
+
+### Changed
+- **The lines inside a table are visible now.** They were `--border-light`,
+  which is the right tone for a divider under a heading — where the eye
+  already knows the boundary is there — and the wrong one inside a table,
+  where the line is what a reader follows across four family columns to find
+  the cell that belongs to theirs. At `#f1f5f9` it was not there to follow.
+  Table rules have their own token now, so changing them again is one place.
+
 ## [0.8.10~beta1] - 2026-08-12
 
 ### Fixed
