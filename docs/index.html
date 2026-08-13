@@ -151,6 +151,10 @@
             <span class="lang-en">Changelog</span>
             <span class="lang-zh">變更紀錄</span>
         </a>
+        <a href="#related" class="sidebar__link">
+            <span class="lang-en">Related Projects</span>
+            <span class="lang-zh">相關專案</span>
+        </a>
         <a href="#acknowledgments" class="sidebar__link">
             <span class="lang-en">Acknowledgments</span>
             <span class="lang-zh">致謝</span>
@@ -167,7 +171,7 @@
     <div class="hero__glow"></div>
     <div class="hero__glow-left"></div>
     <div class="hero__content">
-        <div class="hero__badge">v0.8.12~beta1 <span class="hero__badge-sep"></span> MIT License</div>
+        <div class="hero__badge">v0.8.13~beta1 <span class="hero__badge-sep"></span> MIT License</div>
         <h1 class="hero__title">jt-pve-storage-dellemc</h1>
         <p class="hero__project-desc">
             <span class="lang-en">Dell EMC Storage Plugins for Proxmox VE</span>
@@ -1297,6 +1301,15 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
     </h2>
 
     <div class="changelog-entry">
+        <div class="changelog-version">v0.8.13~beta1</div>
+        <div class="changelog-date">2026-08-13</div>
+        <div class="changelog-summary">
+            <span class="lang-en">A Related projects section at the foot of this site, one card per sibling plugin. They share the host-side layer, and several defects fixed here were found by reading their incident records.</span>
+            <span class="lang-zh">本站最下方新增「相關專案」區塊，每個相關外掛一張卡片。它們共用主機端那一層，而這裡修掉的缺陷有好幾個，是讀它們的事故紀錄找到的。</span>
+        </div>
+    </div>
+
+    <div class="changelog-entry">
         <div class="changelog-version">v0.8.12~beta1</div>
         <div class="changelog-date">2026-08-12</div>
         <div class="changelog-summary">
@@ -2347,15 +2360,39 @@ DellPowerFlexPlugin                  <span class="comment"># no SCSI LUN, no mul
         <span class="lang-en">The host-side layer — device discovery, multipath handling, the anti-hang rules and the orphan reaper — is carried over from two related projects, where those lessons were paid for in production:</span>
         <span class="lang-zh">主機端底層 —— 裝置探索、multipath 處理、防止卡死的規則與 orphan 清理 —— 承接自兩個相關專案，那些教訓是在正式環境付出代價換來的：</span>
     </p>
-    <ul>
-        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">jt-pve-storage-purestorage</a></li>
-        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">jt-pve-storage-netapp</a></li>
-        <li><a href="https://github.com/jasoncheng7115/jt-pve-storage-synology" target="_blank" rel="noopener">jt-pve-storage-synology</a></li>
-    </ul>
     <p>
         <span class="lang-en">In the absence of hardware, this plugin was written against Dell's published documentation: the PowerStore REST guide, the PowerVault ME5 CLI Reference Guide, and the PowerFlex REST and SDC material.</span>
         <span class="lang-zh">在沒有實機的情況下，本外掛是依據 Dell 公開的文件撰寫的：PowerStore REST 指南、PowerVault ME5 CLI Reference Guide，以及 PowerFlex 的 REST 與 SDC 資料。</span>
     </p>
+</section>
+
+<section class="doc-section" id="related">
+    <h2 class="section-title">
+        <span class="lang-en">Related projects</span>
+        <span class="lang-zh">相關專案</span>
+    </h2>
+    <p class="section-subtitle">
+        <span class="lang-en">Proxmox VE storage plugins for other storage servers, sharing the host-side layer and the operational rules this one inherits. Several of the defects fixed here were found by reading their incident records.</span>
+        <span class="lang-zh">其他儲存伺服器的 Proxmox VE 儲存外掛，與本專案共用主機端那一層，以及本專案承接的維運規則。這裡修掉的缺陷有好幾個，是讀它們的事故紀錄找到的。</span>
+    </p>
+
+    <div class="card-grid">
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-netapp" target="_blank" rel="noopener">
+            <div class="card__icon">NA</div>
+            <div class="card__title">jt-pve-storage-netapp</div>
+            <div class="card__desc">NetApp ONTAP</div>
+        </a>
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-purestorage" target="_blank" rel="noopener">
+            <div class="card__icon">PS</div>
+            <div class="card__title">jt-pve-storage-purestorage</div>
+            <div class="card__desc">Pure Storage FlashArray</div>
+        </a>
+        <a class="card" href="https://github.com/jasoncheng7115/jt-pve-storage-synology" target="_blank" rel="noopener">
+            <div class="card__icon">SY</div>
+            <div class="card__title">jt-pve-storage-synology</div>
+            <div class="card__desc">Synology SAN Manager</div>
+        </a>
+    </div>
 </section>
 
 </div><!-- /content-wrap -->

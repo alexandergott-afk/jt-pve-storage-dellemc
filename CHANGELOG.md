@@ -7,6 +7,19 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.13~beta1] - 2026-08-13
+
+### Changed
+- **A Related projects section at the foot of the documentation site**, in the
+  shape the related synology project uses: a card each for the NetApp, Pure
+  Storage and Synology plugins, with what each one talks to. They share the
+  host-side layer and the operational rules this plugin inherits, and several
+  of the defects fixed here were found by reading their incident records —
+  which is worth saying where a reader can act on it.
+
+  The links were a bare list inside Acknowledgments before, where nobody
+  looking for a sibling project would think to find them.
+
 ## [0.8.12~beta1] - 2026-08-12
 
 ### Fixed

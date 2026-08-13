@@ -387,6 +387,15 @@ img { max-width: 100%; height: auto; display: block; }
     box-shadow: 0 4px 12px rgba(15,37,71,0.06);
 }
 
+/* A card that is a link. The whole card is the target, so it must not carry
+   the underline and the link colour a run of text would — the hover border
+   is what says it can be clicked. */
+a.card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
 .card__icon {
     width: 38px; height: 38px;
     border-radius: 8px;
@@ -394,6 +403,14 @@ img { max-width: 100%; height: auto; display: block; }
     margin-bottom: 12px;
 }
 .card__icon svg { flex-shrink: 0; }
+
+/* The two-letter mark a related project's card carries instead of an icon.
+   Sized here rather than inline so the three cards cannot drift apart. */
+.card__icon {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
 
 .card:nth-child(3n+1) .card__icon { background: rgba(79,70,229,0.08);  color: var(--indigo); }
 .card:nth-child(3n+2) .card__icon { background: rgba(14,165,233,0.08); color: #0284c7; }

@@ -1,3 +1,13 @@
+jt-pve-storage-dellemc (0.8.13~beta1-1) unstable; urgency=low
+
+  * BETA RELEASE. Not for production use.
+  * Documentation site: a Related projects section at the foot of the page,
+    in the shape the related synology project uses - one card per sibling
+    plugin with what it talks to. The links were previously a bare list
+    inside Acknowledgments.
+
+ -- Jason Cheng <jason@jason.tools>  Wed, 13 Aug 2026 10:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.12~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.
