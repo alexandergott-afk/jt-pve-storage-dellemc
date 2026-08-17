@@ -7,6 +7,33 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.15~beta1] - 2026-08-17
+
+### Fixed
+- **The logout was sent without the session key, so the array ended nothing.**
+  Every logout since 0.8.9 was a no-op. `_release_request` passes
+  `no_auth => 1` — necessary, because `_request` calls `ensure_session` and
+  `ensure_session` releases the session it is about to replace, which is a
+  loop — but `no_auth` also skips `_auth_headers`, and that is where the
+  session key lives. `GET /api/exit` went out with no `sessionKey`; an ME
+  answers it happily, ends nothing, and holds the slot until its own idle
+  timeout.
+
+  `no_auth` means *do not go and get a session*. It does not mean *this
+  request needs no credential*. The logout now carries the credential
+  explicitly, for every family.
+
+  This is why 0.8.14 made things worse rather than better, exactly as the
+  customer read it: that release stopped a forked child from caching its
+  client, which was right, so a poll went from one client to three — and with
+  the logout ineffective, from one leaked session per poll to three. Measured
+  on their ME4024 at 3.1 seconds per session against 0.8.13's 9.5.
+
+  The fixture in the tests is the reason this survived five releases: it
+  counted the logout and answered success without looking at the headers, so
+  it confirmed a logout that never worked. It refuses one without a valid key
+  now, as the array does.
+
 ## [0.8.14~beta1] - 2026-08-17
 
 ### Fixed

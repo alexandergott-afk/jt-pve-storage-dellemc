@@ -5,7 +5,7 @@ SHELL := /bin/bash
 # the minor number moves — 0.7.0, 0.7.1, ... 0.7.99, then 0.8.0. Keep this in
 # step with debian/changelog; the release workflow refuses to publish when
 # the git tag and debian/changelog disagree.
-VERSION = 0.8.14~beta1
+VERSION = 0.8.15~beta1
 
 DESTDIR =
 PREFIX   = /usr

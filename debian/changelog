@@ -1,3 +1,20 @@
+jt-pve-storage-dellemc (0.8.15~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: the logout was sent without the session key, so the array ended
+    nothing - every logout since 0.8.9 was a no-op. _release_request passes
+    no_auth => 1 to avoid recursing through ensure_session, and no_auth also
+    skips _auth_headers, which is where the session key lives. The logout now
+    carries the credential explicitly, for every family. This is why 0.8.14
+    tripled the leak rather than fixing it: it correctly stopped a forked
+    child from caching, so a poll went from one client to three, and with the
+    logout ineffective from one leaked session per poll to three.
+  * The test fixture now refuses a logout that does not carry a valid session
+    key, as the array does; accepting one without looking at the headers is
+    why this survived five releases.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 17 Aug 2026 15:30:00 +0800
+
 jt-pve-storage-dellemc (0.8.14~beta1-1) unstable; urgency=high
 
   * BETA RELEASE. Not for production use.

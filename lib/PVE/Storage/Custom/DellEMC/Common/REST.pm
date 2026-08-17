@@ -266,14 +266,33 @@ sub _session_to_release {
 
 # Send the request that ends a session.
 #
-# no_auth is not optional here: _request calls ensure_session, ensure_session
-# releases the session it is about to replace, and that is a loop. The session
-# key still travels — it lives in the headers, not in ensure_session.
+# Two things have to be true at once, and getting only the first is how this
+# leaked for five releases.
+#
+# no_auth, because _request calls ensure_session, ensure_session releases the
+# session it is about to replace, and that is a loop.
+#
+# AND the credential, explicitly. no_auth does not mean "this request needs no
+# credential" — it means "do not go and get one". It skips _auth_headers, and
+# _auth_headers is where the session key lives. A logout without it asks the
+# array to end a session it was never told the name of: an ME answers the
+# GET /api/exit happily and ends nothing, so `show sessions` keeps the row and
+# the slot is held until the array's own idle timeout. The comment above used
+# to claim the key still travelled. It did not; nothing checked, and the fake
+# array in the tests counted the request without looking at its headers.
 sub _release_request {
     my ($self, $method, $endpoint, $body) = @_;
 
     local $self->{_logging_out} = 1;
-    eval { $self->_request($method, $endpoint, $body, no_auth => 1) };
+
+    my %auth = eval { $self->_auth_headers() };
+
+    eval {
+        $self->_request($method, $endpoint, $body,
+            no_auth => 1,
+            headers => \%auth,
+        );
+    };
     $self->_clear_session();
 
     return;

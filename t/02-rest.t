@@ -757,4 +757,84 @@ like($@, qr/password is required/, 'password is mandatory');
         '... with no_auth, which is what keeps it out of the loop');
 }
 
+# ---------------------------------------------------------------------------
+# The logout carries the credential
+#
+# no_auth means "do not go and get a session", not "this request needs no
+# credential" — it skips _auth_headers, and _auth_headers is where the session
+# key lives. A logout without it asks the array to end a session it was never
+# told the name of: an ME answers GET /api/exit happily, ends nothing, and the
+# slot is held until its own idle timeout.
+#
+# That shipped in 0.8.9 and was not caught for five releases, because the fake
+# array in these tests counted the request without looking at its headers. So
+# this one reads the headers, and the fixture refuses a logout that does not
+# carry the key — which is what the real ME does.
+# ---------------------------------------------------------------------------
+
+{
+    my @live;      # session keys the array considers open
+    my @refused;
+
+    {
+        package Test::StrictArray;
+        sub new { bless {}, shift }
+        sub timeout { 1 }
+        sub default_header { }
+        sub cookie_jar { }
+        sub can { my ($s, $m) = @_; return $m eq 'cookie_jar' ? 0 : UNIVERSAL::can($s, $m) }
+
+        sub request {
+            my ($self, $req) = @_;
+
+            my $path = $req->uri->path;
+            my $key  = $req->header('sessionKey');
+            my $body;
+
+            if ($path =~ m{/login}) {
+                my $new = 'abcdef' . sprintf('%010d', scalar(@live) + 1);
+                push @live, $new;
+                $body = { status => [{ response => $new,
+                    'response-type-numeric' => 0, 'return-code' => 1 }] };
+            } elsif ($path =~ m{/exit}) {
+                if (defined $key && grep { $_ eq $key } @live) {
+                    @live = grep { $_ ne $key } @live;
+                    $body = { status => [{ response => 'Logged out',
+                        'response-type-numeric' => 0, 'return-code' => 3 }] };
+                } else {
+                    push @refused, $key;
+                    $body = { status => [{ response => 'Invalid session key',
+                        'response-type-numeric' => 1, 'return-code' => 2 }] };
+                }
+            } else {
+                $body = { status => [{ 'response-type-numeric' => 0,
+                    'return-code' => 0 }], system => [{ 'system-name' => 'FAKE' }] };
+            }
+
+            return HTTP::Response->new(200, 'OK',
+                HTTP::Headers->new('Content-Type' => 'application/json'),
+                JSON::encode_json($body));
+        }
+    }
+
+    require PVE::Storage::Custom::DellEMC::PowerVault::API;
+
+    {
+        my $api = PVE::Storage::Custom::DellEMC::PowerVault::API->new(
+            portal => '10.0.0.1', username => 'u', password => 'p');
+        $api->{_ua} = Test::StrictArray->new;
+
+        eval { $api->system_get() };
+        is(scalar(@live), 1, 'the client logged in');
+    }
+    # $api is out of scope: DESTROY logs out.
+
+    is_deeply(\@refused, [],
+        'the logout was accepted — it carried the session key, which is the'
+      . ' only way the array knows which session to end');
+    is(scalar(@live), 0,
+        'and the array no longer holds the session: an ME has no command to'
+      . ' clear one, so a refused logout is a slot lost until it times out');
+}
+
 done_testing();
