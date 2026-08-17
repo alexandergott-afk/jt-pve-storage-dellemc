@@ -273,3 +273,41 @@ hosts by searching for the `pve-<cluster>-` prefix, so a node whose host was
 adopted under a different name is not pre-mapped from elsewhere. It maps
 itself when it activates the storage, which is what happens before a migration
 completes, so nothing breaks — the mapping simply happens a moment later.
+
+## PowerVault ME: a dedicated account with a short session timeout
+
+An ME management session occupies one of a small number of slots and lives out
+its idle timeout — 1800 seconds by default — and the ME CLI has no command to
+clear one. This plugin returns its sessions, but anything that ends a process
+without running its cleanup leaves one behind until the array times it out.
+
+An ME can set that timeout per user, so the plugin can have an account whose
+sessions expire quickly while the administrator's own account keeps the
+default. Measured on an ME4024 by a customer: about 180 concurrent sessions
+before, about 16 after.
+
+```
+create user roles manage interfaces wbi timeout 120 pveplugin
+```
+
+- **120 seconds is the minimum** the ME accepts (`help set user`); the range
+  is 120–43200.
+- **`interfaces wbi` restricts the account to the REST interface** — no CLI,
+  no FTP, no SMI-S — which is worth having on its own.
+- **Leave the password off the command line** and let the CLI prompt for it.
+  The ME CLI does not use shell quoting rules: `password 'secret'` makes the
+  quotes part of the password, and `'` is in the array's forbidden set, so it
+  answers *Invalid character(s) were entered.* — which says nothing about the
+  quotes being the cause.
+
+Then point the storage at it. This side **is** a shell, so quote normally:
+
+```bash
+pvesm set <storeid> --dell-username pveplugin --dell-password '<the password>'
+systemctl restart pvestatd
+```
+
+`show sessions` on the array then names the source in the Username column,
+which is worth more than it sounds: the plugin's sessions are `pveplugin` and
+a person's are their own, so a count no longer has to be attributed by
+timestamp.

@@ -245,6 +245,28 @@ cat /var/lib/pve-storage-dellemc/<storeid>-host
 沒有這個檔案，代表外掛建立並使用自己的 `pve-<叢集>-<節點>`。刪掉這個檔案，下一次啟用
 就會重新解析一次。
 
+## PowerVault ME：管理連線在儲存伺服器上累積
+
+`show sessions` 看到數量一直往上，而 ME 沒有任何指令可以清掉它們 —— 只能等儲存伺服器
+逾時，預設 1800 秒。
+
+本外掛開出去的每一個連線都會歸還：長命行程在 TTL 汰換時歸還，短命行程做完工作時歸還。
+在 0.8.14 之前會破壞這件事的，是「快取在一個以 `POSIX::_exit` 結束的行程裡」的
+client —— 那種結束方式完全不會跑任何清理。自 0.8.14 起，只有載入本外掛的那個行程會快取
+client；任何經由 `fork` 到達的行程，都是每次呼叫建一個，呼叫返回時就把連線還回去。
+
+如果連線仍然累積，最有用的量測是「輪詢有沒有 fork」。在節點上，趁 `pvestatd` 正在輪詢時：
+
+```bash
+watch -n1 'ps -eo pid,ppid,etimes,cmd | grep [p]vestatd'
+```
+
+如果每隔幾秒就看到多一行 `pvestatd`、又消失，代表輪詢跑在一個分叉出來的子行程裡。請把
+那個畫面連同版本（`dpkg-query -W jt-pve-storage-dellemc`）與 `pveversion` 一起提供。
+
+無論如何都有效的緩解方式，是建立一個連線逾時很短的專用帳號 —— 見
+`docs/CONFIGURATION_zh-TW.md`。
+
 ## 回報問題時要收集的資訊
 
 ```bash

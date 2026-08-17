@@ -7,6 +7,46 @@ Versioning: the patch number increments per release and runs to .99 before
 the minor number moves — 0.7.0, 0.7.1, … 0.7.99, then 0.8.0. Every 0.x
 release is a prerelease; 1.0.0 is the on-hardware test pass.
 
+## [0.8.14~beta1] - 2026-08-17
+
+### Fixed
+- **A forked process still leaked its management session.** Measured by a
+  customer on an ME4024: one session per `pvestatd` poll, none returned, about
+  180 in steady state against the array's ceiling — and at the same rate as
+  0.8.8, so none of the session work had reached it.
+
+  0.8.10 stopped caching the client when `PVE::RESTEnvironment->is_worker` is
+  true. That flag is set only in `fork_worker`'s child, and it is PVE's label
+  for one kind of fork. Any other forked child — `run_fork`, a timeout
+  wrapper, a change to how a daemon runs its poll — inherits the parent's
+  cache, misses on the process-id check, builds a client, caches it **in the
+  child**, and ends with `POSIX::_exit`: no `DESTROY`, no `END`, and the
+  session is gone for good.
+
+  The rule is the process now, not PVE's label for it. Only the process that
+  loaded the plugin caches a client; anything reached through `fork` builds
+  one per call and gives its session back when the call returns. Demonstrated
+  by forking three children that each do one call and exit: before, four
+  logins and no logouts; after, four and three — the parent keeps its cached
+  client, which is what a cache is for.
+
+### Added
+- **A dedicated ME account with a short session timeout**, in
+  `docs/CONFIGURATION`. An ME can set the session timeout per user (120
+  seconds minimum), so the plugin's sessions expire quickly while the
+  operator's account keeps the default 1800. A customer measured about 180
+  concurrent sessions before and about 16 after. It also makes `show sessions`
+  name the source.
+
+  With the trap that goes with it: the ME CLI does not use shell quoting, so
+  `password 'secret'` puts the quotes in the password, `'` is a forbidden
+  character, and the array answers *Invalid character(s) were entered.* with
+  no hint that the quotes are the cause.
+
+- `docs/TROUBLESHOOTING` gains the session-accumulation entry, including the
+  one measurement that separates the remaining causes: whether the poll runs
+  in a forked child.
+
 ## [0.8.13~beta1] - 2026-08-13
 
 ### Changed

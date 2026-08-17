@@ -329,6 +329,32 @@ No such file means the plugin created and uses its own
 `pve-<cluster>-<node>`. Removing the file makes the next activation resolve
 again from scratch.
 
+## PowerVault ME: management sessions accumulating on the array
+
+`show sessions` shows the count climbing, and the ME has no command to clear
+one — they go when the array times them out, 1800 seconds by default.
+
+Every session this plugin opens is returned: when a long-lived process
+replaces one at its TTL, and when a short-lived process finishes its work.
+What defeated that before 0.8.14 was a client cached in a process that ends
+with `POSIX::_exit`, which runs no cleanup at all. From 0.8.14 only the
+process that loaded the plugin caches a client; anything reached through
+`fork` builds one per call and gives its session back when the call returns.
+
+If sessions still accumulate, the useful measurement is whether the poll
+forks. On the node, while `pvestatd` is polling:
+
+```bash
+watch -n1 'ps -eo pid,ppid,etimes,cmd | grep [p]vestatd'
+```
+
+A second `pvestatd` line appearing and disappearing every few seconds means
+the poll runs in a forked child. Send that along with the version
+(`dpkg-query -W jt-pve-storage-dellemc`) and `pveversion`.
+
+The mitigation that works regardless is a dedicated account with a short
+session timeout — see `docs/CONFIGURATION.md`.
+
 ## Collecting information for a bug report
 
 ```bash

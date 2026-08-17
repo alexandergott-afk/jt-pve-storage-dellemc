@@ -1,3 +1,21 @@
+jt-pve-storage-dellemc (0.8.14~beta1-1) unstable; urgency=high
+
+  * BETA RELEASE. Not for production use.
+  * Fixed: a forked process still leaked its management session. 0.8.10
+    stopped caching the client when PVE::RESTEnvironment->is_worker is true,
+    but that flag is set only in fork_worker.s child - PVE.s label for one
+    kind of fork. Any other forked child cached a client and ended with
+    POSIX::_exit, which runs no DESTROY and no END. Only the process that
+    loaded the plugin caches a client now; anything reached through fork
+    builds one per call and returns its session when the call returns.
+    Measured by a customer on an ME4024 at one session per pvestatd poll.
+  * Added: a dedicated ME account with a short per-user session timeout in
+    docs/CONFIGURATION (about 180 concurrent sessions down to about 16, as
+    measured by the customer), including the ME CLI quoting trap; and a
+    session-accumulation entry in docs/TROUBLESHOOTING.
+
+ -- Jason Cheng <jason@jason.tools>  Mon, 17 Aug 2026 12:00:00 +0800
+
 jt-pve-storage-dellemc (0.8.13~beta1-1) unstable; urgency=low
 
   * BETA RELEASE. Not for production use.

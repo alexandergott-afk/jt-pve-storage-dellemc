@@ -716,4 +716,74 @@ my %BASE_DEFAULT_IS_RIGHT = (
     }
 }
 
+# ---------------------------------------------------------------------------
+# A forked child does not cache its client
+#
+# A client kept in a package hash lives until the process ends, and a PVE
+# worker ends with POSIX::_exit — no DESTROY, no END, so the session is never
+# given back. is_worker covers PVE's own workers; it does not cover run_fork,
+# a timeout wrapper, or a future change to how pvestatd polls. Any of those
+# leaks one session per call, which is what a customer measured on a real
+# ME4024: one management session per poll, none returned, ~180 in steady
+# state against the array's session ceiling.
+#
+# So the rule is the process, not PVE's label for it: cache only where this
+# module was compiled. Anything else got here through fork.
+# ---------------------------------------------------------------------------
+
+{
+    use POSIX ();
+    use File::Temp qw(tempfile);
+
+    for my $plugin (@PLUGINS) {
+        my $scfg = {
+            'dell-portal'   => '10.0.0.1',
+            'dell-username' => 'u',
+            'dell-password' => 'p',
+            'pvault-pool'   => 'A',
+            'unity-pool'    => 'A',
+            'pflex-storage-pool' => 'A',
+        };
+
+        # Warm the cache here, as a long-lived process does.
+        my $parent = eval { $plugin->_api($scfg, storeid => 'f1') };
+
+      SKIP: {
+            skip "$plugin: no client could be built here", 2 unless $parent;
+
+            is($plugin->_api($scfg, storeid => 'f1'), $parent,
+                "$plugin reuses its client in the process that built it");
+
+            my ($fh, $file) = tempfile(UNLINK => 1);
+            close $fh;
+
+            my $pid = fork();
+            if (!defined $pid) {
+                fail("$plugin: fork failed");
+            } elsif ($pid == 0) {
+                my $a = eval { $plugin->_api($scfg, storeid => 'f1') };
+                my $b = eval { $plugin->_api($scfg, storeid => 'f1') };
+                my $same = ($a && $b && $a == $b) ? 'same' : 'different';
+                if (open(my $out, '>', $file)) {
+                    print {$out} $same;
+                    close $out;
+                }
+                POSIX::_exit(0);
+            }
+            waitpid($pid, 0);
+
+            my $answer = do {
+                open my $in, '<', $file or die $!;
+                local $/;
+                <$in> // '';
+            };
+
+            is($answer, 'different',
+                "$plugin gives a forked child a fresh client each call, so it"
+              . " is freed on return and its session goes back — a cached one"
+              . " lives until POSIX::_exit and is never returned");
+        }
+    }
+}
+
 done_testing();

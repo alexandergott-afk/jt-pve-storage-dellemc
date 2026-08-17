@@ -219,3 +219,33 @@ journalctl -t pvestatd | grep dellpowerstore    # 外掛輸出的訊息
 有一件連帶的事值得知道。磁碟區要預先對應到其他節點的 host，是以 `pve-<叢集>-` 前置
 字串搜尋的，所以某個節點若採用了不同名稱的 host，就不會被別處預先對應。它會在自己啟用
 儲存時完成對應 —— 而那正是遷移完成前會發生的事，所以不會出問題，只是時間點稍晚一點。
+
+## PowerVault ME：為外掛建立專用帳號並縮短連線逾時
+
+ME 的管理連線會佔用數量有限的其中一個名額，並且會存到閒置逾時為止 —— 預設 1800 秒
+—— 而 ME 的 CLI 沒有任何指令可以清掉它。本外掛會歸還自己的連線，但任何「結束行程時
+沒有跑到清理」的情況，都會留下一個，只能等儲存伺服器自己逾時。
+
+ME 可以逐一使用者設定那個逾時，所以可以給外掛一個「連線很快就過期」的帳號，而管理者
+自己的帳號維持預設值。客戶在 ME4024 上實測：切換前約 180 個並存連線，切換後約 16 個。
+
+```
+create user roles manage interfaces wbi timeout 120 pveplugin
+```
+
+- **120 秒是 ME 接受的最小值**（`help set user`），範圍是 120–43200。
+- **`interfaces wbi` 讓該帳號只能走 REST** —— 不能用 CLI、FTP、SMI-S —— 這件事本身
+  就值得做。
+- **不要在指令列上寫密碼**，讓 CLI 互動式提示輸入。ME 的 CLI 不使用 shell 的引號規則：
+  寫成 `password 'secret'` 會把引號本身算進密碼，而 `'` 正好在儲存伺服器的禁用字元清單
+  裡，於是它回答 *Invalid character(s) were entered.* —— 而那句話完全看不出原因是引號。
+
+接著把儲存指向它。這一側**是** shell，所以照常加引號：
+
+```bash
+pvesm set <storeid> --dell-username pveplugin --dell-password '<密碼>'
+systemctl restart pvestatd
+```
+
+之後儲存伺服器上的 `show sessions`，Username 欄位就分得出來源。這比聽起來有用：外掛的
+連線是 `pveplugin`，人操作的是他自己的帳號，數量不必再靠時間戳去推測是誰的。

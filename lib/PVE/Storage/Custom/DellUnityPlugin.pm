@@ -154,6 +154,9 @@ sub family_options {
 # ---------------------------------------------------------------------------
 
 my %API_CACHE;
+
+# The process this module was compiled in; see _api.
+my $BOOT_PID = $$;
 use constant API_CACHE_TTL => 300;
 
 sub _api {
@@ -161,16 +164,22 @@ sub _api {
 
     my $health = $opts{status} ? 1 : 0;
 
-    # A PVE worker runs one task and ends with POSIX::_exit, which skips END
-    # blocks and global destruction alike — so nothing at exit can give the
-    # session back, which is what a customer measured on 0.8.9. Keeping the
-    # client in a package hash is what holds it to that moment. Uncached, the
-    # client is freed when the method returns and DESTROY releases the
-    # session, which happens well before the _exit.
+    # Cache only in the process that loaded this module.
     #
-    # PVE::RESTEnvironment->is_worker is PVE's own flag for this, set in the
-    # forked child; eval because the unit tests run without PVE.
-    my $worker = eval { PVE::RESTEnvironment->is_worker() } ? 1 : 0;
+    # A client kept in a package hash lives until the process ends. A PVE
+    # worker ends with POSIX::_exit, which runs no DESTROY and no END, so a
+    # cached client in a forked child is a session the storage server never
+    # gets back — and 'forked child' is not only PVE's own worker: run_fork,
+    # a timeout wrapper, or a future change to how pvestatd polls all produce
+    # one. is_worker answers PVE's question, not ours.
+    #
+    # $BOOT_PID is the process this module was compiled in — pvestatd,
+    # pvedaemon, or the pvesm command itself. Anything else got here through
+    # fork, and is treated as short-lived: build a client for the call, let it
+    # be freed when the call returns, and DESTROY gives the session back well
+    # before any _exit.
+    my $forked = ($$ != $BOOT_PID) ? 1 : 0;
+    my $worker = $forked || (eval { PVE::RESTEnvironment->is_worker() } ? 1 : 0);
 
     # The storeid is part of the key, not only of the object.
     #
