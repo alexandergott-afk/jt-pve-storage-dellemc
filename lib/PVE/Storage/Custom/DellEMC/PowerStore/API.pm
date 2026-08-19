@@ -507,6 +507,10 @@ sub get_managed_capacity {
 sub align_size {
     my ($class, $bytes) = @_;
 
+    # PowerStore rejects volumes smaller than 1 MiB. This is hit by
+    # Proxmox efidisk0 volumes, which may be only 540672 bytes.
+    $bytes = MIN_VOLUME_SIZE if $bytes < MIN_VOLUME_SIZE;
+    
     my $granularity = SIZE_GRANULARITY;
     my $remainder = $bytes % $granularity;
 
