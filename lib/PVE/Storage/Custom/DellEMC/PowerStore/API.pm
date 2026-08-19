@@ -38,6 +38,9 @@ use constant {
     # PowerStore requires volume sizes to be a multiple of 8 KiB.
     SIZE_GRANULARITY => 8192,
 
+    # PowerStore rejects volumes smaller than 1 MiB.
+    MIN_VOLUME_SIZE => 1024 * 1024,
+    
     # The developers guide documents the pagination limit as 1 to 2000, 100
     # by default, and answers 206 Partial Content with a Content-Range header
     # when the collection is larger. 200 keeps a poll's response small while
