@@ -296,7 +296,7 @@ sub _volume_group_scope_name {
     );
 
     # Reserve space for the storage ID, separators and VMID.
-    my $cluster_max = 128 - length($storeid) - length($suffix) - 1;
+    my $cluster_max = $class->naming->max_volume_group_name_length() - length($storeid) - length($suffix) - 1;
 
     die "Storage ID '$storeid' and VMID '$vmid' leave no room for the"
       . " Proxmox cluster name in a PowerStore volume group name\n"
