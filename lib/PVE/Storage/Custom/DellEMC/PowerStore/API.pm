@@ -492,6 +492,134 @@ sub get_managed_capacity {
 }
 
 # ---------------------------------------------------------------------------
+# Volume groups
+#
+# One PowerStore volume group is used per Proxmox VM. Its name is:
+#
+#   <cluster-name>-<storage-id>-<vmid>
+#
+# Example:
+#
+#   pvecluster-ps1-104
+# ---------------------------------------------------------------------------
+
+sub volume_group_get {
+    my ($self, $id, %opts) = @_;
+
+    return $self->get(
+        "/volume_group/$id",
+        {
+            select => 'id,name,description,is_write_order_consistent,'
+                    . 'protection_policy_id,volume_ids',
+        },
+        %opts,
+    );
+}
+
+sub volume_group_get_by_name {
+    my ($self, $name, %opts) = @_;
+
+    my $rows = $self->get(
+        '/volume_group',
+        {
+            name   => "eq.$name",
+            select => 'id,name,description,is_write_order_consistent,'
+                    . 'protection_policy_id,volume_ids',
+        },
+        %opts,
+    );
+
+    return (ref($rows) eq 'ARRAY' && @$rows) ? $rows->[0] : undef;
+}
+
+sub volume_group_create {
+    my ($self, $name, %opts) = @_;
+
+    my $body = {
+        name => $name,
+
+        # VM disks should be captured consistently when group snapshots or
+        # protection policies are used.
+        is_write_order_consistent => JSON::true,
+    };
+
+    $body->{description} = $opts{description}
+        if defined $opts{description};
+
+    $body->{protection_policy_id} = $opts{protection_policy_id}
+        if defined $opts{protection_policy_id};
+
+    $body->{volume_ids} = $opts{volume_ids}
+        if ref($opts{volume_ids}) eq 'ARRAY' && @{ $opts{volume_ids} };
+
+    my $res = $self->post('/volume_group', $body, %opts);
+
+    return ref($res) eq 'HASH' ? $res->{id} : undef;
+}
+
+sub volume_group_get_or_create {
+    my ($self, $name, %opts) = @_;
+
+    my $existing = $self->volume_group_get_by_name($name, %opts);
+
+    return $existing->{id}
+        if ref($existing) eq 'HASH'
+        && defined $existing->{id}
+        && length $existing->{id};
+
+    my $id = $self->volume_group_create($name, %opts);
+
+    die $self->_msg(
+        "PowerStore created volume group '$name' but returned no id"
+    ) . "\n" unless defined $id && length $id;
+
+    return $id;
+}
+
+sub volume_group_add_members {
+    my ($self, $group_id, $volume_ids, %opts) = @_;
+
+    die $self->_msg("volume_group_add_members needs a volume group id") . "\n"
+        unless defined $group_id && length $group_id;
+
+    die $self->_msg("volume_group_add_members needs at least one volume id") . "\n"
+        unless ref($volume_ids) eq 'ARRAY' && @$volume_ids;
+
+    return $self->post(
+        "/volume_group/$group_id/add_members",
+        { volume_ids => $volume_ids },
+        %opts,
+    );
+}
+
+sub volume_group_remove_members {
+    my ($self, $group_id, $volume_ids, %opts) = @_;
+
+    die $self->_msg("volume_group_remove_members needs a volume group id") . "\n"
+        unless defined $group_id && length $group_id;
+
+    die $self->_msg("volume_group_remove_members needs at least one volume id") . "\n"
+        unless ref($volume_ids) eq 'ARRAY' && @$volume_ids;
+
+    return $self->post(
+        "/volume_group/$group_id/remove_members",
+        { volume_ids => $volume_ids },
+        %opts,
+    );
+}
+
+sub volume_group_delete {
+    my ($self, $group_id, %opts) = @_;
+
+    return $self->_request(
+        'DELETE',
+        "/volume_group/$group_id",
+        undef,
+        %opts,
+    );
+}
+
+# ---------------------------------------------------------------------------
 # Volumes
 # ---------------------------------------------------------------------------
 
