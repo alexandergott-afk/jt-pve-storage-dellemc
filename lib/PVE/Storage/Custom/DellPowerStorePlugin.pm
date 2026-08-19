@@ -319,6 +319,59 @@ sub _volume_group_scope_name {
 # Example:
 #
 #   pve-ps1-104-disk0
+
+# Resolve the PowerStore volume group for a new volume.
+#
+# If pstore-volume-group is configured, it names an existing group and takes
+# precedence over automatic per-VM grouping.
+#
+# Otherwise, create or reuse:
+#
+#   <cluster-name>-<storage-id>-<vmid>
+sub _resolve_volume_group_id {
+    my ($class, $scfg, $storeid, $volume_name, %opts) = @_;
+
+    my $api = $class->_api(
+        $scfg,
+        storeid => $storeid,
+        %opts,
+    );
+
+    my $configured = $scfg->{'pstore-volume-group'};
+
+    if (defined $configured && length $configured) {
+        my $group = $api->volume_group_get_by_name(
+            $configured,
+            %opts,
+        );
+
+        die "Configured PowerStore volume group '$configured' does not exist"
+          . " on the array\n"
+            unless ref($group) eq 'HASH'
+            && defined $group->{id}
+            && length $group->{id};
+
+        return $group->{id};
+    }
+
+    my $vmid = $class->_volume_vmid(
+        $storeid,
+        $volume_name,
+    );
+
+    my $group_name = $class->_volume_group_scope_name(
+        $scfg,
+        $storeid,
+        $vmid,
+    );
+
+    return $api->volume_group_get_or_create(
+        $group_name,
+        description => "Proxmox VE VM $vmid on storage $storeid",
+        %opts,
+    );
+}
+
 sub _volume_vmid {
     my ($class, $storeid, $name) = @_;
 
@@ -459,31 +512,51 @@ sub _array_list_volumes {
 sub _array_create_volume {
     my ($class, $scfg, $storeid, $name, $size, %opts) = @_;
 
-    my $api = $class->_api($scfg, %opts);
+    my $api = $class->_api(
+        $scfg,
+        storeid => $storeid,
+        %opts,
+    );
 
     my %args;
+
     $args{appliance_id} = $scfg->{'pstore-appliance'}
-        if defined $scfg->{'pstore-appliance'} && length $scfg->{'pstore-appliance'};
+        if defined $scfg->{'pstore-appliance'}
+        && length $scfg->{'pstore-appliance'};
+
+    $args{volume_group_id} = $class->_resolve_volume_group_id(
+        $scfg,
+        $storeid,
+        $name,
+        %opts,
+    );
 
     for my $pair (
-        ['pstore-volume-group'       => 'volume_group_id'],
         ['pstore-performance-policy' => 'performance_policy_id'],
         ['pstore-protection-policy'  => 'protection_policy_id'],
     ) {
         my ($option, $field) = @$pair;
         my $value = $scfg->{$option};
-        $args{$field} = $value if defined $value && length $value;
+
+        $args{$field} = $value
+            if defined $value && length $value;
     }
 
-    $args{description} = "Proxmox VE storage $storeid" if defined $storeid;
+    $args{description} = "Proxmox VE storage $storeid";
 
-    my $id = $api->volume_create($name, $size, %args);
+    my $id = $api->volume_create(
+        $name,
+        $size,
+        %args,
+        %opts,
+    );
 
-    # PowerStore answers some requests with 202 and a job id instead of the
-    # finished object. The caller looks the volume up by name immediately
-    # afterwards, so wait for it to actually be there rather than failing with
-    # "does not exist" on a volume that is merely still being created.
-    $class->_await_volume($scfg, $name, %opts);
+    $class->_await_volume(
+        $scfg,
+        $name,
+        storeid => $storeid,
+        %opts,
+    );
 
     return $id;
 }
@@ -602,15 +675,62 @@ sub _array_snapshot_rollback {
 sub _array_clone {
     my ($class, $scfg, $storeid, $source, $target, %opts) = @_;
 
-    my $api = $class->_api($scfg, %opts);
+    my $api = $class->_api(
+        $scfg,
+        storeid => $storeid,
+        %opts,
+    );
 
-    my $source_id = $class->_volume_id($scfg, $source, %opts)
-        // $class->_snapshot_id($scfg, $source, %opts);
-    die "Clone source '$source' does not exist on the array\n" unless $source_id;
+    my $source_id = $class->_volume_id(
+        $scfg,
+        $source,
+        storeid => $storeid,
+        %opts,
+    );
 
-    my $id = $api->volume_clone($source_id, $target, %opts);
+    $source_id //= $class->_snapshot_id(
+        $scfg,
+        $source,
+        storeid => $storeid,
+        %opts,
+    );
 
-    $class->_await_volume($scfg, $target, %opts);
+    die "Clone source '$source' does not exist on the array\n"
+        unless $source_id;
+
+    my $volume_group_id = $class->_resolve_volume_group_id(
+        $scfg,
+        $storeid,
+        $target,
+        %opts,
+    );
+
+    my $id = $api->volume_clone(
+        $source_id,
+        $target,
+        %opts,
+    );
+
+    $class->_await_volume(
+        $scfg,
+        $target,
+        storeid => $storeid,
+        %opts,
+    );
+
+    # A background clone operation may not return the completed volume ID.
+    $id //= $class->_require_volume_id(
+        $scfg,
+        $target,
+        storeid => $storeid,
+        %opts,
+    );
+
+    $api->volume_group_add_members(
+        $volume_group_id,
+        [ $id ],
+        %opts,
+    );
 
     return $id;
 }
