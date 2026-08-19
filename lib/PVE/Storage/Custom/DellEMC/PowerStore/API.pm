@@ -567,14 +567,35 @@ sub volume_group_get_or_create {
         && defined $existing->{id}
         && length $existing->{id};
 
-    my $id = $self->volume_group_create($name, %opts);
+    my $id = eval {
+        $self->volume_group_create($name, %opts);
+    };
+
+    return $id
+        if defined $id && length $id;
+
+    my $create_error = $@;
+
+    # Another PVE worker or cluster node may have created the same per-VM
+    # volume group after the initial lookup.
+    $existing = eval {
+        $self->volume_group_get_by_name($name, %opts);
+    };
+
+    return $existing->{id}
+        if ref($existing) eq 'HASH'
+        && defined $existing->{id}
+        && length $existing->{id};
+
+    die $create_error
+        if defined $create_error && length $create_error;
 
     die $self->_msg(
-        "PowerStore created volume group '$name' but returned no id"
-    ) . "\n" unless defined $id && length $id;
-
-    return $id;
+        "PowerStore created volume group '$name' but returned no id and the"
+      . " group was not visible in a follow-up lookup"
+    ) . "\n";
 }
+
 
 sub volume_group_add_members {
     my ($self, $group_id, $volume_ids, %opts) = @_;
