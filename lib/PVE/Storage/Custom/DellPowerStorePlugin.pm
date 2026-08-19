@@ -310,6 +310,39 @@ sub _volume_group_scope_name {
     return join('-', $cluster_name, $storeid, 0 + $vmid);
 }
 
+# Extract the VMID from a volume name owned by this storage.
+#
+# Expected shape:
+#
+#   pve-<storeid>-<vmid>-<object>
+#
+# Example:
+#
+#   pve-ps1-104-disk0
+sub _volume_vmid {
+    my ($class, $storeid, $name) = @_;
+
+    die "Cannot determine a VMID without a storage ID\n"
+        unless defined $storeid && length $storeid;
+
+    die "Cannot determine a VMID without a volume name\n"
+        unless defined $name && length $name;
+
+    my $prefix = $class->naming->volume_prefix($storeid);
+
+    die "Volume '$name' does not belong to storage '$storeid'\n"
+        unless index($name, $prefix) == 0;
+
+    my $remainder = substr($name, length($prefix));
+
+    my ($vmid) = $remainder =~ /^(\d+)(?:-|$)/;
+
+    die "Cannot determine the VMID from volume name '$name'\n"
+        unless defined $vmid;
+
+    return 0 + $vmid;
+}
+
 sub _volume_id {
     my ($class, $scfg, $name, %opts) = @_;
 
