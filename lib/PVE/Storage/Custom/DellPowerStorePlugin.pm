@@ -264,6 +264,27 @@ sub _to_epoch {
 # Name to id resolution
 # ---------------------------------------------------------------------------
 
+sub _volume_group_scope_name {
+    my ($class, $scfg, $storeid, $vmid) = @_;
+
+    die "Cannot build a PowerStore volume group name without a storage ID\n"
+        unless defined $storeid && length $storeid;
+
+    die "Cannot build a PowerStore volume group name without a VMID\n"
+        unless defined $vmid && $vmid =~ /^\d+$/;
+
+    my $cluster_name = $class->_cluster_name($scfg);
+
+    die "Cannot build a PowerStore volume group name because the Proxmox"
+      . " cluster name is empty\n"
+        unless defined $cluster_name && length $cluster_name;
+
+    $cluster_name = $class->naming->sanitize($cluster_name, 40);
+    $storeid      = $class->naming->sanitize($storeid, 40);
+
+    return join('-', $cluster_name, $storeid, 0 + $vmid);
+}
+
 sub _volume_id {
     my ($class, $scfg, $name, %opts) = @_;
 
