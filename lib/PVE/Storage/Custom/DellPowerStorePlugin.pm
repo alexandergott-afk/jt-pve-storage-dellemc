@@ -94,14 +94,14 @@ sub family_properties {
             type => 'string',
             optional => 1,
         },
-        'pstore-volume-group' => {
-            description => "Place every volume of this storage in the named"
-                . " volume group, which gives them a namespace on the array"
-                . " and lets protection policies apply to them as a unit. The"
-                . " group must already exist.",
-            type => 'string',
-            optional => 1,
-        },
+		'pstore-volume-group' => {
+			description => "Place every volume of this storage in the named existing"
+				. " PowerStore volume group. When unset, the plugin automatically"
+				. " creates one volume group per VM named"
+				. " <cluster-name>-<storage-id>-<vmid>.",
+			type => 'string',
+			optional => 1,
+		},
         'pstore-performance-policy' => {
             description => "Performance policy applied to new volumes.",
             type => 'string',
@@ -264,6 +264,15 @@ sub _to_epoch {
 # Name to id resolution
 # ---------------------------------------------------------------------------
 
+# Return the automatically generated PowerStore volume group name for one VM.
+#
+# This method is used only when pstore-volume-group is not configured.
+#
+#   <cluster-name>-<storage-id>-<vmid>
+#
+# Example:
+#
+#   pvecluster-ps1-104
 sub _volume_group_scope_name {
     my ($class, $scfg, $storeid, $vmid) = @_;
 
@@ -279,8 +288,24 @@ sub _volume_group_scope_name {
       . " cluster name is empty\n"
         unless defined $cluster_name && length $cluster_name;
 
-    $cluster_name = $class->naming->sanitize($cluster_name, 40);
-    $storeid      = $class->naming->sanitize($storeid, 40);
+    my $suffix = '-' . $vmid;
+
+    $storeid = $class->naming->sanitize(
+        $storeid,
+        $class->naming->max_storeid_length(),
+    );
+
+    # Reserve space for the storage ID, separators and VMID.
+    my $cluster_max = 128 - length($storeid) - length($suffix) - 1;
+
+    die "Storage ID '$storeid' and VMID '$vmid' leave no room for the"
+      . " Proxmox cluster name in a PowerStore volume group name\n"
+        if $cluster_max < 1;
+
+    $cluster_name = $class->naming->sanitize(
+        $cluster_name,
+        $cluster_max,
+    );
 
     return join('-', $cluster_name, $storeid, 0 + $vmid);
 }
