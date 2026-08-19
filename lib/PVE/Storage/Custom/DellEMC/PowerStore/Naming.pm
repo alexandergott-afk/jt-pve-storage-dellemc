@@ -26,6 +26,7 @@ use base qw(PVE::Storage::Custom::DellEMC::Common::Naming);
 sub max_volume_name_length   { 128 }
 sub max_snapshot_name_length { 128 }
 sub max_host_name_length     { 128 }
+sub max_volume_group_name_length { 128 }
 
 # The storeid's share of a volume name. Wider than the default because the
 # names are longer here, but still bounded: the vmid, the object kind and a
