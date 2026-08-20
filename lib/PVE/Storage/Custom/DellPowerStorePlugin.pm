@@ -282,30 +282,25 @@ sub _volume_group_scope_name {
     die "Cannot build a PowerStore volume group name without a VMID\n"
         unless defined $vmid && $vmid =~ /^\d+$/;
 
-    my $cluster_name = $class->_cluster_name($scfg);
+    my $suffix = '-' . $vmid;
+
+    # Reserve space for the storage ID, separators and VMID.
+    my $cluster_max = $class->naming->max_volume_group_name_length() - length($storeid) - length($suffix) - 1;
+	
+    my $cluster_name = $class->naming->sanitize($class->_cluster_name($scfg), $cluster_max);
 
     die "Cannot build a PowerStore volume group name because the Proxmox"
       . " cluster name is empty\n"
         unless defined $cluster_name && length $cluster_name;
-
-    my $suffix = '-' . $vmid;
 
     $storeid = $class->naming->sanitize(
         $storeid,
         $class->naming->max_storeid_length(),
     );
 
-    # Reserve space for the storage ID, separators and VMID.
-    my $cluster_max = $class->naming->max_volume_group_name_length() - length($storeid) - length($suffix) - 1;
-
     die "Storage ID '$storeid' and VMID '$vmid' leave no room for the"
       . " Proxmox cluster name in a PowerStore volume group name\n"
         if $cluster_max < 1;
-
-    $cluster_name = $class->naming->sanitize(
-        $cluster_name,
-        $cluster_max,
-    );
 
     return join('-', $cluster_name, $storeid, 0 + $vmid);
 }
@@ -586,7 +581,77 @@ sub _array_delete_volume {
     my $id = $class->_volume_id($scfg, $name, %opts);
     return 1 unless $id;   # already gone; deletion is idempotent
 
-    return $class->_api($scfg, %opts)->volume_delete($id, %opts);
+    my $api = $class->_api($scfg, %opts);
+    my $vol = $api->volume_get($id, %opts);
+
+    # 1. Remove from Volume Group(s) first, otherwise array refuses delete
+    my @vg_ids;
+    foreach my $vg (@{$vol->{volume_groups} // []}) {
+        my $vgid = $vg->{id} // next;
+        push @vg_ids, $vgid;
+        
+        eval {
+            $api->volume_group_remove_members($vgid, [ $id ], %opts);
+        };
+        if ($@) {
+            warn "Failed to remove volume '$name' from volume group '$vgid': $@\n";
+        }
+    }
+
+    # 2. Detach from ALL hosts (it might still be mapped to another node in the cluster)
+    my $mappings = eval { $api->mapping_list(volume_id => $id, %opts) } // [];
+    foreach my $map (@$mappings) {
+        eval {
+            if (defined $map->{host_group_id} && length $map->{host_group_id}) {
+                $api->volume_detach($id, host_group_id => $map->{host_group_id}, %opts);
+            } elsif (defined $map->{host_id} && length $map->{host_id}) {
+                $api->volume_detach($id, host_id => $map->{host_id}, %opts);
+            }
+        };
+        if ($@) {
+            warn "Failed to detach volume '$name' from mapping: $@\n";
+        }
+    }
+
+    # 3. Delete the volume itself. Try with force if it fails (e.g. if snapshots exist)
+    eval {
+        $api->volume_delete($id, %opts);
+    };
+    if ($@) {
+        warn "Initial delete failed, retrying with force (ignoring snapshots)... $@\n";
+        eval { $api->volume_delete($id, %opts, force => 1); };
+        if ($@) {
+            die "Failed to delete volume '$name' from array: $@\n";
+        }
+    }
+
+    # 4. Clean up empty volume groups (only if no OTHER volumes are in it)
+    foreach my $vgid (@vg_ids) {
+        eval {
+            my $vginfo = $api->volume_group_get($vgid, %opts);
+            my $members = $vginfo->{volumes} // [];
+            my $has_others = 0;
+            
+            # Check if there are any volumes left EXCEPT the one we just deleted
+            foreach my $m (@$members) {
+                my $mid = ref($m) eq 'HASH' ? $m->{id} : $m;
+                if (defined $mid && $mid ne $id) {
+                    $has_others = 1;
+                    last;
+                }
+            }
+            
+            if (!$has_others) {
+                warn "Deleting empty volume group '$vgid'\n";
+                $api->volume_group_delete($vgid, %opts);
+            }
+        };
+        if ($@) {
+            warn "Volume '$name' was deleted, but empty volume group '$vgid' could not be deleted: $@\n";
+        }
+    }
+
+    return 1;
 }
 
 sub _array_resize_volume {
