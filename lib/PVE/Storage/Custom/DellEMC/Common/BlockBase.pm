@@ -2680,7 +2680,9 @@ sub volume_snapshot {
                 };
                 if ($@) {
                     warn "Async VM config backup failed: $@\n";
-                }
+                }else{
+                    warn "VM config backup OK";
+				}
                 
                 # CRITICAL: Use POSIX::_exit so no DESTROY blocks are called,
                 # which would log out the parent's shared REST session!
