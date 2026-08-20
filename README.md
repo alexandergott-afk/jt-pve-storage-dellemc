@@ -299,6 +299,13 @@ pvesm add dellpowerstore ps1 \
 Add `--pstore-appliance` on a multi-appliance cluster, `--pstore-volume-group`
 to keep every volume in one group, and `--dell-protocol fc` for Fibre Channel.
 
+#### Automatic Volume Group management
+If `--pstore-volume-group` is not specified, the plugin automatically creates and manages a dedicated PowerStore Volume Group for **each individual VM**.
+
+ - **Naming Convention**: The group is named `<cluster-name>-<storage-id>-<vmid>` (e.g., `pvecluster-ps1-102`).
+ - **Lifecycle**: When a VM's first disk is created, the corresponding volume group is created on the array. When a disk is deleted, it is removed from the group. If the deleted disk was the last remaining disk in that volume group, the plugin automatically deletes the empty volume group to keep the array tidy.
+ - **Benefits**: This ensures that array-side features like consistent snapshots and protection policies can be applied per-VM without manual intervention. Volumes are also safely detached from hosts and removed from their groups before deletion to prevent array state conflicts (HTTP 422).
+
 ### PowerVault ME4 / ME5
 
 ```bash
