@@ -40,7 +40,7 @@ use constant {
 
     # PowerStore rejects volumes smaller than 1 MiB.
     MIN_VOLUME_SIZE => 1024 * 1024,
-    
+
     # The developers guide documents the pagination limit as 1 to 2000, 100
     # by default, and answers 206 Partial Content with a Content-Range header
     # when the collection is larger. 200 keeps a poll's response small while
@@ -332,7 +332,7 @@ sub _warn_wildcard {
 # response small and stable; PowerStore returns a large object otherwise.
 sub _volume_select {
     return 'id,name,size,wwn,type,state,appliance_id,creation_timestamp,'
-         . 'protection_data,logical_used';
+         . 'protection_data,logical_used,volume_groups';
 }
 
 # ---------------------------------------------------------------------------
@@ -510,7 +510,7 @@ sub volume_group_get {
         "/volume_group/$id",
         {
             select => 'id,name,description,is_write_order_consistent,'
-                    . 'protection_policy_id,volume_ids',
+                    . 'protection_policy_id,volumes',
         },
         %opts,
     );
@@ -524,7 +524,7 @@ sub volume_group_get_by_name {
         {
             name   => "eq.$name",
             select => 'id,name,description,is_write_order_consistent,'
-                    . 'protection_policy_id,volume_ids',
+                    . 'protection_policy_id,volumes',
         },
         %opts,
     );
@@ -567,35 +567,14 @@ sub volume_group_get_or_create {
         && defined $existing->{id}
         && length $existing->{id};
 
-    my $id = eval {
-        $self->volume_group_create($name, %opts);
-    };
-
-    return $id
-        if defined $id && length $id;
-
-    my $create_error = $@;
-
-    # Another PVE worker or cluster node may have created the same per-VM
-    # volume group after the initial lookup.
-    $existing = eval {
-        $self->volume_group_get_by_name($name, %opts);
-    };
-
-    return $existing->{id}
-        if ref($existing) eq 'HASH'
-        && defined $existing->{id}
-        && length $existing->{id};
-
-    die $create_error
-        if defined $create_error && length $create_error;
+    my $id = $self->volume_group_create($name, %opts);
 
     die $self->_msg(
-        "PowerStore created volume group '$name' but returned no id and the"
-      . " group was not visible in a follow-up lookup"
-    ) . "\n";
-}
+        "PowerStore created volume group '$name' but returned no id"
+    ) . "\n" unless defined $id && length $id;
 
+    return $id;
+}
 
 sub volume_group_add_members {
     my ($self, $group_id, $volume_ids, %opts) = @_;
@@ -659,7 +638,7 @@ sub align_size {
     # PowerStore rejects volumes smaller than 1 MiB. This is hit by
     # Proxmox efidisk0 volumes, which may be only 540672 bytes.
     $bytes = MIN_VOLUME_SIZE if $bytes < MIN_VOLUME_SIZE;
-    
+
     my $granularity = SIZE_GRANULARITY;
     my $remainder = $bytes % $granularity;
 
