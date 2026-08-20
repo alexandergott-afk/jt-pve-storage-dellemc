@@ -2658,8 +2658,38 @@ sub volume_snapshot {
     if ($class->_config_backup_enabled($scfg)
         && $volname =~ /^(?:vm|base)-(\d+)-disk-\d+\z/) {
         my $vmid = $1;
-        eval { $class->_backup_vm_config($scfg, $storeid, $vmid, $snap) };
-        warn "VM config backup failed (not fatal): $@" if $@;
+        
+        # Run the config backup asynchronously in a background process.
+        # We use a raw fork() because PVE::Tools::run_fork blocks the parent
+        # via waitpid, which would freeze the VM until the backup is done.
+        {
+            # Prevent zombie processes: the parent will not wait(),
+            # so the kernel reaps the child automatically when it exits.
+            local $SIG{CHLD} = 'IGNORE';
+            
+            my $pid = fork();
+            
+            if (!defined $pid) {
+                warn "Failed to fork for VM config backup: $!\n";
+            } elsif ($pid == 0) {
+                # CHILD PROCESS
+                # Build a fresh API client for this short-lived process,
+                # so we don't accidentally destroy the parent's REST session.
+                eval {
+                    $class->_backup_vm_config($scfg, $storeid, $vmid, $snap);
+                };
+                if ($@) {
+                    warn "Async VM config backup failed: $@\n";
+                }
+                
+                # CRITICAL: Use POSIX::_exit so no DESTROY blocks are called,
+                # which would log out the parent's shared REST session!
+                POSIX::_exit(0);
+            }
+            
+            # PARENT PROCESS
+            # Returns immediately without waiting. The VM is thawed instantly.
+        }
     }
 
     return 1;
